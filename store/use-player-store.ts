@@ -18,7 +18,7 @@ interface PlayerStore extends PlayerProfile {
 export const usePlayerStore = create<PlayerStore>()(
   persist(
     (set, get) => ({
-      totalPoints: 0,
+      totalPoints: 100,   // welcome gift so the store works on first launch
       spentPoints: 0,
       streak: 0,
       lastActiveDay: '',
