@@ -69,7 +69,7 @@ export default function TasksScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="title">Today's Tasks</ThemedText>
+        <ThemedText type="title">Today&apos;s Tasks</ThemedText>
         <View style={styles.subrow}>
           <ThemedText style={styles.count}>
             {completedIds.size}/{PRESET_TASKS.length} done

@@ -6,7 +6,10 @@
       "Bash(git config *)",
       "Bash(npm install *)",
       "Bash(git commit *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npx expo *)"
     ]
   }
 }
