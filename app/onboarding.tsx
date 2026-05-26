@@ -1,17 +1,177 @@
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Dimensions,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { usePlayerStore } from '@/store/use-player-store';
 
+const { width: W } = Dimensions.get('window');
+const TOTAL_SLIDES = 3;
+
+// ─── How-it-works content ────────────────────────────────────────────────────
+
+const HOW_STEPS = [
+  {
+    emoji: '🧹',
+    title: 'Log a cleaning task',
+    body: 'Pick from presets whenever you tidy up. Every task earns you points.',
+  },
+  {
+    emoji: '⭐',
+    title: 'Spend in the store',
+    body: 'Buy snacks, toys, and potions to keep your monster happy and fed.',
+  },
+  {
+    emoji: '🌱',
+    title: 'Keep your space going',
+    body: 'Clean consistently and your monster thrives. Miss a day? No shame — just keep going.',
+  },
+];
+
+// ─── Slide 0 — Welcome ───────────────────────────────────────────────────────
+
+function WelcomeSlide({ onNext }: { onNext: () => void }) {
+  return (
+    <View style={[s.slide, { width: W }]}>
+      <View style={s.slideBody}>
+        <Text style={s.appTitle}>Mess{'\n'}Monster</Text>
+        <Text style={s.tagline}>
+          Your mess is your{'\n'}monster&apos;s fuel.
+        </Text>
+        <Text style={s.caption}>
+          A tiny creature lives in your phone.{'\n'}
+          The cleaner your space, the happier it gets.
+        </Text>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [s.btn, { opacity: pressed ? 0.72 : 1 }]}
+        onPress={onNext}
+      >
+        <Text style={s.btnText}>Let&apos;s go  →</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Slide 1 — How it works ──────────────────────────────────────────────────
+
+function HowSlide({ onNext }: { onNext: () => void }) {
+  return (
+    <View style={[s.slide, { width: W }]}>
+      <View style={s.slideBody}>
+        <Text style={s.slideHeading}>How it works</Text>
+
+        <View style={how.list}>
+          {HOW_STEPS.map((step, i) => (
+            <View key={i} style={how.row}>
+              <Text style={how.emoji}>{step.emoji}</Text>
+              <View style={how.text}>
+                <Text style={how.title}>{step.title}</Text>
+                <Text style={how.desc}>{step.body}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <Text style={s.note}>
+          Low pressure. Zero shame.{'\n'}
+          Pick back up whenever you&apos;re ready. 🫶
+        </Text>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [s.btn, { opacity: pressed ? 0.72 : 1 }]}
+        onPress={onNext}
+      >
+        <Text style={s.btnText}>Got it  →</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Slide 2 — Choose your monster ───────────────────────────────────────────
+
+function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna') => void }) {
+  return (
+    <View style={[s.slide, { width: W }]}>
+      <View style={s.slideBody}>
+        <Text style={s.slideHeading}>Choose your{'\n'}monster</Text>
+
+        <View style={pick.row}>
+          {/* ── Nilly ── */}
+          <Pressable
+            style={({ pressed }) => [pick.card, pick.nillyCard, pressed && pick.cardPressed]}
+            onPress={() => onChoose('nilly')}
+            accessibilityRole="button"
+            accessibilityLabel="Choose Nilly"
+          >
+            <Image
+              source={require('../assets/images/nilly.png')}
+              style={pick.img}
+              resizeMode="contain"
+            />
+            <Text style={[pick.name, { color: '#1a5c3a' }]}>Nilly</Text>
+            <Text style={[pick.tagline, { color: '#52b788' }]}>kawaii & clean</Text>
+            <View style={[pick.pill, { backgroundColor: '#52b788' }]}>
+              <Text style={pick.pillText}>Choose</Text>
+            </View>
+          </Pressable>
+
+          {/* ── Luna ── */}
+          <Pressable
+            style={({ pressed }) => [pick.card, pick.lunaCard, pressed && pick.cardPressed]}
+            onPress={() => onChoose('luna')}
+            accessibilityRole="button"
+            accessibilityLabel="Choose Luna"
+          >
+            <Image
+              source={require('../assets/images/luna.png')}
+              style={pick.img}
+              resizeMode="contain"
+            />
+            <Text style={[pick.name, { color: '#cc2222' }]}>Luna</Text>
+            <Text style={[pick.tagline, { color: '#a78bfa' }]}>dark & witchy</Text>
+            <View style={[pick.pill, { backgroundColor: '#cc2222' }]}>
+              <Text style={pick.pillText}>Choose</Text>
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Progress dots ───────────────────────────────────────────────────────────
+
+function ProgressDots({ total, active }: { total: number; active: number }) {
+  return (
+    <View style={dots.row}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View key={i} style={[dots.dot, i === active && dots.activeDot]} />
+      ))}
+    </View>
+  );
+}
+
+// ─── Root screen ─────────────────────────────────────────────────────────────
+
 export default function OnboardingScreen() {
-  const router = useRouter();
+  const router        = useRouter();
   const selectMonster = usePlayerStore((s) => s.selectMonster);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster);
-  const [hydrated, setHydrated] = useState(
-    () => usePlayerStore.persist.hasHydrated()
-  );
+  const [hydrated, setHydrated] = useState(() => usePlayerStore.persist.hasHydrated());
+  const [page, setPage]         = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (hydrated) return;
@@ -19,10 +179,14 @@ export default function OnboardingScreen() {
   }, [hydrated]);
 
   if (!hydrated) return null;
+  if (selectedMonster) return <Redirect href="/(tabs)" />;
 
-  if (selectedMonster) {
-    return <Redirect href="/(tabs)" />;
-  }
+  const goTo = (i: number) => {
+    setPage(i);
+    scrollRef.current?.scrollTo({ x: i * W, animated: true });
+  };
+
+  const goNext = () => goTo(Math.min(page + 1, TOTAL_SLIDES - 1));
 
   const choose = (monster: 'nilly' | 'luna') => {
     selectMonster(monster);
@@ -30,160 +194,222 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={s.root}>
       <StatusBar style="light" />
 
-      <View style={styles.split}>
-        {/* Nilly — left half */}
-        <TouchableOpacity
-          style={[styles.half, styles.nillyHalf]}
-          onPress={() => choose('nilly')}
-          activeOpacity={0.82}
-        >
-          <View style={[styles.placeholder, styles.nillyPlaceholder]}>
-            <Text style={styles.placeholderEmoji}>🌿</Text>
-          </View>
-          <Text style={styles.nillyName}>Nilly</Text>
-          <Text style={styles.nillyTagline}>kawaii & clean</Text>
-          <View style={[styles.pill, styles.nillyPill]}>
-            <Text style={styles.pillText}>Tap to choose</Text>
-          </View>
-        </TouchableOpacity>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ width: W * TOTAL_SLIDES }}
+      >
+        <WelcomeSlide onNext={goNext} />
+        <HowSlide    onNext={goNext} />
+        <ChooseSlide onChoose={choose} />
+      </ScrollView>
 
-        <View style={styles.divider} />
-
-        {/* Luna — right half */}
-        <TouchableOpacity
-          style={[styles.half, styles.lunaHalf]}
-          onPress={() => choose('luna')}
-          activeOpacity={0.82}
-        >
-          <View style={[styles.placeholder, styles.lunaPlaceholder]}>
-            <Text style={styles.placeholderEmoji}>🦇</Text>
-          </View>
-          <Text style={styles.lunaName}>Luna</Text>
-          <Text style={styles.lunaTagline}>dark & witchy</Text>
-          <View style={[styles.pill, styles.lunaPill]}>
-            <Text style={styles.pillText}>Tap to choose</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Title overlay — sits on top of the split */}
-      <View style={styles.titleBar} pointerEvents="none">
-        <Text style={styles.titleText}>Choose your{'\n'}Monster!</Text>
+      <View style={s.dotsArea}>
+        <ProgressDots total={TOTAL_SLIDES} active={page} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Shared slide styles ─────────────────────────────────────────────────────
+
+const SLIDE_PT = Platform.OS === 'android' ? 52 : 68;
+
+const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  split: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  half: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 120,
-    paddingBottom: 60,
-    gap: 10,
-  },
-  nillyHalf: {
-    backgroundColor: '#b8f5c8',
-  },
-  lunaHalf: {
     backgroundColor: '#0d0118',
   },
-  divider: {
-    width: 3,
-    backgroundColor: '#000',
+
+  // Each slide fills the width; content is top-aligned with flex
+  slide: {
+    flex: 1,
+    backgroundColor: '#0d0118',
+    paddingTop: SLIDE_PT,
+    paddingHorizontal: 28,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
   },
-  placeholder: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    alignItems: 'center',
+  slideBody: {
+    flex: 1,
     justifyContent: 'center',
-    marginBottom: 6,
   },
-  nillyPlaceholder: {
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    borderWidth: 3,
-    borderColor: '#52b788',
+
+  // Slide 0 – hero type
+  appTitle: {
+    fontSize: 72,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -1,
+    lineHeight: 76,
+    marginBottom: 24,
   },
-  lunaPlaceholder: {
-    backgroundColor: 'rgba(150,0,0,0.2)',
-    borderWidth: 3,
-    borderColor: '#cc2222',
+  tagline: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 34,
+    marginBottom: 18,
   },
-  placeholderEmoji: {
-    fontSize: 68,
+  caption: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 24,
   },
-  nillyName: {
-    fontSize: 32,
+
+  // Slide 1 & 2 – section heading
+  slideHeading: {
+    fontSize: 38,
     fontWeight: '800',
-    color: '#1a5c3a',
-    letterSpacing: 1,
+    color: '#ffffff',
+    letterSpacing: 0.2,
+    lineHeight: 46,
+    marginBottom: 32,
   },
-  lunaName: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#cc2222',
-    letterSpacing: 1,
-  },
-  nillyTagline: {
-    fontSize: 13,
-    color: '#52b788',
+
+  // Shared note / disclaimer
+  note: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 28,
     fontStyle: 'italic',
   },
-  lunaTagline: {
-    fontSize: 13,
-    color: '#a78bfa',
+
+  // CTA button — white pill at the bottom of every slide
+  btn: {
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  btnText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0d0118',
+    letterSpacing: 0.3,
+  },
+
+  // Dots bar
+  dotsArea: {
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    alignItems: 'center',
+  },
+});
+
+// ─── How-it-works styles ─────────────────────────────────────────────────────
+
+const how = StyleSheet.create({
+  list: {
+    gap: 20,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  emoji: {
+    fontSize: 32,
+    lineHeight: 40,
+    width: 40,
+    textAlign: 'center',
+  },
+  text: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  desc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 20,
+  },
+});
+
+// ─── Monster-pick styles ─────────────────────────────────────────────────────
+
+const CARD_W = (W - 28 * 2 - 12) / 2; // two cards with gap, respecting horizontal padding
+
+const pick = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  card: {
+    width: CARD_W,
+    borderRadius: 24,
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  nillyCard: {
+    backgroundColor: '#c8f7da',
+  },
+  lunaCard: {
+    backgroundColor: '#1a0a2a',
+    borderWidth: 1,
+    borderColor: '#3a1a4a',
+  },
+  cardPressed: {
+    opacity: 0.78,
+  },
+  img: {
+    width: CARD_W - 32,
+    height: CARD_W - 32,
+    marginBottom: 4,
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  tagline: {
+    fontSize: 12,
     fontStyle: 'italic',
   },
   pill: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 999,
     marginTop: 6,
-  },
-  nillyPill: {
-    backgroundColor: '#52b788',
-  },
-  lunaPill: {
-    backgroundColor: '#cc2222',
   },
   pillText: {
     color: '#fff',
-    fontWeight: '600',
     fontSize: 13,
+    fontWeight: '700',
   },
-  titleBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: Platform.OS === 'android' ? 44 : 60,
-    paddingBottom: 18,
+});
+
+// ─── Progress-dot styles ─────────────────────────────────────────────────────
+
+const dots = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.58)',
-    zIndex: 10,
   },
-  titleText: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-    lineHeight: 36,
-    textShadowColor: 'rgba(0,0,0,0.9)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  activeDot: {
+    backgroundColor: '#ffffff',
+    width: 20,
+    borderRadius: 4,
   },
 });
