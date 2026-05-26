@@ -3,16 +3,21 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { DEFAULT_PALETTE, LUNA_PALETTE, NILLY_PALETTE } from '@/monster-theme';
+import { usePlayerStore } from '@/store/use-player-store';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const selectedMonster = usePlayerStore((s) => s.selectedMonster);
+
+  const tabTint =
+    selectedMonster === 'luna'  ? LUNA_PALETTE.tabTint :
+    selectedMonster === 'nilly' ? NILLY_PALETTE.tabTint :
+    DEFAULT_PALETTE.tabTint;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: tabTint,
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
