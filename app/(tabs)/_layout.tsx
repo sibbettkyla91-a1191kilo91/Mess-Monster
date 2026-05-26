@@ -6,13 +6,20 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEFAULT_PALETTE, LUNA_PALETTE, NILLY_PALETTE } from '@/monster-theme';
 import { usePlayerStore } from '@/store/use-player-store';
 
+/** Cheapest item in the store (Party Hat). Badge hides below this. */
+const MIN_STORE_ITEM_COST = 20;
+
 export default function TabLayout() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster);
+  const availablePoints = usePlayerStore((s) => s.availablePoints());
 
   const tabTint =
     selectedMonster === 'luna'  ? LUNA_PALETTE.tabTint :
     selectedMonster === 'nilly' ? NILLY_PALETTE.tabTint :
     DEFAULT_PALETTE.tabTint;
+
+  // Empty-string badge renders as a coloured dot; undefined hides it entirely
+  const storeBadge = availablePoints >= MIN_STORE_ITEM_COST ? ('' as const) : undefined;
 
   return (
     <Tabs
@@ -40,6 +47,8 @@ export default function TabLayout() {
         options={{
           title: 'Store',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="bag.fill" color={color} />,
+          tabBarBadge: storeBadge,
+          tabBarBadgeStyle: { backgroundColor: tabTint },
         }}
       />
     </Tabs>
