@@ -3,10 +3,10 @@ import {
   Animated,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { usePetStore } from '@/store/use-pet-store';
@@ -49,7 +49,7 @@ const THEMES = {
     subtext:         '#6b7c75',
     pillText:        '#ffffff',
     cardBg:          '#ffffff',
-    cardBorder:      '#c8ecd8',
+    cardBorder:      'rgba(82,183,136,0.22)',
     disabledCardBg:  '#f1f3f2',
     disabledText:    '#b4bcb8',
     toastBg:         '#2d3436',
@@ -64,7 +64,7 @@ const THEMES = {
     subtext:         '#9986a0',
     pillText:        '#f0e6d3',
     cardBg:          '#24243e',
-    cardBorder:      '#3a2a4e',
+    cardBorder:      'rgba(255,255,255,0.09)',
     disabledCardBg:  '#1e1e32',
     disabledText:    '#50506a',
     toastBg:         '#f0e6d3',
@@ -72,7 +72,7 @@ const THEMES = {
   },
 } as const;
 
-type Theme = typeof THEMES.nilly;
+type Theme = (typeof THEMES)[keyof typeof THEMES];
 
 // ─── Toast hook ───────────────────────────────────────────────────────────────
 
@@ -316,8 +316,8 @@ const styles = StyleSheet.create({
   // Card
   card: {
     flex: 1,
-    borderRadius: 18,
-    borderWidth: 1.5,
+    borderRadius: 20,
+    borderWidth: 1,
     padding: 16,
     gap: 5,
     shadowColor: '#000',
