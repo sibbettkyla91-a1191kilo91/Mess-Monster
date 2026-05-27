@@ -1,7 +1,9 @@
 name: Generate package-lock.json
 
 on:
-  workflow_dispatch
+  push:
+      paths:
+            - 'package.json'
 
   jobs:
     generate-lock:
