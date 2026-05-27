@@ -9,7 +9,10 @@
       "PowerShell(git *)",
       "Bash(Get-ChildItem -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(npx expo *)"
+      "Bash(npx expo *)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)"
     ]
   }
 }
