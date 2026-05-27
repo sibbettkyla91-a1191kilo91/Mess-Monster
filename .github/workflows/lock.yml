@@ -1,0 +1,21 @@
+name: Regenerate Lock File
+on: push
+jobs:
+  lock:
+      runs-on: ubuntu-latest
+          permissions:
+                contents: write
+                    steps:
+                          - uses: actions/checkout@v4
+                                - uses: actions/setup-node@v4
+                                        with:
+                                                  node-version: 22
+                                                        - run: npm install
+                                                              - run: |
+                                                                        git config user.name "GitHub Actions"
+                                                                                  git config user.email "actions@github.com"
+                                                                                            if git status --porcelain | grep -q package-lock.json; then
+                                                                                                        git add package-lock.json
+                                                                                                                    git commit -m "chore: Regenerate package-lock.json"
+                                                                                                                                git push
+                                                                                                                                          fi
