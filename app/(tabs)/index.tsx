@@ -202,8 +202,9 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const lastCaredAt     = usePetStore((s) => s.lastCaredAt);
-  const mood            = deriveMood(lastCaredAt);
+  const health          = usePetStore((s) => s.health);
+  const happiness       = usePetStore((s) => s.happiness);
+  const mood            = deriveMood(health, happiness);
   const availablePoints = usePlayerStore((s) => s.availablePoints());
   const streak          = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? 'nilly';

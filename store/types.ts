@@ -16,7 +16,10 @@ export interface CleaningTask {
 }
 
 export interface PetState {
-  lastCaredAt: number; // unix ms — mood is derived from this, never stored
+  health: number;        // 0–100
+  happiness: number;     // 0–100
+  lastCaredAt: number;   // unix ms — last care action
+  lastSessionAt: number; // unix ms — when applyDecay last ran; used to calculate offline drift
 }
 
 export interface PlayerProfile {
