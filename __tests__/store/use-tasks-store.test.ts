@@ -1,3 +1,4 @@
+import { getDailyRoll, PRESET_TASKS } from '@/store/preset-tasks';
 import { useTasksStore } from '@/store/use-tasks-store';
 import { CleaningTask } from '@/store/types';
 
@@ -17,7 +18,11 @@ const makeTask = (overrides: Partial<CleaningTask> = {}): CleaningTask => ({
 });
 
 beforeEach(() => {
-  useTasksStore.setState({ tasks: [] });
+  useTasksStore.setState({
+    tasks: [],
+    dailyRoll: getDailyRoll(new Date().toISOString().slice(0, 10)),
+    dailyRollDate: new Date().toISOString().slice(0, 10),
+  });
 });
 
 // ─── addTask ──────────────────────────────────────────────────────────────────
@@ -97,5 +102,75 @@ describe('clearHistory', () => {
   it('is safe to call on an already-empty list', () => {
     expect(() => useTasksStore.getState().clearHistory()).not.toThrow();
     expect(useTasksStore.getState().tasks).toHaveLength(0);
+  });
+});
+
+// ─── getDailyRoll (pure function) ─────────────────────────────────────────────
+
+describe('getDailyRoll', () => {
+  it('returns exactly 6 tasks', () => {
+    expect(getDailyRoll('2026-05-27')).toHaveLength(6);
+  });
+
+  it('is deterministic — same date always produces same roll', () => {
+    const a = getDailyRoll('2026-05-27');
+    const b = getDailyRoll('2026-05-27');
+    expect(a.map((t) => t.id)).toEqual(b.map((t) => t.id));
+  });
+
+  it('produces different rolls on different dates', () => {
+    const a = getDailyRoll('2026-05-27');
+    const b = getDailyRoll('2026-05-28');
+    expect(a.map((t) => t.id)).not.toEqual(b.map((t) => t.id));
+  });
+
+  it('covers at least 4 distinct categories', () => {
+    const roll = getDailyRoll('2026-05-27');
+    const categories = new Set(roll.map((t) => t.category));
+    expect(categories.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('never returns duplicate tasks in the same roll', () => {
+    const roll = getDailyRoll('2026-05-27');
+    const ids = roll.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('only returns tasks from the provided pool', () => {
+    const roll = getDailyRoll('2026-05-27', PRESET_TASKS);
+    const poolIds = new Set(PRESET_TASKS.map((t) => t.id));
+    roll.forEach((t) => expect(poolIds.has(t.id)).toBe(true));
+  });
+
+  it('respects a custom count', () => {
+    expect(getDailyRoll('2026-05-27', PRESET_TASKS, 3)).toHaveLength(3);
+  });
+});
+
+// ─── dailyRoll store state ────────────────────────────────────────────────────
+
+describe('dailyRoll store state', () => {
+  it('initialises with exactly 6 tasks', () => {
+    expect(useTasksStore.getState().dailyRoll).toHaveLength(6);
+  });
+
+  it('initialises dailyRollDate to today', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect(useTasksStore.getState().dailyRollDate).toBe(today);
+  });
+
+  it('refreshDailyRoll is a no-op when the date has not changed', () => {
+    const before = useTasksStore.getState().dailyRoll.map((t) => t.id);
+    useTasksStore.getState().refreshDailyRoll();
+    const after = useTasksStore.getState().dailyRoll.map((t) => t.id);
+    expect(after).toEqual(before);
+  });
+
+  it('refreshDailyRoll recomputes when dailyRollDate is stale', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    useTasksStore.setState({ dailyRollDate: '2020-01-01', dailyRoll: [] });
+    useTasksStore.getState().refreshDailyRoll();
+    expect(useTasksStore.getState().dailyRollDate).toBe(today);
+    expect(useTasksStore.getState().dailyRoll).toHaveLength(6);
   });
 });

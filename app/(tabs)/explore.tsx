@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -26,29 +26,10 @@ import { usePetStore } from '@/store/use-pet-store';
 import { usePlayerStore } from '@/store/use-player-store';
 import { usePhotoStore } from '@/store/use-photo-store';
 import { useStoreStore } from '@/store/use-store-store';
+import { PresetTask } from '@/store/preset-tasks';
 import { useTasksStore } from '@/store/use-tasks-store';
 import { STORE_ITEMS } from '@/store/store-items';
 import { TaskCategory } from '@/store/types';
-
-interface PresetTask {
-  id: string;
-  label: string;
-  category: TaskCategory;
-  pointValue: number;
-}
-
-const PRESET_TASKS: PresetTask[] = [
-  { id: 'wash-dishes',    label: 'Wash the dishes',    category: 'kitchen',     pointValue: 20 },
-  { id: 'wipe-counters',  label: 'Wipe down counters', category: 'kitchen',     pointValue: 15 },
-  { id: 'clean-stovetop', label: 'Clean the stovetop', category: 'kitchen',     pointValue: 30 },
-  { id: 'scrub-toilet',   label: 'Scrub the toilet',   category: 'bathroom',    pointValue: 40 },
-  { id: 'wipe-sink',      label: 'Wipe sink & mirror', category: 'bathroom',    pointValue: 20 },
-  { id: 'make-bed',       label: 'Make the bed',       category: 'bedroom',     pointValue: 10 },
-  { id: 'tidy-floor',     label: 'Tidy the floor',     category: 'bedroom',     pointValue: 15 },
-  { id: 'vacuum',         label: 'Vacuum the floor',   category: 'living_room', pointValue: 30 },
-  { id: 'dust-surfaces',  label: 'Dust surfaces',      category: 'living_room', pointValue: 20 },
-  { id: 'take-out-trash', label: 'Take out the trash', category: 'trash',       pointValue: 15 },
-];
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
   kitchen:     '\ud83c\udf73',
@@ -78,6 +59,8 @@ interface TaskProgress {
 
 export default function TasksScreen() {
   const addTask = useTasksStore((s) => s.addTask);
+  const dailyRoll = useTasksStore((s) => s.dailyRoll);
+  const refreshDailyRoll = useTasksStore((s) => s.refreshDailyRoll);
   const earnPoints = usePlayerStore((s) => s.earnPoints);
   const recordActivity = usePlayerStore((s) => s.recordActivity);
   const care = usePetStore((s) => s.care);
@@ -96,6 +79,9 @@ export default function TasksScreen() {
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDark = scheme === 'dark';
+
+  // Refresh the roll when the screen mounts in case the date ticked over
+  useEffect(() => { refreshDailyRoll(); }, [refreshDailyRoll]);
 
   const getProgress = (taskId: string): TaskProgress => {
     return taskProgress[taskId] ?? { state: 'idle', hasPhoto: false };
@@ -218,7 +204,7 @@ export default function TasksScreen() {
         <ThemedText type="title">{"Today\u2019s Tasks"}</ThemedText>
         <View style={styles.subrow}>
           <ThemedText style={styles.count}>
-            {completedCount}/{PRESET_TASKS.length} done
+            {completedCount}/{dailyRoll.length} done
           </ThemedText>
           {celebration && (
             <View style={[styles.celebrationPill, { backgroundColor: isDark ? accentDark : accentLight }]}>
@@ -231,7 +217,7 @@ export default function TasksScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {PRESET_TASKS.map((task) => {
+        {dailyRoll.map((task) => {
           const progress = getProgress(task.id);
           const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
 
