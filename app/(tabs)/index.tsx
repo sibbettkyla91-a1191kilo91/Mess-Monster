@@ -30,6 +30,7 @@ const THEMES = {
     radialColor:    'rgba(155,230,195,0.18)',
     glowColor:      'rgba(82,183,136,0.13)',
     particleColor:  '#3aab6f',
+    barTrack:       'rgba(0,0,0,0.10)',
   },
   luna: {
     background:     '#1a1a2e',
@@ -41,6 +42,7 @@ const THEMES = {
     radialColor:    'rgba(60,20,80,0.22)',
     glowColor:      'rgba(90,35,160,0.16)',
     particleColor:  '#d8c0ff',
+    barTrack:       'rgba(255,255,255,0.12)',
   },
 } as const;
 
@@ -199,6 +201,60 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
   );
 }
 
+// ─── StatBar ─────────────────────────────────────────────────────────────────
+
+function StatBar({
+  icon,
+  label,
+  value,
+  color,
+  trackColor,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+  color: string;
+  trackColor: string;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: value,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+  }, [value, anim]);
+
+  const widthPct = anim.interpolate({
+    inputRange:  [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={barStyles.row}>
+      <View style={barStyles.labelRow}>
+        <Text style={barStyles.icon}>{icon}</Text>
+        <Text style={[barStyles.label, { color }]}>{label}</Text>
+        <Text style={[barStyles.value, { color }]}>{Math.round(value)}</Text>
+      </View>
+      <View style={[barStyles.track, { backgroundColor: trackColor }]}>
+        <Animated.View style={[barStyles.fill, { width: widthPct, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+const barStyles = StyleSheet.create({
+  row:      { gap: 5 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  icon:     { fontSize: 13 },
+  label:    { flex: 1, fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
+  value:    { fontSize: 13, fontWeight: '700', opacity: 0.75 },
+  track:    { height: 8, borderRadius: 4, overflow: 'hidden' },
+  fill:     { height: '100%', borderRadius: 4 },
+});
+
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -339,6 +395,12 @@ export default function HomeScreen() {
         {monster === 'nilly' ? 'Nilly' : 'Luna'}
       </ThemedText>
 
+      {/* ── Health & happiness bars ── */}
+      <View style={styles.statBars}>
+        <StatBar icon="❤️" label="Health"    value={health}    color={theme.accent}       trackColor={theme.barTrack} />
+        <StatBar icon="✨" label="Happiness" value={happiness} color={theme.particleColor} trackColor={theme.barTrack} />
+      </View>
+
       {/* ── Mood card ── */}
       <View
         style={[
@@ -383,7 +445,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Stat bar
+  // Health + happiness bars
+  statBars: {
+    width: '100%',
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  // Top stat bar (points + streak pills)
   statBar: {
     width: '100%',
     flexDirection: 'row',
