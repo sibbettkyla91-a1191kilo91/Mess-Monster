@@ -15,17 +15,22 @@ interface TaskTimerProps {
 export function TaskTimer({ totalSeconds, onComplete, active }: TaskTimerProps) {
   const [remaining, setRemaining] = useState(totalSeconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep a stable ref to onComplete so the timer never restarts just because
+  // the parent passed a new inline arrow function.
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const firedRef = useRef(false);
   const { accent } = useMonsterTheme();
 
   useEffect(() => {
     if (!active) return;
 
+    firedRef.current = false;
     setRemaining(totalSeconds);
     intervalRef.current = setInterval(() => {
       setRemaining((prev) => {
         if (prev <= 1) {
           if (intervalRef.current) clearInterval(intervalRef.current);
-          onComplete();
           return 0;
         }
         return prev - 1;
@@ -35,7 +40,16 @@ export function TaskTimer({ totalSeconds, onComplete, active }: TaskTimerProps) 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [active, totalSeconds, onComplete]);
+  }, [active, totalSeconds]); // onComplete intentionally omitted — we use onCompleteRef
+
+  // Call onComplete outside the state updater (pure updaters only) and guard
+  // against React Strict Mode's double-invocation of effects.
+  useEffect(() => {
+    if (remaining === 0 && active && !firedRef.current) {
+      firedRef.current = true;
+      onCompleteRef.current();
+    }
+  }, [remaining, active]);
 
   if (!active && remaining === totalSeconds) return null;
 
