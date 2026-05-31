@@ -13,6 +13,7 @@ interface PlayerStore extends PlayerProfile {
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
   recordActivity: () => void; // call after a task is logged to update streak
   selectMonster: (monster: 'nilly' | 'luna') => void;
+  setMonsterName: (name: string) => void;
 }
 
 export const usePlayerStore = create<PlayerStore>()(
@@ -23,6 +24,7 @@ export const usePlayerStore = create<PlayerStore>()(
       streak: 0,
       lastActiveDay: '',
       selectedMonster: null,
+      monsterName: '',
 
       availablePoints: () => get().totalPoints - get().spentPoints,
 
@@ -46,6 +48,7 @@ export const usePlayerStore = create<PlayerStore>()(
       },
 
       selectMonster: (monster) => set({ selectedMonster: monster }),
+      setMonsterName: (name) => set({ monsterName: name }),
     }),
     {
       name: 'mm-player',

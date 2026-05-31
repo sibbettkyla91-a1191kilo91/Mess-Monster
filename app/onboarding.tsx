@@ -9,9 +9,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
+import { randomMonsterName } from '@/store/name-randomizer';
 import { usePlayerStore } from '@/store/use-player-store';
 
 const { width: W } = Dimensions.get('window');
@@ -101,7 +103,15 @@ function HowSlide({ onNext }: { onNext: () => void }) {
 
 // ─── Slide 2 — Choose your monster ───────────────────────────────────────────
 
-function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna') => void }) {
+function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna', name: string) => void }) {
+  const [selected, setSelected] = useState<'nilly' | 'luna' | null>(null);
+  const [nameVal, setNameVal]   = useState('');
+
+  const handleSelect = (m: 'nilly' | 'luna') => {
+    setSelected(m);
+    setNameVal(randomMonsterName(m));
+  };
+
   return (
     <View style={[s.slide, { width: W }]}>
       <View style={s.slideBody}>
@@ -110,8 +120,12 @@ function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna') => void }) 
         <View style={pick.row}>
           {/* ── Nilly ── */}
           <Pressable
-            style={({ pressed }) => [pick.card, pick.nillyCard, pressed && pick.cardPressed]}
-            onPress={() => onChoose('nilly')}
+            style={({ pressed }) => [
+              pick.card, pick.nillyCard,
+              selected === 'nilly' && pick.cardSelected,
+              pressed && pick.cardPressed,
+            ]}
+            onPress={() => handleSelect('nilly')}
             accessibilityRole="button"
             accessibilityLabel="Choose Nilly"
           >
@@ -122,15 +136,16 @@ function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna') => void }) 
             />
             <Text style={[pick.name, { color: '#1a5c3a' }]}>Nilly</Text>
             <Text style={[pick.tagline, { color: '#52b788' }]}>kawaii & clean</Text>
-            <View style={[pick.pill, { backgroundColor: '#52b788' }]}>
-              <Text style={pick.pillText}>Choose</Text>
-            </View>
           </Pressable>
 
           {/* ── Luna ── */}
           <Pressable
-            style={({ pressed }) => [pick.card, pick.lunaCard, pressed && pick.cardPressed]}
-            onPress={() => onChoose('luna')}
+            style={({ pressed }) => [
+              pick.card, pick.lunaCard,
+              selected === 'luna' && pick.cardSelected,
+              pressed && pick.cardPressed,
+            ]}
+            onPress={() => handleSelect('luna')}
             accessibilityRole="button"
             accessibilityLabel="Choose Luna"
           >
@@ -141,12 +156,43 @@ function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna') => void }) 
             />
             <Text style={[pick.name, { color: '#cc2222' }]}>Luna</Text>
             <Text style={[pick.tagline, { color: '#a78bfa' }]}>dark & witchy</Text>
-            <View style={[pick.pill, { backgroundColor: '#cc2222' }]}>
-              <Text style={pick.pillText}>Choose</Text>
-            </View>
           </Pressable>
         </View>
+
+        {/* ── Name input — appears after monster is selected ── */}
+        {selected !== null && (
+          <View style={ni.container}>
+            <Text style={ni.label}>Name your monster</Text>
+            <View style={ni.row}>
+              <TextInput
+                value={nameVal}
+                onChangeText={setNameVal}
+                style={ni.input}
+                maxLength={20}
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                selectionColor="#ffffff"
+                autoCorrect={false}
+              />
+              <Pressable
+                style={({ pressed }) => [ni.diceBtn, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => setNameVal(randomMonsterName(selected))}
+                accessibilityLabel="Random name"
+              >
+                <Text style={ni.diceText}>🎲</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
+
+      {selected !== null && (
+        <Pressable
+          style={({ pressed }) => [s.btn, { opacity: pressed ? 0.72 : 1 }]}
+          onPress={() => onChoose(selected, nameVal.trim() || randomMonsterName(selected))}
+        >
+          <Text style={s.btnText}>Let&apos;s go  →</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -166,8 +212,9 @@ function ProgressDots({ total, active }: { total: number; active: number }) {
 // ─── Root screen ─────────────────────────────────────────────────────────────
 
 export default function OnboardingScreen() {
-  const router        = useRouter();
-  const selectMonster = usePlayerStore((s) => s.selectMonster);
+  const router          = useRouter();
+  const selectMonster   = usePlayerStore((s) => s.selectMonster);
+  const setMonsterName  = usePlayerStore((s) => s.setMonsterName);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster);
   const [hydrated, setHydrated] = useState(() => usePlayerStore.persist.hasHydrated());
   const [page, setPage]         = useState(0);
@@ -188,8 +235,9 @@ export default function OnboardingScreen() {
 
   const goNext = () => goTo(Math.min(page + 1, TOTAL_SLIDES - 1));
 
-  const choose = (monster: 'nilly' | 'luna') => {
+  const choose = (monster: 'nilly' | 'luna', name: string) => {
     selectMonster(monster);
+    setMonsterName(name);
     router.replace('/(tabs)');
   };
 
@@ -363,6 +411,10 @@ const pick = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3a1a4a',
   },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.55)',
+  },
   cardPressed: {
     opacity: 0.78,
   },
@@ -380,16 +432,50 @@ const pick = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
-  pill: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 999,
-    marginTop: 6,
+});
+
+// ─── Name-input styles ────────────────────────────────────────────────────────
+
+const ni = StyleSheet.create({
+  container: {
+    marginTop: 24,
+    gap: 8,
   },
-  pillText: {
-    color: '#fff',
+  label: {
     fontSize: 13,
-    fontWeight: '700',
+    color: 'rgba(255,255,255,0.45)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  diceBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diceText: {
+    fontSize: 22,
   },
 });
 

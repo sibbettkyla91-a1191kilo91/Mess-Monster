@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,8 +11,18 @@ import {
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
-import { deriveMood, usePetStore } from '@/store/use-pet-store';
+import { PetMood, deriveMood, usePetStore } from '@/store/use-pet-store';
 import { usePlayerStore } from '@/store/use-player-store';
+
+const STAGE_LABELS = ['Hatchling', 'Growing', 'Mature', 'Evolved ✨'] as const;
+
+const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
+  thriving: 'rgba(255,215,0,0.15)',
+  happy:    null,
+  neutral:  null,
+  sad:      'rgba(100,120,180,0.20)',
+  sick:     'rgba(80,180,80,0.25)',
+};
 
 // ─── Dimensions ──────────────────────────────────────────────────────────────
 
@@ -261,10 +272,12 @@ const barStyles = StyleSheet.create({
 export default function HomeScreen() {
   const health          = usePetStore((s) => s.health);
   const happiness       = usePetStore((s) => s.happiness);
+  const evolutionStage  = usePetStore((s) => s.evolutionStage);
   const mood            = deriveMood(health, happiness);
   const availablePoints = usePlayerStore((s) => s.availablePoints());
   const streak          = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? 'nilly';
+  const monsterName     = usePlayerStore((s) => s.monsterName);
   const router          = useRouter();
 
   const monster = selectedMonster === 'luna' ? 'luna' : 'nilly';
@@ -347,10 +360,53 @@ export default function HomeScreen() {
     return () => { active = false; clearTimeout(tid); scaleAnim.setValue(1); };
   }, [mood, scaleAnim]);
 
+  // ── Evolution scale pulse (slow continuous loop at stage 3) ──────────────
+  const evoScaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (evolutionStage < 3) { evoScaleAnim.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(evoScaleAnim, { toValue: 1.04, duration: 1800, useNativeDriver: true }),
+        Animated.timing(evoScaleAnim, { toValue: 1.00, duration: 1800, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => { loop.stop(); evoScaleAnim.setValue(1); };
+  }, [evolutionStage, evoScaleAnim]);
+
+  // ── Sick wobble (continuous slow oscillation when mood is sick) ──────────
+  const sickWobbleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (mood !== 'sick') { sickWobbleAnim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sickWobbleAnim, { toValue:  1, duration: 700, useNativeDriver: true }),
+        Animated.timing(sickWobbleAnim, { toValue: -1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => { loop.stop(); sickWobbleAnim.setValue(0); };
+  }, [mood, sickWobbleAnim]);
+
   const wiggleRot = wiggleAnim.interpolate({
     inputRange:  [-9, 0, 9],
     outputRange: ['-4.5deg', '0deg', '4.5deg'],
   });
+
+  const sickWobbleRot = sickWobbleAnim.interpolate({
+    inputRange:  [-1, 0, 1],
+    outputRange: ['-8deg', '0deg', '8deg'],
+  });
+
+  // Neutral mood: reduce opacity to 0.9. Stage 0 takes priority (0.7).
+  const wrapperOpacity = Math.min(
+    evolutionStage === 0 ? 0.7 : 1,
+    mood === 'neutral' ? 0.9 : 1,
+  );
+
+  const overlayColor = MOOD_OVERLAY_COLOR[mood];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -375,25 +431,59 @@ export default function HomeScreen() {
 
       {/* ── Animated monster ── */}
       <View style={styles.monsterArea}>
-        <Animated.Image
-          source={MONSTER_IMAGES[monster]}
+        <Animated.View
           style={[
-            styles.monsterImage,
+            styles.monsterImageWrapper,
+            { opacity: wrapperOpacity },
+            evolutionStage === 2 && {
+              shadowColor: theme.accent,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.45,
+              shadowRadius: 18,
+              elevation: 8,
+            },
+            evolutionStage === 3 && {
+              shadowColor: theme.accent,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.75,
+              shadowRadius: 30,
+              elevation: 14,
+            },
             {
               transform: [
                 { translateY: bobAnim },
                 { scale: scaleAnim },
+                { scale: evoScaleAnim },
                 { rotateZ: wiggleRot },
+                { rotateZ: sickWobbleRot },
               ],
             },
           ]}
-          resizeMode="contain"
-        />
+        >
+          <Image
+            source={MONSTER_IMAGES[monster]}
+            style={styles.monsterImage}
+            resizeMode="contain"
+          />
+          {overlayColor !== null && (
+            <View
+              pointerEvents="none"
+              style={[styles.moodOverlay, { backgroundColor: overlayColor }]}
+            />
+          )}
+        </Animated.View>
+      </View>
+
+      {/* ── Evolution stage label ── */}
+      <View style={[styles.stagePill, { backgroundColor: theme.accent + '33' }]}>
+        <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
+          {STAGE_LABELS[evolutionStage]}
+        </ThemedText>
       </View>
 
       {/* ── Monster name ── */}
       <ThemedText style={[styles.monsterName, { color: theme.text }]}>
-        {monster === 'nilly' ? 'Nilly' : 'Luna'}
+        {monsterName || (monster === 'nilly' ? 'Nilly' : 'Luna')}
       </ThemedText>
 
       {/* ── Health & happiness bars ── */}
@@ -478,9 +568,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
+  monsterImageWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   monsterImage: {
     width: IMAGE_SIZE,
     height: IMAGE_SIZE,
+  },
+  moodOverlay: {
+    position: 'absolute',
+    width: IMAGE_SIZE,
+    height: IMAGE_SIZE,
+    borderRadius: IMAGE_SIZE * 0.1,
+  },
+
+  // Evolution stage pill
+  stagePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 10,
+  },
+  stageLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
 
   // Name
