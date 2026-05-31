@@ -12,7 +12,11 @@
       "Bash(npx expo *)",
       "Bash(git push *)",
       "Bash(git remote *)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(git pull *)",
+      "Bash(npx tsc *)",
+      "Bash(node *)",
+      "Bash(Remove-Item \"stores\\\\monsterStore.ts\")"
     ]
   }
 }
