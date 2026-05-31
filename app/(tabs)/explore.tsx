@@ -64,6 +64,8 @@ export default function TasksScreen() {
   const earnPoints = usePlayerStore((s) => s.earnPoints);
   const recordActivity = usePlayerStore((s) => s.recordActivity);
   const care = usePetStore((s) => s.care);
+  const trackEarned = usePetStore((s) => s.trackEarned);
+  const checkStreakMilestones = usePetStore((s) => s.checkStreakMilestones);
   const addPhoto = usePhotoStore((s) => s.addPhoto);
   const buyItem = useStoreStore((s) => s.buyItem);
   const scheme = useColorScheme();
@@ -158,6 +160,7 @@ export default function TasksScreen() {
     // Log the task
     addTask({ ...task, completedAt: Date.now() });
     recordActivity();
+    checkStreakMilestones(); // streak already updated — reads post-increment value
     care();
 
     if (progress.hasPhoto) {
@@ -165,6 +168,7 @@ export default function TasksScreen() {
       const reward = rollReward();
       const totalPoints = Math.round(task.pointValue * reward.pointsMultiplier);
       earnPoints(totalPoints);
+      trackEarned(totalPoints);
 
       // Handle free item if applicable
       let freeItemName: string | undefined;
@@ -184,6 +188,7 @@ export default function TasksScreen() {
     } else {
       // No photo — base points only
       earnPoints(task.pointValue);
+      trackEarned(task.pointValue);
       showCelebration(`\u2728 +${task.pointValue} pts (snap a photo next time for bonuses!)`);
     }
 
@@ -192,7 +197,7 @@ export default function TasksScreen() {
       ...prev,
       [task.id]: { ...prev[task.id], state: 'completed' },
     }));
-  }, [taskProgress, addTask, recordActivity, care, earnPoints, buyItem, showCelebration]);
+  }, [taskProgress, addTask, recordActivity, care, checkStreakMilestones, earnPoints, trackEarned, buyItem, showCelebration]);
 
   const completedCount = Object.values(taskProgress).filter(
     (p) => p.state === 'completed'

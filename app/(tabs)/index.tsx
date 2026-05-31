@@ -270,10 +270,12 @@ const barStyles = StyleSheet.create({
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const health          = usePetStore((s) => s.health);
-  const happiness       = usePetStore((s) => s.happiness);
-  const evolutionStage  = usePetStore((s) => s.evolutionStage);
-  const mood            = deriveMood(health, happiness);
+  const health                  = usePetStore((s) => s.health);
+  const happiness               = usePetStore((s) => s.happiness);
+  const evolutionStage          = usePetStore((s) => s.evolutionStage);
+  const pendingMilestoneBanner  = usePetStore((s) => s.pendingMilestoneBanner);
+  const clearMilestoneBanner    = usePetStore((s) => s.clearMilestoneBanner);
+  const mood                    = deriveMood(health, happiness);
   const availablePoints = usePlayerStore((s) => s.availablePoints());
   const streak          = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? 'nilly';
@@ -374,6 +376,13 @@ export default function HomeScreen() {
     loop.start();
     return () => { loop.stop(); evoScaleAnim.setValue(1); };
   }, [evolutionStage, evoScaleAnim]);
+
+  // ── Milestone banner auto-dismiss ────────────────────────────────────────
+  useEffect(() => {
+    if (!pendingMilestoneBanner) return;
+    const t = setTimeout(clearMilestoneBanner, 3000);
+    return () => clearTimeout(t);
+  }, [pendingMilestoneBanner, clearMilestoneBanner]);
 
   // ── Sick wobble (continuous slow oscillation when mood is sick) ──────────
   const sickWobbleAnim = useRef(new Animated.Value(0)).current;
@@ -521,6 +530,20 @@ export default function HomeScreen() {
           Clean Something →
         </ThemedText>
       </Pressable>
+
+      {/* ── Streak milestone banner ── */}
+      {pendingMilestoneBanner !== null && (
+        <Pressable
+          style={[styles.milestoneBanner, { backgroundColor: theme.accent }]}
+          onPress={clearMilestoneBanner}
+          accessibilityRole="button"
+          accessibilityLabel={`${pendingMilestoneBanner}-day streak milestone`}
+        >
+          <ThemedText style={[styles.milestoneBannerText, { color: theme.pillText }]}>
+            🔥 {pendingMilestoneBanner}-day streak! +50 bonus points
+          </ThemedText>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -648,6 +671,28 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.4,
+  },
+
+  // Streak milestone banner — floats above everything
+  milestoneBanner: {
+    position: 'absolute',
+    bottom: 110, // above the tab bar
+    left: 24,
+    right: 24,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  milestoneBannerText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   // Habitat background layers

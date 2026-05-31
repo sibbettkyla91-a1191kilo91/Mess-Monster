@@ -2,8 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { PetState } from './types';
+import { usePlayerStore } from './use-player-store';
+
+const STREAK_MILESTONES = [3, 7, 14, 30];
 
 export type PetMood = 'thriving' | 'happy' | 'neutral' | 'sad' | 'sick';
+
+export function deriveEvolutionStage(totalPointsEarned: number): 0 | 1 | 2 | 3 {
+  if (totalPointsEarned >= 1200) return 3;
+  if (totalPointsEarned >= 600)  return 2;
+  if (totalPointsEarned >= 200)  return 1;
+  return 0;
+}
 
 const HEALTH_DECAY_RATE    = 1.5; // pts lost per hour
 const HAPPINESS_DECAY_RATE = 2.0; // pts lost per hour
@@ -28,15 +38,22 @@ export function deriveMood(health: number, happiness: number): PetMood {
 interface PetStore extends PetState {
   care: () => void;
   applyDecay: () => void;
+  trackEarned: (amount: number) => void;
+  checkStreakMilestones: () => void;
+  clearMilestoneBanner: () => void;
 }
 
 export const usePetStore = create<PetStore>()(
   persist(
     (set, get) => ({
-      health:        100,
-      happiness:     100,
-      lastCaredAt:   Date.now(),
-      lastSessionAt: Date.now(),
+      health:            100,
+      happiness:         100,
+      lastCaredAt:       Date.now(),
+      lastSessionAt:     Date.now(),
+      evolutionStage:            0,
+      totalPointsEarned:         0,
+      claimedStreakMilestones:   [],
+      pendingMilestoneBanner:    null,
 
       care: () =>
         set((s) => ({
@@ -44,6 +61,31 @@ export const usePetStore = create<PetStore>()(
           happiness:   clamp(s.happiness + HAPPINESS_CARE_BOOST),
           lastCaredAt: Date.now(),
         })),
+
+      trackEarned: (amount) =>
+        set((s) => {
+          const newTotal = s.totalPointsEarned + amount;
+          return {
+            totalPointsEarned: newTotal,
+            evolutionStage: deriveEvolutionStage(newTotal),
+          };
+        }),
+
+      checkStreakMilestones: () => {
+        const streak = usePlayerStore.getState().streak;
+        const { claimedStreakMilestones } = get();
+        const hit = STREAK_MILESTONES.find(
+          (m) => streak >= m && !claimedStreakMilestones.includes(m),
+        );
+        if (!hit) return;
+        set((s) => ({
+          claimedStreakMilestones: [...s.claimedStreakMilestones, hit],
+          pendingMilestoneBanner: hit,
+        }));
+        usePlayerStore.getState().earnPoints(50);
+      },
+
+      clearMilestoneBanner: () => set({ pendingMilestoneBanner: null }),
 
       applyDecay: () => {
         const now = Date.now();

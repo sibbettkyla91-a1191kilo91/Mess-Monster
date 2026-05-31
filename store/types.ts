@@ -22,6 +22,8 @@ export interface PetState {
   lastSessionAt: number; // unix ms — when applyDecay last ran; used to calculate offline drift
   evolutionStage: 0 | 1 | 2 | 3; // derived from totalPointsEarned; 0=hatchling 1=growing 2=mature 3=evolved
   totalPointsEarned: number;      // lifetime cleaning points — drives evolution, never decremented
+  claimedStreakMilestones: number[]; // streak day counts already rewarded, e.g. [3, 7]
+  pendingMilestoneBanner: number | null; // set when a new milestone is hit; cleared by UI after display
 }
 
 export interface PlayerProfile {
