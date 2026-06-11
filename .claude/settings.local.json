@@ -16,7 +16,8 @@
       "Bash(git pull *)",
       "Bash(npx tsc *)",
       "Bash(node *)",
-      "Bash(Remove-Item \"stores\\\\monsterStore.ts\")"
+      "Bash(Remove-Item \"stores\\\\monsterStore.ts\")",
+      "Bash(xargs grep -l \"completed\\\\|verified\")"
     ]
   }
 }

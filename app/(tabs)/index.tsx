@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -27,7 +28,9 @@ const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
 // ─── Dimensions ──────────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_SIZE = Math.max(220, Math.round(SCREEN_WIDTH * 0.68));
+const IMAGE_SIZE   = Math.max(220, Math.round(SCREEN_WIDTH * 0.68));
+// Monster feet at ~50% of screen height
+const MONSTER_TOP  = Math.round(SCREEN_HEIGHT * 0.50) - IMAGE_SIZE;
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +46,7 @@ const THEMES = {
     glowColor:      'rgba(82,183,136,0.13)',
     particleColor:  '#3aab6f',
     barTrack:       'rgba(0,0,0,0.10)',
+    panelBg:        'rgba(240,250,245,0.88)',
   },
   luna: {
     background:     '#1a1a2e',
@@ -55,6 +59,7 @@ const THEMES = {
     glowColor:      'rgba(90,35,160,0.16)',
     particleColor:  '#d8c0ff',
     barTrack:       'rgba(255,255,255,0.12)',
+    panelBg:        'rgba(10,10,20,0.82)',
   },
 } as const;
 
@@ -82,6 +87,11 @@ const MOOD_CONFIG = {
 const MONSTER_IMAGES = {
   nilly: require('../../assets/images/nilly.png'),
   luna:  require('../../assets/images/luna.png'),
+};
+
+const HABITAT_IMAGES = {
+  nilly: require('../../assets/images/nilly-habitat.jpg'),
+  luna:  require('../../assets/images/luna-habitat.jpg'),
 };
 
 // ─── Particle definitions ────────────────────────────────────────────────────
@@ -195,13 +205,6 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {/* Simulated radial background glow — lighter center, darker edges */}
-      <View style={[styles.radialGlow, { backgroundColor: theme.radialColor }]} />
-
-      {/* Spotlight orb behind the monster */}
-      <View style={[styles.monsterGlow, { backgroundColor: theme.glowColor }]} />
-
-      {/* Floating particles */}
       {particles.map((def) => (
         <FloatingParticle
           key={def.id}
@@ -418,19 +421,26 @@ export default function HomeScreen() {
   const overlayColor = MOOD_OVERLAY_COLOR[mood];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* ── Animated habitat layer ── */}
+    <View style={styles.container}>
+      {/* ── Full-screen habitat background ── */}
+      <ImageBackground
+        source={HABITAT_IMAGES[monster]}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
+
+      {/* ── Floating particles overlay ── */}
       <MonsterHabitat monster={monster} />
 
-      {/* ── Stat bar ── */}
-      <View style={styles.statBar}>
-        <View style={[styles.pill, { backgroundColor: theme.accent }]}>
+      {/* ── Top pills ── */}
+      <View style={styles.topBar}>
+        <View style={styles.pillScrim}>
           <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
             ⭐ {availablePoints} pts
           </ThemedText>
         </View>
         {streak > 0 && (
-          <View style={[styles.pill, { backgroundColor: theme.accent }]}>
+          <View style={styles.pillScrim}>
             <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
               🔥 {streak}d streak
             </ThemedText>
@@ -438,98 +448,94 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* ── Animated monster ── */}
-      <View style={styles.monsterArea}>
-        <Animated.View
-          style={[
-            styles.monsterImageWrapper,
-            { opacity: wrapperOpacity },
-            evolutionStage === 2 && {
-              shadowColor: theme.accent,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.45,
-              shadowRadius: 18,
-              elevation: 8,
-            },
-            evolutionStage === 3 && {
-              shadowColor: theme.accent,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.75,
-              shadowRadius: 30,
-              elevation: 14,
-            },
-            {
-              transform: [
-                { translateY: bobAnim },
-                { scale: scaleAnim },
-                { scale: evoScaleAnim },
-                { rotateZ: wiggleRot },
-                { rotateZ: sickWobbleRot },
-              ],
-            },
-          ]}
-        >
-          <Image
-            source={MONSTER_IMAGES[monster]}
-            style={styles.monsterImage}
-            resizeMode="contain"
-          />
-          {overlayColor !== null && (
-            <View
-              pointerEvents="none"
-              style={[styles.moodOverlay, { backgroundColor: overlayColor }]}
-            />
-          )}
-        </Animated.View>
-      </View>
-
-      {/* ── Evolution stage label ── */}
-      <View style={[styles.stagePill, { backgroundColor: theme.accent + '33' }]}>
-        <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
-          {STAGE_LABELS[evolutionStage]}
-        </ThemedText>
-      </View>
-
-      {/* ── Monster name ── */}
-      <ThemedText style={[styles.monsterName, { color: theme.text }]}>
-        {monsterName || (monster === 'nilly' ? 'Nilly' : 'Luna')}
-      </ThemedText>
-
-      {/* ── Health & happiness bars ── */}
-      <View style={styles.statBars}>
-        <StatBar icon="❤️" label="Health"    value={health}    color={theme.accent}       trackColor={theme.barTrack} />
-        <StatBar icon="✨" label="Happiness" value={happiness} color={theme.particleColor} trackColor={theme.barTrack} />
-      </View>
-
-      {/* ── Mood card ── */}
-      <View
+      {/* ── Monster centered at ~50% screen height ── */}
+      <Animated.View
         style={[
-          styles.moodCard,
-          { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+          styles.monsterImageWrapper,
+          { opacity: wrapperOpacity },
+          evolutionStage === 2 && {
+            shadowColor: theme.accent,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.45,
+            shadowRadius: 18,
+            elevation: 8,
+          },
+          evolutionStage === 3 && {
+            shadowColor: theme.accent,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.75,
+            shadowRadius: 30,
+            elevation: 14,
+          },
+          {
+            transform: [
+              { translateY: bobAnim },
+              { scale: scaleAnim },
+              { scale: evoScaleAnim },
+              { rotateZ: wiggleRot },
+              { rotateZ: sickWobbleRot },
+            ],
+          },
         ]}
       >
-        <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
-          {moodCfg.label}
-        </ThemedText>
-        <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
-          {moodCfg.message}
-        </ThemedText>
-      </View>
+        <Image
+          source={MONSTER_IMAGES[monster]}
+          style={styles.monsterImage}
+          resizeMode="contain"
+        />
+        {overlayColor !== null && (
+          <View
+            pointerEvents="none"
+            style={[styles.moodOverlay, { backgroundColor: overlayColor }]}
+          />
+        )}
+      </Animated.View>
 
-      {/* ── CTA button ── */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.ctaButton,
-          { backgroundColor: theme.accent, opacity: pressed ? 0.82 : 1 },
-        ]}
-        onPress={() => router.navigate('/(tabs)/explore')}
-        accessibilityRole="button"
-        accessibilityLabel="Go clean something"
-      >
-        <ThemedText style={[styles.ctaText, { color: theme.pillText }]}>
-          Clean Something →
-        </ThemedText>
-      </Pressable>
+      {/* ── Bottom panel ── */}
+      <View style={[styles.bottomPanel, { backgroundColor: theme.panelBg }]}>
+        {/* Name + stage badge row */}
+        <View style={styles.nameRow}>
+          <ThemedText style={[styles.monsterName, { color: theme.text }]}>
+            {monsterName || (monster === 'nilly' ? 'Nilly' : 'Luna')}
+          </ThemedText>
+          <View style={[styles.stagePill, { backgroundColor: theme.accent + '33' }]}>
+            <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
+              {STAGE_LABELS[evolutionStage]}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Health & happiness bars */}
+        <View style={styles.statBars}>
+          <StatBar icon="❤️" label="Health"    value={health}    color={theme.accent}       trackColor={theme.barTrack} />
+          <StatBar icon="✨" label="Happiness" value={happiness} color={theme.particleColor} trackColor={theme.barTrack} />
+        </View>
+
+        {/* Mood section */}
+        <View style={styles.moodSection}>
+          <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
+            {moodCfg.label}
+          </ThemedText>
+          <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
+            {moodCfg.message}
+          </ThemedText>
+        </View>
+
+        {/* CTA button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.ctaButton,
+            { backgroundColor: theme.accent, opacity: pressed ? 0.82 : 1 },
+          ]}
+          onPress={() => router.navigate('/(tabs)/explore')}
+          accessibilityRole="button"
+          accessibilityLabel="Go clean something"
+        >
+          <ThemedText style={[styles.ctaText, { color: theme.pillText }]}>
+            Clean Something →
+          </ThemedText>
+        </Pressable>
+      </View>
 
       {/* ── Streak milestone banner ── */}
       {pendingMilestoneBanner !== null && (
@@ -553,28 +559,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    alignItems: 'center',
   },
 
-  // Health + happiness bars
-  statBars: {
-    width: '100%',
-    gap: 10,
-    marginBottom: 14,
-  },
-
-  // Top stat bar (points + streak pills)
-  statBar: {
-    width: '100%',
+  // Top pills — absolute, corner-anchored
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 54,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
-  pill: {
+  pillScrim: {
+    backgroundColor: 'rgba(0,0,0,0.25)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
@@ -585,15 +585,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Monster image area
-  monsterArea: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
+  // Monster — absolute, feet at ~50% screen height
   monsterImageWrapper: {
+    position: 'absolute',
+    top: MONSTER_TOP,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   monsterImage: {
     width: IMAGE_SIZE,
@@ -606,59 +604,66 @@ const styles = StyleSheet.create({
     borderRadius: IMAGE_SIZE * 0.1,
   },
 
-  // Evolution stage pill
+  // Bottom panel — anchored to screen bottom
+  bottomPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
+    paddingBottom: 28,
+    gap: 12,
+  },
+
+  // Name + stage badge row
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  monsterName: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
   stagePill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
-    marginBottom: 10,
   },
   stageLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
 
-  // Name
-  monsterName: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 18,
+  // Health + happiness bars
+  statBars: {
+    gap: 8,
   },
 
-  // Mood card
-  moodCard: {
-    width: '100%',
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 24,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 16,
+  // Mood section
+  moodSection: {
+    gap: 4,
   },
   moodLabel: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   moodMessage: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     opacity: 0.85,
   },
 
   // CTA button
   ctaButton: {
-    width: '100%',
     borderRadius: 16,
-    paddingVertical: 18,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -673,10 +678,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // Streak milestone banner — floats above everything
+  // Streak milestone banner — floats above the bottom panel
   milestoneBanner: {
     position: 'absolute',
-    bottom: 110, // above the tab bar
+    bottom: 220,
     left: 24,
     right: 24,
     borderRadius: 16,
@@ -693,24 +698,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
-  },
-
-  // Habitat background layers
-  radialGlow: {
-    position: 'absolute',
-    // Centered by aligning relative to negative margins from a 130% wide circle
-    left:   -(SCREEN_WIDTH * 0.15),
-    top:    SCREEN_HEIGHT * 0.02,
-    width:  SCREEN_WIDTH * 1.30,
-    height: SCREEN_WIDTH * 1.30,
-    borderRadius: SCREEN_WIDTH * 0.65,
-  },
-  monsterGlow: {
-    position: 'absolute',
-    left:   (SCREEN_WIDTH - IMAGE_SIZE * 0.95) / 2,
-    top:    SCREEN_HEIGHT * 0.14,
-    width:  IMAGE_SIZE * 0.95,
-    height: IMAGE_SIZE * 0.95,
-    borderRadius: IMAGE_SIZE * 0.475,
   },
 });
