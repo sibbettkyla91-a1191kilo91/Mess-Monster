@@ -387,6 +387,21 @@ section {
     position: relative;
 }
 
+.evolution-tease-text {
+    margin-top: 1.5rem;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--primary-mint-dark);
+    font-weight: 600;
+}
+
+.ascended-hint {
+    color: var(--gold);
+    font-size: 0.85rem;
+    vertical-align: middle;
+    margin-left: 0.25rem;
+    opacity: 0.8;
+}
 
 .feature-tier ul {
     list-style: none;
