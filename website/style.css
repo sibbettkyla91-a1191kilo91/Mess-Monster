@@ -387,18 +387,6 @@ section {
     position: relative;
 }
 
-.feature-tier.premium::before {
-    content: "RECOMMENDED";
-    position: absolute;
-    top: -15px;
-    right: 30px;
-    background-color: var(--gold);
-    color: var(--dark-charcoal);
-    padding: 0.2rem 1rem;
-    font-weight: 800;
-    font-size: 0.7rem;
-    border-radius: 5px;
-}
 
 .feature-tier ul {
     list-style: none;
@@ -576,6 +564,10 @@ footer {
     }
 
     .monsters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .features-grid {
         grid-template-columns: 1fr;
     }
 
