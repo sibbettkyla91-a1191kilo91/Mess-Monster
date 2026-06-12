@@ -155,12 +155,15 @@ nav {
 .mascot-box {
     width: 250px;
     height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.placeholder-box img {
-    max-width: 100px;
-    margin-bottom: 1rem;
-    opacity: 0.3;
+.mascot-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .placeholder-box p {
@@ -303,9 +306,19 @@ section {
     color: #fff;
 }
 
-.luna-card .placeholder-box {
-    background-color: #3d4547;
-    border-color: #555;
+.monster-img-container {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.monster-img-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .monster-card h3 {
