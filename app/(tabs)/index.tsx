@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  ImageSourcePropType,
   Pressable,
   StyleSheet,
   Text,
@@ -14,8 +15,17 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { PetMood, deriveMood, usePetStore } from '@/store/use-pet-store';
 import { usePlayerStore } from '@/store/use-player-store';
+import { AdultVariant, EvolutionStage } from '@/store/types';
 
-const STAGE_LABELS = ['Hatchling', 'Growing', 'Mature', 'Evolved ✨'] as const;
+// ─── Stage labels ─────────────────────────────────────────────────────────────
+
+const STAGE_LABELS: Record<EvolutionStage, string> = {
+  egg:      'Egg',
+  baby:     'Baby',
+  teen:     'Teen',
+  adult:    'Adult',
+  ascended: 'Ascended ✨',
+};
 
 const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
   thriving: 'rgba(255,215,0,0.15)',
@@ -28,9 +38,8 @@ const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
 // ─── Dimensions ──────────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_SIZE   = Math.max(220, Math.round(SCREEN_WIDTH * 0.68));
-// Monster feet at ~50% of screen height
-const MONSTER_TOP  = Math.round(SCREEN_HEIGHT * 0.50) - IMAGE_SIZE;
+const IMAGE_SIZE  = Math.max(220, Math.round(SCREEN_WIDTH * 0.68));
+const MONSTER_TOP = Math.round(SCREEN_HEIGHT * 0.50) - IMAGE_SIZE;
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 
@@ -82,33 +91,67 @@ const MOOD_CONFIG = {
   },
 } as const;
 
-// ─── Assets ──────────────────────────────────────────────────────────────────
+// ─── Stage sprite map ─────────────────────────────────────────────────────────
+// All sprites live in assets/ (root). Adult variants are determined at evolution time.
 
-const MONSTER_IMAGES = {
-  nilly: require('../../assets/images/nilly.png'),
-  luna:  require('../../assets/images/luna.png'),
-};
+const STAGE_SPRITES = {
+  luna: {
+    egg:              require('../../assets/luna_egg.png'),
+    baby:             require('../../assets/luna_baby.png'),
+    teen:             require('../../assets/luna_teen.png'),
+    adult:            require('../../assets/luna_adult.png'),
+    adult_kitchen:    require('../../assets/luna_adult_kitchen.png'),
+    adult_livingroom: require('../../assets/luna_adult_livingroom.png'),
+    adult_bedroom:    require('../../assets/luna_adult_bedroom.png'),
+    adult_bathroom:   require('../../assets/luna_adult_bathroom.png'),
+  },
+  nilly: {
+    egg:              require('../../assets/nilly_egg.png'),
+    baby:             require('../../assets/nilly_baby.png'),
+    teen:             require('../../assets/nilly_teen.png'),
+    adult:            require('../../assets/nilly_adult.png'),
+    adult_kitchen:    require('../../assets/nilly_adult_kitchen.png'),
+    adult_livingroom: require('../../assets/nilly_adult_livingroom.png'),
+    adult_bedroom:    require('../../assets/nilly_adult_bedroom.png'),
+    adult_bathroom:   require('../../assets/nilly_adult_bathroom.png'),
+  },
+} as const;
 
 const HABITAT_IMAGES = {
   nilly: require('../../assets/images/nilly-habitat.jpg'),
   luna:  require('../../assets/images/luna-habitat.jpg'),
 };
 
+function getMonsterSprite(
+  monster: 'nilly' | 'luna',
+  stage: EvolutionStage,
+  adultVariant: AdultVariant,
+): ImageSourcePropType {
+  const sprites = STAGE_SPRITES[monster];
+  if (stage === 'adult' || stage === 'ascended') {
+    // Ascended shows adult sprite until its own art is implemented
+    const key = adultVariant === 'base'
+      ? 'adult'
+      : (`adult_${adultVariant}` as keyof typeof sprites);
+    return (sprites[key] ?? sprites.adult) as ImageSourcePropType;
+  }
+  return (sprites[stage as keyof typeof sprites] ?? sprites.egg) as ImageSourcePropType;
+}
+
 // ─── Particle definitions ────────────────────────────────────────────────────
 
 interface ParticleDef {
   id:       string;
-  x:        number;   // fraction of SCREEN_WIDTH
-  y:        number;   // fraction of SCREEN_HEIGHT
+  x:        number;
+  y:        number;
   char:     string;
   size:     number;
-  opacity:  number;   // peak opacity
-  duration: number;   // full cycle ms
-  delay:    number;   // startup delay ms
-  driftY:   number;   // pixels to float upward per half-cycle
+  opacity:  number;
+  duration: number;
+  delay:    number;
+  driftY:   number;
 }
 
-// Luna: stars and sparkle glyphs that drift upward like embers
 const LUNA_PARTICLES: ParticleDef[] = [
   { id: 'l1',  x: 0.06, y: 0.11, char: '★', size: 14, opacity: 0.55, duration: 3400, delay: 0,    driftY: 18 },
   { id: 'l2',  x: 0.83, y: 0.08, char: '★', size: 9,  opacity: 0.40, duration: 4200, delay: 600,  driftY: 12 },
@@ -122,7 +165,6 @@ const LUNA_PARTICLES: ParticleDef[] = [
   { id: 'l10', x: 0.54, y: 0.68, char: '✦', size: 9,  opacity: 0.25, duration: 5200, delay: 1500, driftY: 12 },
 ];
 
-// Nilly: sparkle glyphs, soft orbs, and drifting leaves
 const NILLY_PARTICLES: ParticleDef[] = [
   { id: 'n1',  x: 0.07, y: 0.09, char: '✦', size: 12, opacity: 0.48, duration: 3200, delay: 0,    driftY: 16 },
   { id: 'n2',  x: 0.86, y: 0.12, char: '✦', size: 8,  opacity: 0.38, duration: 4000, delay: 500,  driftY: 12 },
@@ -146,37 +188,20 @@ function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
     const yLoop = Animated.loop(
       Animated.sequence([
         Animated.delay(def.delay),
-        Animated.timing(translateY, {
-          toValue:  -def.driftY,
-          duration: def.duration / 2,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue:  0,
-          duration: def.duration / 2,
-          useNativeDriver: true,
-        }),
+        Animated.timing(translateY, { toValue: -def.driftY, duration: def.duration / 2, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0,           duration: def.duration / 2, useNativeDriver: true }),
       ]),
     );
     const opacityLoop = Animated.loop(
       Animated.sequence([
         Animated.delay(def.delay),
-        Animated.timing(opacity, {
-          toValue:  def.opacity,
-          duration: def.duration * 0.55,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue:  def.opacity * 0.18,
-          duration: def.duration * 0.45,
-          useNativeDriver: true,
-        }),
+        Animated.timing(opacity, { toValue: def.opacity,        duration: def.duration * 0.55, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: def.opacity * 0.18, duration: def.duration * 0.45, useNativeDriver: true }),
       ]),
     );
     yLoop.start();
     opacityLoop.start();
     return () => { yLoop.stop(); opacityLoop.stop(); };
-  // static particle — deps never change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -184,8 +209,8 @@ function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
     <Animated.Text
       style={{
         position: 'absolute',
-        left:     def.x * SCREEN_WIDTH,
-        top:      def.y * SCREEN_HEIGHT,
+        left: def.x * SCREEN_WIDTH,
+        top:  def.y * SCREEN_HEIGHT,
         fontSize: def.size,
         color,
         opacity,
@@ -206,11 +231,7 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
       {particles.map((def) => (
-        <FloatingParticle
-          key={def.id}
-          def={def}
-          color={theme.particleColor}
-        />
+        <FloatingParticle key={def.id} def={def} color={theme.particleColor} />
       ))}
     </View>
   );
@@ -219,32 +240,17 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
 // ─── StatBar ─────────────────────────────────────────────────────────────────
 
 function StatBar({
-  icon,
-  label,
-  value,
-  color,
-  trackColor,
+  icon, label, value, color, trackColor,
 }: {
-  icon: string;
-  label: string;
-  value: number;
-  color: string;
-  trackColor: string;
+  icon: string; label: string; value: number; color: string; trackColor: string;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: value,
-      duration: 600,
-      useNativeDriver: false,
-    }).start();
+    Animated.timing(anim, { toValue: value, duration: 600, useNativeDriver: false }).start();
   }, [value, anim]);
 
-  const widthPct = anim.interpolate({
-    inputRange:  [0, 100],
-    outputRange: ['0%', '100%'],
-  });
+  const widthPct = anim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] });
 
   return (
     <View style={barStyles.row}>
@@ -270,52 +276,272 @@ const barStyles = StyleSheet.create({
   fill:     { height: '100%', borderRadius: 4 },
 });
 
+// ─── EvolutionCelebration ────────────────────────────────────────────────────
+
+function EvolutionCelebration({
+  stage,
+  monsterName,
+  theme,
+  onDismiss,
+}: {
+  stage: EvolutionStage;
+  monsterName: string;
+  theme: (typeof THEMES)[keyof typeof THEMES];
+  onDismiss: () => void;
+}) {
+  const scaleAnim   = useRef(new Animated.Value(0.4)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim    = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 55,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
+    );
+    glowLoop.start();
+
+    const t = setTimeout(onDismiss, 4200);
+    return () => { glowLoop.stop(); clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const glowScale = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+
+  return (
+    <Pressable
+      style={[StyleSheet.absoluteFillObject, evolutionStyles.overlay]}
+      onPress={onDismiss}
+      accessibilityRole="button"
+      accessibilityLabel="Evolution celebration — tap to continue"
+    >
+      <Animated.View
+        style={[
+          evolutionStyles.card,
+          {
+            backgroundColor: theme.cardBg,
+            borderColor: theme.accent,
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+            shadowColor: theme.accent,
+          },
+        ]}
+      >
+        <Animated.Text
+          style={[evolutionStyles.emoji, { transform: [{ scale: glowScale }] }]}
+        >
+          ✨
+        </Animated.Text>
+        <ThemedText style={[evolutionStyles.title, { color: theme.accent }]}>
+          Evolution!
+        </ThemedText>
+        <ThemedText style={[evolutionStyles.stageName, { color: theme.text }]}>
+          {monsterName} evolved into {STAGE_LABELS[stage]}!
+        </ThemedText>
+        <ThemedText style={[evolutionStyles.hint, { color: theme.text }]}>
+          Tap to continue
+        </ThemedText>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const evolutionStyles = StyleSheet.create({
+  overlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    zIndex: 100,
+  },
+  card: {
+    width: SCREEN_WIDTH * 0.82,
+    borderRadius: 24,
+    borderWidth: 2,
+    padding: 28,
+    alignItems: 'center',
+    gap: 10,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  emoji:     { fontSize: 56 },
+  title:     { fontSize: 28, fontWeight: '800', letterSpacing: 0.6 },
+  stageName: { fontSize: 17, fontWeight: '500', textAlign: 'center', opacity: 0.9 },
+  hint:      { fontSize: 13, opacity: 0.5, marginTop: 4 },
+});
+
+// ─── PremiumGateModal ────────────────────────────────────────────────────────
+
+function PremiumGateModal({
+  stage,
+  theme,
+  onDismiss,
+  onUpgrade,
+}: {
+  stage: EvolutionStage;
+  theme: (typeof THEMES)[keyof typeof THEMES];
+  onDismiss: () => void;
+  onUpgrade: () => void;
+}) {
+  const scaleAnim   = useRef(new Animated.Value(0.85)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stageName = stage.charAt(0).toUpperCase() + stage.slice(1);
+
+  return (
+    <Pressable
+      style={[StyleSheet.absoluteFillObject, evolutionStyles.overlay]}
+      onPress={onDismiss}
+      accessibilityRole="button"
+      accessibilityLabel="Premium upgrade modal — tap outside to dismiss"
+    >
+      <Animated.View
+        style={[
+          evolutionStyles.card,
+          {
+            backgroundColor: theme.cardBg,
+            borderColor: theme.accent,
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+            shadowColor: theme.accent,
+          },
+        ]}
+        // Prevent tap-through to the backdrop dismiss
+        onStartShouldSetResponder={() => true}
+      >
+        <Text style={[evolutionStyles.emoji]}>🔒</Text>
+        <ThemedText style={[evolutionStyles.title, { color: theme.accent }]}>
+          Premium Feature
+        </ThemedText>
+        <ThemedText style={[evolutionStyles.stageName, { color: theme.text }]}>
+          {stageName} form and beyond require Premium.
+        </ThemedText>
+        <ThemedText style={[premiumStyles.body, { color: theme.text }]}>
+          Your monster is ready to evolve! Unlock Adult and Ascended forms by upgrading to Premium (~$4.99/month).
+        </ThemedText>
+        <Pressable
+          style={[premiumStyles.upgradeButton, { backgroundColor: theme.accent }]}
+          onPress={onUpgrade}
+          accessibilityRole="button"
+          accessibilityLabel="Upgrade to Premium"
+        >
+          <ThemedText style={[premiumStyles.upgradeButtonText, { color: theme.pillText }]}>
+            Upgrade to Premium
+          </ThemedText>
+        </Pressable>
+        <Pressable onPress={onDismiss} style={premiumStyles.dismissButton}>
+          <ThemedText style={[premiumStyles.dismissText, { color: theme.text }]}>
+            Maybe later
+          </ThemedText>
+        </Pressable>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const premiumStyles = StyleSheet.create({
+  body: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    opacity: 0.75,
+  },
+  upgradeButton: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 4,
+  },
+  upgradeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  dismissButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  dismissText: {
+    fontSize: 14,
+    opacity: 0.55,
+  },
+});
+
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const health                  = usePetStore((s) => s.health);
-  const happiness               = usePetStore((s) => s.happiness);
-  const evolutionStage          = usePetStore((s) => s.evolutionStage);
-  const pendingMilestoneBanner  = usePetStore((s) => s.pendingMilestoneBanner);
-  const clearMilestoneBanner    = usePetStore((s) => s.clearMilestoneBanner);
-  const mood                    = deriveMood(health, happiness);
+  const health                 = usePetStore((s) => s.health);
+  const happiness              = usePetStore((s) => s.happiness);
+  const evolutionStage         = usePetStore((s) => s.evolutionStage);
+  const adultVariant           = usePetStore((s) => s.adultVariant);
+  const pendingMilestoneBanner = usePetStore((s) => s.pendingMilestoneBanner);
+  const pendingEvolution       = usePetStore((s) => s.pendingEvolution);
+  const pendingPremiumGate     = usePetStore((s) => s.pendingPremiumGate);
+  const clearMilestoneBanner   = usePetStore((s) => s.clearMilestoneBanner);
+  const clearPendingEvolution  = usePetStore((s) => s.clearPendingEvolution);
+  const clearPremiumGate       = usePetStore((s) => s.clearPremiumGate);
+  const recheckEvolution       = usePetStore((s) => s.recheckEvolution);
+
   const availablePoints = usePlayerStore((s) => s.availablePoints());
   const streak          = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? 'nilly';
   const monsterName     = usePlayerStore((s) => s.monsterName);
+  const setPremium      = usePlayerStore((s) => s.setPremium);
   const router          = useRouter();
+
+  const mood = deriveMood(health, happiness);
 
   const monster = selectedMonster === 'luna' ? 'luna' : 'nilly';
   const theme   = THEMES[monster];
   const moodCfg = MOOD_CONFIG[monster][mood];
 
-  // ── Bob (constant float, mood affects speed and direction) ────────────────
+  const displayName = monsterName || (monster === 'nilly' ? 'Nilly' : 'Luna');
+
+  // ── Bob ────────────────────────────────────────────────────────────────────
   const bobAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const isSad    = mood === 'sad' || mood === 'sick';
     const bobSpeed = mood === 'thriving' ? 900 : isSad ? 2600 : 1700;
-    const bobAmt   = isSad ? 6 : -12; // sad/sick droop down; others float up
+    const bobAmt   = isSad ? 6 : -12;
 
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bobAnim, {
-          toValue:  bobAmt,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bobAnim, {
-          toValue:  0,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
+        Animated.timing(bobAnim, { toValue: bobAmt, duration: bobSpeed / 2, useNativeDriver: true }),
+        Animated.timing(bobAnim, { toValue: 0,      duration: bobSpeed / 2, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [mood, bobAnim]);
 
-  // ── Wiggle (random small rotation, 4–8 s interval) ────────────────────────
+  // ── Wiggle ─────────────────────────────────────────────────────────────────
   const wiggleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -327,10 +553,10 @@ export default function HomeScreen() {
       tid = setTimeout(() => {
         if (!active) return;
         Animated.sequence([
-          Animated.timing(wiggleAnim, { toValue: -9,  duration: 80,  useNativeDriver: true }),
-          Animated.timing(wiggleAnim, { toValue:  9,  duration: 100, useNativeDriver: true }),
-          Animated.timing(wiggleAnim, { toValue: -5,  duration: 80,  useNativeDriver: true }),
-          Animated.timing(wiggleAnim, { toValue:  0,  duration: 100, useNativeDriver: true }),
+          Animated.timing(wiggleAnim, { toValue: -9, duration: 80,  useNativeDriver: true }),
+          Animated.timing(wiggleAnim, { toValue:  9, duration: 100, useNativeDriver: true }),
+          Animated.timing(wiggleAnim, { toValue: -5, duration: 80,  useNativeDriver: true }),
+          Animated.timing(wiggleAnim, { toValue:  0, duration: 100, useNativeDriver: true }),
         ]).start(() => schedule());
       }, 4000 + Math.random() * 4000);
     };
@@ -340,7 +566,7 @@ export default function HomeScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Thriving scale-pulse (occasional bounce when mood is at peak) ─────────
+  // ── Thriving scale-pulse ───────────────────────────────────────────────────
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -365,11 +591,12 @@ export default function HomeScreen() {
     return () => { active = false; clearTimeout(tid); scaleAnim.setValue(1); };
   }, [mood, scaleAnim]);
 
-  // ── Evolution scale pulse (slow continuous loop at stage 3) ──────────────
+  // ── Evolution glow pulse (adult / ascended) ────────────────────────────────
   const evoScaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (evolutionStage < 3) { evoScaleAnim.setValue(1); return; }
+    const isAdult = evolutionStage === 'adult' || evolutionStage === 'ascended';
+    if (!isAdult) { evoScaleAnim.setValue(1); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(evoScaleAnim, { toValue: 1.04, duration: 1800, useNativeDriver: true }),
@@ -380,14 +607,14 @@ export default function HomeScreen() {
     return () => { loop.stop(); evoScaleAnim.setValue(1); };
   }, [evolutionStage, evoScaleAnim]);
 
-  // ── Milestone banner auto-dismiss ────────────────────────────────────────
+  // ── Milestone banner auto-dismiss ─────────────────────────────────────────
   useEffect(() => {
     if (!pendingMilestoneBanner) return;
     const t = setTimeout(clearMilestoneBanner, 3000);
     return () => clearTimeout(t);
   }, [pendingMilestoneBanner, clearMilestoneBanner]);
 
-  // ── Sick wobble (continuous slow oscillation when mood is sick) ──────────
+  // ── Sick wobble ────────────────────────────────────────────────────────────
   const sickWobbleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -403,22 +630,29 @@ export default function HomeScreen() {
   }, [mood, sickWobbleAnim]);
 
   const wiggleRot = wiggleAnim.interpolate({
-    inputRange:  [-9, 0, 9],
-    outputRange: ['-4.5deg', '0deg', '4.5deg'],
+    inputRange: [-9, 0, 9], outputRange: ['-4.5deg', '0deg', '4.5deg'],
   });
-
   const sickWobbleRot = sickWobbleAnim.interpolate({
-    inputRange:  [-1, 0, 1],
-    outputRange: ['-8deg', '0deg', '8deg'],
+    inputRange: [-1, 0, 1], outputRange: ['-8deg', '0deg', '8deg'],
   });
 
-  // Neutral mood: reduce opacity to 0.9. Stage 0 takes priority (0.7).
+  // Egg stage: slightly faded to convey "not yet hatched"
   const wrapperOpacity = Math.min(
-    evolutionStage === 0 ? 0.7 : 1,
+    evolutionStage === 'egg' ? 0.75 : 1,
     mood === 'neutral' ? 0.9 : 1,
   );
 
   const overlayColor = MOOD_OVERLAY_COLOR[mood];
+
+  // Stage-based shadow intensity
+  const isAdult = evolutionStage === 'adult' || evolutionStage === 'ascended';
+  const shadowStyle = isAdult
+    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.75, shadowRadius: 30, elevation: 14 }
+    : evolutionStage === 'teen'
+    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 18, elevation: 8 }
+    : null;
+
+  const monsterSource = getMonsterSprite(monster, evolutionStage, adultVariant);
 
   return (
     <View style={styles.container}>
@@ -448,25 +682,12 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* ── Monster centered at ~50% screen height ── */}
+      {/* ── Monster ── */}
       <Animated.View
         style={[
           styles.monsterImageWrapper,
           { opacity: wrapperOpacity },
-          evolutionStage === 2 && {
-            shadowColor: theme.accent,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.45,
-            shadowRadius: 18,
-            elevation: 8,
-          },
-          evolutionStage === 3 && {
-            shadowColor: theme.accent,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.75,
-            shadowRadius: 30,
-            elevation: 14,
-          },
+          shadowStyle,
           {
             transform: [
               { translateY: bobAnim },
@@ -479,7 +700,7 @@ export default function HomeScreen() {
         ]}
       >
         <Image
-          source={MONSTER_IMAGES[monster]}
+          source={monsterSource}
           style={styles.monsterImage}
           resizeMode="contain"
         />
@@ -493,10 +714,9 @@ export default function HomeScreen() {
 
       {/* ── Bottom panel ── */}
       <View style={[styles.bottomPanel, { backgroundColor: theme.panelBg }]}>
-        {/* Name + stage badge row */}
         <View style={styles.nameRow}>
           <ThemedText style={[styles.monsterName, { color: theme.text }]}>
-            {monsterName || (monster === 'nilly' ? 'Nilly' : 'Luna')}
+            {displayName}
           </ThemedText>
           <View style={[styles.stagePill, { backgroundColor: theme.accent + '33' }]}>
             <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
@@ -505,13 +725,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Health & happiness bars */}
         <View style={styles.statBars}>
           <StatBar icon="❤️" label="Health"    value={health}    color={theme.accent}       trackColor={theme.barTrack} />
           <StatBar icon="✨" label="Happiness" value={happiness} color={theme.particleColor} trackColor={theme.barTrack} />
         </View>
 
-        {/* Mood section */}
         <View style={styles.moodSection}>
           <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
             {moodCfg.label}
@@ -521,7 +739,6 @@ export default function HomeScreen() {
           </ThemedText>
         </View>
 
-        {/* CTA button */}
         <Pressable
           style={({ pressed }) => [
             styles.ctaButton,
@@ -550,6 +767,31 @@ export default function HomeScreen() {
           </ThemedText>
         </Pressable>
       )}
+
+      {/* ── Evolution celebration overlay ── */}
+      {pendingEvolution !== null && (
+        <EvolutionCelebration
+          stage={pendingEvolution}
+          monsterName={displayName}
+          theme={theme}
+          onDismiss={clearPendingEvolution}
+        />
+      )}
+
+      {/* ── Premium gate modal ── */}
+      {pendingPremiumGate !== null && (
+        <PremiumGateModal
+          stage={pendingPremiumGate}
+          theme={theme}
+          onDismiss={clearPremiumGate}
+          onUpgrade={() => {
+            // Placeholder: set premium true; real IAP wired in a future update
+            setPremium(true);
+            clearPremiumGate();
+            recheckEvolution();
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -560,8 +802,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  // Top pills — absolute, corner-anchored
   topBar: {
     position: 'absolute',
     top: 0,
@@ -584,8 +824,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-
-  // Monster — absolute, feet at ~50% screen height
   monsterImageWrapper: {
     position: 'absolute',
     top: MONSTER_TOP,
@@ -603,8 +841,6 @@ const styles = StyleSheet.create({
     height: IMAGE_SIZE,
     borderRadius: IMAGE_SIZE * 0.1,
   },
-
-  // Bottom panel — anchored to screen bottom
   bottomPanel: {
     position: 'absolute',
     bottom: 0,
@@ -616,8 +852,6 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 12,
   },
-
-  // Name + stage badge row
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -639,13 +873,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-
-  // Health + happiness bars
   statBars: {
     gap: 8,
   },
-
-  // Mood section
   moodSection: {
     gap: 4,
   },
@@ -659,8 +889,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     opacity: 0.85,
   },
-
-  // CTA button
   ctaButton: {
     borderRadius: 16,
     paddingVertical: 16,
@@ -677,8 +905,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
   },
-
-  // Streak milestone banner — floats above the bottom panel
   milestoneBanner: {
     position: 'absolute',
     bottom: 220,

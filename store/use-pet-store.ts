@@ -1,19 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { PetState } from './types';
+import { AdultVariant, EvolutionStage, PetState, TaskCategory } from './types';
 import { usePlayerStore } from './use-player-store';
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
 
 export type PetMood = 'thriving' | 'happy' | 'neutral' | 'sad' | 'sick';
 
-export function deriveEvolutionStage(totalPointsEarned: number): 0 | 1 | 2 | 3 {
-  if (totalPointsEarned >= 1200) return 3;
-  if (totalPointsEarned >= 600)  return 2;
-  if (totalPointsEarned >= 200)  return 1;
-  return 0;
-}
+// Both points AND days must be met to evolve. Never de-evolve.
+const EVOLUTION_THRESHOLDS: Partial<Record<EvolutionStage, { points: number; days: number }>> = {
+  baby:  { points: 50,  days: 3  },
+  teen:  { points: 200, days: 7  },
+  adult: { points: 500, days: 14 },
+};
+
+const STAGE_ORDER: EvolutionStage[] = ['egg', 'baby', 'teen', 'adult', 'ascended'];
+
+// Adult variant is determined by which room category the user has completed most (lifetime).
+const ROOM_CATEGORY_MAP: Partial<Record<TaskCategory, AdultVariant>> = {
+  kitchen:     'kitchen',
+  living_room: 'livingroom',
+  bedroom:     'bedroom',
+  bathroom:    'bathroom',
+};
 
 const HEALTH_DECAY_RATE    = 1.5; // pts lost per hour
 const HAPPINESS_DECAY_RATE = 2.0; // pts lost per hour
@@ -25,7 +35,6 @@ function clamp(v: number): number {
   return Math.min(100, Math.max(0, v));
 }
 
-/** Mood is derived from health + happiness, not stored. */
 export function deriveMood(health: number, happiness: number): PetMood {
   const avg = (health + happiness) / 2;
   if (avg >= 75) return 'thriving';
@@ -35,25 +44,62 @@ export function deriveMood(health: number, happiness: number): PetMood {
   return 'sick';
 }
 
+function nextStage(current: EvolutionStage): EvolutionStage | null {
+  const idx = STAGE_ORDER.indexOf(current);
+  if (idx === -1 || idx >= STAGE_ORDER.length - 1) return null;
+  return STAGE_ORDER[idx + 1];
+}
+
+function determineAdultVariant(
+  categoryCompletions: Partial<Record<TaskCategory, number>>,
+): AdultVariant {
+  let maxCount = 0;
+  let topCat: TaskCategory | null = null;
+  let tied = false;
+
+  for (const [cat, count] of Object.entries(categoryCompletions) as [TaskCategory, number][]) {
+    const variant = ROOM_CATEGORY_MAP[cat];
+    if (!variant || !count) continue;
+    if (count > maxCount) {
+      maxCount = count;
+      topCat = cat;
+      tied = false;
+    } else if (count === maxCount) {
+      tied = true;
+    }
+  }
+
+  if (!topCat || tied || !ROOM_CATEGORY_MAP[topCat]) return 'base';
+  return ROOM_CATEGORY_MAP[topCat]!;
+}
+
 interface PetStore extends PetState {
   care: () => void;
   applyDecay: () => void;
-  trackEarned: (amount: number) => void;
+  trackEarned: (amount: number, category?: TaskCategory) => void;
+  recheckEvolution: () => void; // re-run evolution check (e.g., after premium unlock)
   checkStreakMilestones: () => void;
   clearMilestoneBanner: () => void;
+  clearPendingEvolution: () => void;
+  clearPremiumGate: () => void;
 }
 
 export const usePetStore = create<PetStore>()(
   persist(
     (set, get) => ({
-      health:            100,
-      happiness:         100,
-      lastCaredAt:       Date.now(),
-      lastSessionAt:     Date.now(),
-      evolutionStage:            0,
-      totalPointsEarned:         0,
-      claimedStreakMilestones:   [],
-      pendingMilestoneBanner:    null,
+      health:                  100,
+      happiness:               100,
+      lastCaredAt:             Date.now(),
+      lastSessionAt:           Date.now(),
+      evolutionStage:          'egg' as EvolutionStage,
+      totalPointsEarned:       0,
+      adultVariant:            'base' as AdultVariant,
+      categoryCompletions:     {},
+      claimedStreakMilestones: [],
+      pendingMilestoneBanner:  null,
+      pendingEvolution:        null,
+      pendingPremiumGate:      null,
+      premiumGateShownFor:     null,
 
       care: () =>
         set((s) => ({
@@ -62,14 +108,87 @@ export const usePetStore = create<PetStore>()(
           lastCaredAt: Date.now(),
         })),
 
-      trackEarned: (amount) =>
+      trackEarned: (amount, category) =>
         set((s) => {
           const newTotal = s.totalPointsEarned + amount;
-          return {
+
+          const newCategoryCompletions: Partial<Record<TaskCategory, number>> = category
+            ? { ...s.categoryCompletions, [category]: (s.categoryCompletions[category] ?? 0) + 1 }
+            : s.categoryCompletions;
+
+          const baseUpdate = {
             totalPointsEarned: newTotal,
-            evolutionStage: deriveEvolutionStage(newTotal),
+            categoryCompletions: newCategoryCompletions,
+          };
+
+          const next = nextStage(s.evolutionStage);
+
+          // Already at max stage or ascended (not yet implemented)
+          if (!next || next === 'ascended') return baseUpdate;
+
+          const threshold = EVOLUTION_THRESHOLDS[next];
+          if (!threshold) return baseUpdate;
+
+          const { activeDaysCount, isPremium } = usePlayerStore.getState();
+          const meetsConditions =
+            newTotal >= threshold.points && activeDaysCount >= threshold.days;
+          if (!meetsConditions) return baseUpdate;
+
+          // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
+          if (next === 'adult') {
+            if (!isPremium) {
+              // Show gate once per stage — don't repeat if already shown
+              if (s.premiumGateShownFor === next) return baseUpdate;
+              return {
+                ...baseUpdate,
+                pendingPremiumGate: next,
+                premiumGateShownFor: next,
+              };
+            }
+          }
+
+          // Evolve!
+          const adultVariant = next === 'adult'
+            ? determineAdultVariant(newCategoryCompletions)
+            : s.adultVariant;
+
+          return {
+            ...baseUpdate,
+            evolutionStage: next,
+            adultVariant,
+            pendingEvolution: next,
+            pendingPremiumGate: null,
           };
         }),
+
+      recheckEvolution: () => {
+        const s = get();
+        const { activeDaysCount, isPremium } = usePlayerStore.getState();
+        const next = nextStage(s.evolutionStage);
+        if (!next || next === 'ascended') return;
+
+        const threshold = EVOLUTION_THRESHOLDS[next];
+        if (!threshold) return;
+        if (s.totalPointsEarned < threshold.points || activeDaysCount < threshold.days) return;
+
+        if (next === 'adult' && !isPremium) {
+          if (s.premiumGateShownFor !== next) {
+            set({ pendingPremiumGate: next, premiumGateShownFor: next });
+          }
+          return;
+        }
+
+        const adultVariant = next === 'adult'
+          ? determineAdultVariant(s.categoryCompletions)
+          : s.adultVariant;
+
+        set({
+          evolutionStage: next,
+          adultVariant,
+          pendingEvolution: next,
+          pendingPremiumGate: null,
+        });
+      },
 
       checkStreakMilestones: () => {
         const streak = usePlayerStore.getState().streak;
@@ -87,6 +206,10 @@ export const usePetStore = create<PetStore>()(
 
       clearMilestoneBanner: () => set({ pendingMilestoneBanner: null }),
 
+      clearPendingEvolution: () => set({ pendingEvolution: null }),
+
+      clearPremiumGate: () => set({ pendingPremiumGate: null }),
+
       applyDecay: () => {
         const now = Date.now();
         const { lastSessionAt, health, happiness } = get();
@@ -101,6 +224,31 @@ export const usePetStore = create<PetStore>()(
     }),
     {
       name: 'mm-pet',
+      version: 1,
+      migrate: (persistedState: any): any => {
+        // Migrate from old integer stage (0=hatchling, 1=growing, 2=mature, 3=evolved)
+        const STAGE_MAP: Record<number, EvolutionStage> = {
+          0: 'egg',
+          1: 'baby',
+          2: 'teen',
+          3: 'adult',
+        };
+        const oldStage = persistedState?.evolutionStage;
+        const migratedStage: EvolutionStage =
+          typeof oldStage === 'number'
+            ? (STAGE_MAP[oldStage] ?? 'egg')
+            : (oldStage ?? 'egg');
+
+        return {
+          adultVariant: 'base',
+          categoryCompletions: {},
+          pendingEvolution: null,
+          pendingPremiumGate: null,
+          premiumGateShownFor: null,
+          ...persistedState,
+          evolutionStage: migratedStage,
+        };
+      },
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         state?.applyDecay();

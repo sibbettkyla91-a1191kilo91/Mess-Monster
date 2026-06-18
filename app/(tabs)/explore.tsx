@@ -168,7 +168,7 @@ export default function TasksScreen() {
       const reward = rollReward();
       const totalPoints = Math.round(task.pointValue * reward.pointsMultiplier);
       earnPoints(totalPoints);
-      trackEarned(totalPoints);
+      trackEarned(totalPoints, task.category);
 
       // Handle free item if applicable
       let freeItemName: string | undefined;
@@ -188,7 +188,7 @@ export default function TasksScreen() {
     } else {
       // No photo — base points only
       earnPoints(task.pointValue);
-      trackEarned(task.pointValue);
+      trackEarned(task.pointValue, task.category);
       showCelebration(`\u2728 +${task.pointValue} pts (snap a photo next time for bonuses!)`);
     }
 
