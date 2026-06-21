@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Image,
   ImageBackground,
   ImageSourcePropType,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -38,8 +39,8 @@ const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
 // ─── Dimensions ──────────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const IMAGE_SIZE  = Math.max(220, Math.round(SCREEN_WIDTH * 0.68));
-const MONSTER_TOP = Math.round(SCREEN_HEIGHT * 0.50) - IMAGE_SIZE;
+const HABITAT_WIDTH = SCREEN_WIDTH;
+const IMAGE_SIZE    = Math.round(HABITAT_WIDTH * 0.55);
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 
@@ -515,6 +516,8 @@ export default function HomeScreen() {
   const setPremium      = usePlayerStore((s) => s.setPremium);
   const router          = useRouter();
 
+  const [panelHeight, setPanelHeight] = useState(0);
+
   const mood = deriveMood(health, happiness);
 
   const monster = selectedMonster === 'luna' ? 'luna' : 'nilly';
@@ -647,9 +650,9 @@ export default function HomeScreen() {
   // Stage-based shadow intensity
   const isAdult = evolutionStage === 'adult' || evolutionStage === 'ascended';
   const shadowStyle = isAdult
-    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.75, shadowRadius: 30, elevation: 14 }
+    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.75, shadowRadius: 30, elevation: Platform.OS === 'android' ? 0 : 14 }
     : evolutionStage === 'teen'
-    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 18, elevation: 8 }
+    ? { shadowColor: theme.accent, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 18, elevation: Platform.OS === 'android' ? 0 : 8 }
     : null;
 
   const monsterSource = getMonsterSprite(monster, evolutionStage, adultVariant);
@@ -686,6 +689,7 @@ export default function HomeScreen() {
       <Animated.View
         style={[
           styles.monsterImageWrapper,
+          panelHeight > 0 && { bottom: panelHeight + 16 },
           { opacity: wrapperOpacity },
           shadowStyle,
           {
@@ -713,7 +717,10 @@ export default function HomeScreen() {
       </Animated.View>
 
       {/* ── Bottom panel ── */}
-      <View style={[styles.bottomPanel, { backgroundColor: theme.panelBg }]}>
+      <View
+        style={[styles.bottomPanel, { backgroundColor: theme.panelBg }]}
+        onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+      >
         <View style={styles.nameRow}>
           <ThemedText style={[styles.monsterName, { color: theme.text }]}>
             {displayName}
@@ -826,7 +833,7 @@ const styles = StyleSheet.create({
   },
   monsterImageWrapper: {
     position: 'absolute',
-    top: MONSTER_TOP,
+    bottom: '25%',
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -834,6 +841,7 @@ const styles = StyleSheet.create({
   monsterImage: {
     width: IMAGE_SIZE,
     height: IMAGE_SIZE,
+    aspectRatio: 1,
   },
   moodOverlay: {
     position: 'absolute',
