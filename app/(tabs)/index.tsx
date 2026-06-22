@@ -28,13 +28,6 @@ const STAGE_LABELS: Record<EvolutionStage, string> = {
   ascended: 'Ascended ✨',
 };
 
-const MOOD_OVERLAY_COLOR: Record<PetMood, string | null> = {
-  thriving: 'rgba(255,215,0,0.15)',
-  happy:    null,
-  neutral:  null,
-  sad:      'rgba(100,120,180,0.20)',
-  sick:     'rgba(80,180,80,0.25)',
-};
 
 // ─── Dimensions ──────────────────────────────────────────────────────────────
 
@@ -645,8 +638,6 @@ export default function HomeScreen() {
     mood === 'neutral' ? 0.9 : 1,
   );
 
-  const overlayColor = MOOD_OVERLAY_COLOR[mood];
-
   // Stage-based shadow intensity
   const isAdult = evolutionStage === 'adult' || evolutionStage === 'ascended';
   const shadowStyle = isAdult
@@ -708,12 +699,6 @@ export default function HomeScreen() {
           style={styles.monsterImage}
           resizeMode="contain"
         />
-        {overlayColor !== null && (
-          <View
-            pointerEvents="none"
-            style={[styles.moodOverlay, { backgroundColor: overlayColor }]}
-          />
-        )}
       </Animated.View>
 
       {/* ── Bottom panel ── */}
@@ -842,12 +827,6 @@ const styles = StyleSheet.create({
     width: IMAGE_SIZE,
     height: IMAGE_SIZE,
     aspectRatio: 1,
-  },
-  moodOverlay: {
-    position: 'absolute',
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: IMAGE_SIZE * 0.1,
   },
   bottomPanel: {
     position: 'absolute',

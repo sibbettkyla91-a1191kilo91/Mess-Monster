@@ -46,6 +46,14 @@ export default function TabLayout() {
           tabBarBadgeStyle: { backgroundColor: tabTint },
         }}
       />
+      {/* TODO: DEV ONLY — remove this Tabs.Screen before launch */}
+      <Tabs.Screen
+        name="debug-sprites"
+        options={{
+          title: 'Sprites',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="ladybug" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
