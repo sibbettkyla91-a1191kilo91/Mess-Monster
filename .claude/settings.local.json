@@ -34,7 +34,8 @@
       "Bash(python fix_sprites.py)",
       "Bash(Get-Content \"C:\\\\Users\\\\kylas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-kylas-mess-monster\\\\0a9fe877-f403-42d0-868a-08385cd43fc8\\\\tasks\\\\bfuot6whh.output\" -Tail 20)",
       "Bash(Start-Sleep -Seconds 12)",
-      "Bash(Get-Content \"C:\\\\Users\\\\kylas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-kylas-mess-monster\\\\0a9fe877-f403-42d0-868a-08385cd43fc8\\\\tasks\\\\br6andm4n.output\" -Tail 25)"
+      "Bash(Get-Content \"C:\\\\Users\\\\kylas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-kylas-mess-monster\\\\0a9fe877-f403-42d0-868a-08385cd43fc8\\\\tasks\\\\br6andm4n.output\" -Tail 25)",
+      "Bash(xargs wc -l)"
     ]
   }
 }
