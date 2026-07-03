@@ -250,8 +250,19 @@ export const usePetStore = create<PetStore>()(
         };
       },
       storage: createJSONStorage(() => AsyncStorage),
+      // PERFORMANCE: Defer decay application to next tick instead of blocking hydration.
+      // This unblocks the initial render and defers heavy computation to after the UI is ready.
       onRehydrateStorage: () => (state) => {
-        state?.applyDecay();
+        if (state) {
+          // Use setImmediate to schedule decay on the next event loop iteration.
+          // This allows React to complete the initial render before we do heavy calculations.
+          if (typeof setImmediate !== 'undefined') {
+            setImmediate(() => state.applyDecay());
+          } else {
+            // Fallback for environments without setImmediate (e.g., some React Native setups)
+            setTimeout(() => state.applyDecay(), 0);
+          }
+        }
       },
     },
   ),

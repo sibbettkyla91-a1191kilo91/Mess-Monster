@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -18,7 +18,7 @@ import { PetMood, deriveMood, usePetStore } from '@/store/use-pet-store';
 import { usePlayerStore } from '@/store/use-player-store';
 import { AdultVariant, EvolutionStage } from '@/store/types';
 
-// ─── Stage labels ─────────────────────────────────────────────────────────────
+// ─── Stage labels ────────────────────────────────────────────────────────
 
 const STAGE_LABELS: Record<EvolutionStage, string> = {
   egg:      'Egg',
@@ -29,13 +29,13 @@ const STAGE_LABELS: Record<EvolutionStage, string> = {
 };
 
 
-// ─── Dimensions ──────────────────────────────────────────────────────────────
+// ─── Dimensions ─────────────────────────────────────────────────────────
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HABITAT_WIDTH = SCREEN_WIDTH;
 const IMAGE_SIZE    = Math.round(HABITAT_WIDTH * 0.55);
 
-// ─── Theme ───────────────────────────────────────────────────────────────────
+// ─── Theme ───────────────────────────────────────────────────────────
 
 const THEMES = {
   nilly: {
@@ -66,7 +66,7 @@ const THEMES = {
   },
 } as const;
 
-// ─── Mood config ─────────────────────────────────────────────────────────────
+// ─── Mood config ─────────────────────────────────────────────────────────
 
 const MOOD_CONFIG = {
   nilly: {
@@ -85,7 +85,7 @@ const MOOD_CONFIG = {
   },
 } as const;
 
-// ─── Stage sprite map ─────────────────────────────────────────────────────────
+// ─── Stage sprite map ───────────────────────────────────────────────────────
 // All sprites live in assets/ (root). Adult variants are determined at evolution time.
 
 const STAGE_SPRITES = {
@@ -172,7 +172,7 @@ const NILLY_PARTICLES: ParticleDef[] = [
   { id: 'n10', x: 0.93, y: 0.43, char: '🍃', size: 11, opacity: 0.28, duration: 3400, delay: 1800, driftY: 14 },
 ];
 
-// ─── FloatingParticle ────────────────────────────────────────────────────────
+// ─── FloatingParticle ───────────────────────────────────────────────────────
 
 function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
   const translateY = useRef(new Animated.Value(0)).current;
@@ -216,7 +216,7 @@ function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
   );
 }
 
-// ─── MonsterHabitat ──────────────────────────────────────────────────────────
+// ─── MonsterHabitat ───────────────────────────────────────────────────────
 
 function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
   const particles = monster === 'luna' ? LUNA_PARTICLES : NILLY_PARTICLES;
@@ -231,7 +231,7 @@ function MonsterHabitat({ monster }: { monster: 'nilly' | 'luna' }) {
   );
 }
 
-// ─── StatBar ─────────────────────────────────────────────────────────────────
+// ─── StatBar ──────────────────────────────────────────────────────────
 
 function StatBar({
   icon, label, value, color, trackColor,
@@ -380,7 +380,7 @@ const evolutionStyles = StyleSheet.create({
   hint:      { fontSize: 13, opacity: 0.5, marginTop: 4 },
 });
 
-// ─── PremiumGateModal ────────────────────────────────────────────────────────
+// ─── PremiumGateModal ───────────────────────────────────────────────────────
 
 function PremiumGateModal({
   stage,
@@ -487,7 +487,7 @@ const premiumStyles = StyleSheet.create({
   },
 });
 
-// ─── HomeScreen ───────────────────────────────────────────────────────────────
+// ─── HomeScreen ───────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const health                 = usePetStore((s) => s.health);
@@ -502,7 +502,7 @@ export default function HomeScreen() {
   const clearPremiumGate       = usePetStore((s) => s.clearPremiumGate);
   const recheckEvolution       = usePetStore((s) => s.recheckEvolution);
 
-  const availablePoints = usePlayerStore((s) => s.availablePoints());
+  const availablePoints = usePlayerStore((s) => s.availablePointsValue);
   const streak          = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? 'nilly';
   const monsterName     = usePlayerStore((s) => s.monsterName);
@@ -534,10 +534,14 @@ export default function HomeScreen() {
       ]),
     );
     loop.start();
-    return () => loop.stop();
+    return () => {
+      loop.stop();
+      // PERFORMANCE: Reset animation value on cleanup to prevent animation state leaks
+      bobAnim.setValue(0);
+    };
   }, [mood, bobAnim]);
 
-  // ── Wiggle ─────────────────────────────────────────────────────────────────
+  // ── Wiggle ──────────────────────────────────────────────────────────
   const wiggleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -558,11 +562,16 @@ export default function HomeScreen() {
     };
 
     schedule();
-    return () => { active = false; clearTimeout(tid); wiggleAnim.setValue(0); };
+    return () => {
+      active = false;
+      clearTimeout(tid);
+      // PERFORMANCE: Reset animation value on cleanup
+      wiggleAnim.setValue(0);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Thriving scale-pulse ───────────────────────────────────────────────────
+  // ── Thriving scale-pulse ────────────────────────────────��──────────────────
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -584,7 +593,12 @@ export default function HomeScreen() {
     };
 
     schedule();
-    return () => { active = false; clearTimeout(tid); scaleAnim.setValue(1); };
+    return () => {
+      active = false;
+      clearTimeout(tid);
+      // PERFORMANCE: Reset animation value on cleanup
+      scaleAnim.setValue(1);
+    };
   }, [mood, scaleAnim]);
 
   // ── Evolution glow pulse (adult / ascended) ────────────────────────────────
@@ -600,7 +614,11 @@ export default function HomeScreen() {
       ]),
     );
     loop.start();
-    return () => { loop.stop(); evoScaleAnim.setValue(1); };
+    return () => {
+      loop.stop();
+      // PERFORMANCE: Reset animation value on cleanup
+      evoScaleAnim.setValue(1);
+    };
   }, [evolutionStage, evoScaleAnim]);
 
   // ── Milestone banner auto-dismiss ─────────────────────────────────────────
@@ -610,7 +628,7 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, [pendingMilestoneBanner, clearMilestoneBanner]);
 
-  // ── Sick wobble ────────────────────────────────────────────────────────────
+  // ── Sick wobble ─────────────────────────────────────────────────────────
   const sickWobbleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -622,7 +640,11 @@ export default function HomeScreen() {
       ]),
     );
     loop.start();
-    return () => { loop.stop(); sickWobbleAnim.setValue(0); };
+    return () => {
+      loop.stop();
+      // PERFORMANCE: Reset animation value on cleanup
+      sickWobbleAnim.setValue(0);
+    };
   }, [mood, sickWobbleAnim]);
 
   const wiggleRot = wiggleAnim.interpolate({
@@ -788,7 +810,7 @@ export default function HomeScreen() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {

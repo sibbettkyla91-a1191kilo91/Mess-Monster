@@ -8,7 +8,8 @@ function todayISO() {
 }
 
 interface PlayerStore extends PlayerProfile {
-  availablePoints: () => number;
+  availablePointsValue: number; // Computed field: totalPoints - spentPoints
+  availablePoints: () => number; // Selector function for backward compatibility
   earnPoints: (amount: number) => void;
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
   recordActivity: () => void; // call after a task is logged; updates streak + activeDaysCount
@@ -28,15 +29,29 @@ export const usePlayerStore = create<PlayerStore>()(
       isPremium: false,
       selectedMonster: null,
       monsterName: '',
+      availablePointsValue: 100, // Initial value: 100 - 0
 
+      // PERFORMANCE: Computed property updated whenever points change.
+      // This provides a single source of truth that can be selected safely.
+      // Use the selector: usePlayerStore((s) => s.availablePointsValue)
+      // instead of calling availablePoints() to avoid function re-creation.
       availablePoints: () => get().totalPoints - get().spentPoints,
 
       earnPoints: (amount) =>
-        set((s) => ({ totalPoints: s.totalPoints + amount })),
+        set((s) => {
+          const newTotal = s.totalPoints + amount;
+          return {
+            totalPoints: newTotal,
+            availablePointsValue: newTotal - s.spentPoints,
+          };
+        }),
 
       spendPoints: (amount) => {
-        if (get().availablePoints() < amount) return false;
-        set((s) => ({ spentPoints: s.spentPoints + amount }));
+        if (get().availablePointsValue < amount) return false;
+        set((s) => ({
+          spentPoints: s.spentPoints + amount,
+          availablePointsValue: s.availablePointsValue - amount,
+        }));
         return true;
       },
 
@@ -61,11 +76,16 @@ export const usePlayerStore = create<PlayerStore>()(
     {
       name: 'mm-player',
       version: 1,
-      migrate: (persistedState: any): any => ({
-        activeDaysCount: 0,
-        isPremium: false,
-        ...persistedState,
-      }),
+      migrate: (persistedState: any): any => {
+        const totalPoints = persistedState?.totalPoints ?? 100;
+        const spentPoints = persistedState?.spentPoints ?? 0;
+        return {
+          activeDaysCount: 0,
+          isPremium: false,
+          availablePointsValue: totalPoints - spentPoints,
+          ...persistedState,
+        };
+      },
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

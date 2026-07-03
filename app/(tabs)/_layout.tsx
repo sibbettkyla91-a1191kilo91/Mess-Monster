@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -10,11 +10,18 @@ import { usePlayerStore } from '@/store/use-player-store';
 const MIN_STORE_ITEM_COST = 20;
 
 export default function TabLayout() {
-  const availablePoints = usePlayerStore((s) => s.availablePoints());
+  // PERFORMANCE: Select the computed availablePointsValue instead of calling the function.
+  // This prevents unnecessary re-renders when other store values change.
+  const availablePoints = usePlayerStore((s) => s.availablePointsValue);
   const { tabTint } = useMonsterTheme();
 
+  // PERFORMANCE: Memoize the badge value to prevent tab options recalculation on every render
+  const storeBadge = useMemo(
+    () => (availablePoints >= MIN_STORE_ITEM_COST ? ('' as const) : undefined),
+    [availablePoints]
+  );
+
   // Empty-string badge renders as a coloured dot; undefined hides it entirely
-  const storeBadge = availablePoints >= MIN_STORE_ITEM_COST ? ('' as const) : undefined;
 
   return (
     <Tabs
