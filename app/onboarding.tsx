@@ -212,10 +212,11 @@ function ProgressDots({ total, active }: { total: number; active: number }) {
 // ─── Root screen ─────────────────────────────────────────────────────────────
 
 export default function OnboardingScreen() {
-  const router          = useRouter();
-  const selectMonster   = usePlayerStore((s) => s.selectMonster);
-  const setMonsterName  = usePlayerStore((s) => s.setMonsterName);
-  const selectedMonster = usePlayerStore((s) => s.selectedMonster);
+  const router             = useRouter();
+  const selectMonster      = usePlayerStore((s) => s.selectMonster);
+  const setMonsterName     = usePlayerStore((s) => s.setMonsterName);
+  const completeOnboarding = usePlayerStore((s) => s.completeOnboarding);
+  const hasCompletedOnboarding = usePlayerStore((s) => s.hasCompletedOnboarding);
   const [hydrated, setHydrated] = useState(() => usePlayerStore.persist.hasHydrated());
   const [page, setPage]         = useState(0);
   const scrollRef = useRef<ScrollView>(null);
@@ -226,7 +227,7 @@ export default function OnboardingScreen() {
   }, [hydrated]);
 
   if (!hydrated) return null;
-  if (selectedMonster) return <Redirect href="/(tabs)" />;
+  if (hasCompletedOnboarding) return <Redirect href="/(tabs)" />;
 
   const goTo = (i: number) => {
     setPage(i);
@@ -238,6 +239,7 @@ export default function OnboardingScreen() {
   const choose = (monster: 'nilly' | 'luna', name: string) => {
     selectMonster(monster);
     setMonsterName(name);
+    completeOnboarding();
     router.replace('/(tabs)');
   };
 

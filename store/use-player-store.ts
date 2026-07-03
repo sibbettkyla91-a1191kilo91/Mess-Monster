@@ -16,6 +16,7 @@ interface PlayerStore extends PlayerProfile {
   selectMonster: (monster: 'nilly' | 'luna') => void;
   setMonsterName: (name: string) => void;
   setPremium: (value: boolean) => void;
+  completeOnboarding: () => void;
 }
 
 export const usePlayerStore = create<PlayerStore>()(
@@ -29,6 +30,7 @@ export const usePlayerStore = create<PlayerStore>()(
       isPremium: false,
       selectedMonster: null,
       monsterName: '',
+      hasCompletedOnboarding: false,
       availablePointsValue: 100, // Initial value: 100 - 0
 
       // PERFORMANCE: Computed property updated whenever points change.
@@ -72,6 +74,7 @@ export const usePlayerStore = create<PlayerStore>()(
       selectMonster: (monster) => set({ selectedMonster: monster }),
       setMonsterName: (name) => set({ monsterName: name }),
       setPremium: (value) => set({ isPremium: value }),
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),
     {
       name: 'mm-player',

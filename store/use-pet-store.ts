@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { AdultVariant, EvolutionStage, PetState, TaskCategory } from './types';
@@ -215,11 +216,27 @@ export const usePetStore = create<PetStore>()(
         const { lastSessionAt, health, happiness } = get();
         const elapsedHours = (now - lastSessionAt) / 3_600_000;
         if (elapsedHours < MIN_DECAY_HOURS) return;
+        
+        const newHealth = clamp(health - HEALTH_DECAY_RATE * elapsedHours);
+        const newHappiness = clamp(happiness - HAPPINESS_DECAY_RATE * elapsedHours);
+        
         set({
-          health:        clamp(health    - HEALTH_DECAY_RATE    * elapsedHours),
-          happiness:     clamp(happiness - HAPPINESS_DECAY_RATE * elapsedHours),
+          health: newHealth,
+          happiness: newHappiness,
           lastSessionAt: now,
         });
+        
+        // Trigger notification if health or happiness drops below 30
+        if ((newHealth < 30 || newHappiness < 30) && (health >= 30 && happiness >= 30)) {
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Your pet needs care! 🧹',
+              body: 'Time to log a cleaning task and keep your pet happy.',
+              sound: 'default',
+            },
+            trigger: null, // Show immediately
+          });
+        }
       },
     }),
     {
