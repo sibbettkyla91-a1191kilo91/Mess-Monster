@@ -130,7 +130,7 @@ function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna', name: strin
             accessibilityLabel="Choose Nilly"
           >
             <Image
-              source={require('../assets/images/nilly.png')}
+              source={require('../assets/images/nilly_adult.png')}
               style={pick.img}
               resizeMode="contain"
             />
@@ -150,7 +150,7 @@ function ChooseSlide({ onChoose }: { onChoose: (m: 'nilly' | 'luna', name: strin
             accessibilityLabel="Choose Luna"
           >
             <Image
-              source={require('../assets/images/luna.png')}
+              source={require('../assets/images/luna_adult.png')}
               style={pick.img}
               resizeMode="contain"
             />
