@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -227,18 +226,16 @@ export const usePetStore = create<PetStore>()(
           lastSessionAt: now,
         });
         
-        // Trigger notification if health or happiness drops below 30 (only outside Expo Go)
+        // Trigger notification if health or happiness drops below 30
         if ((newHealth < 30 || newHappiness < 30) && (health >= 30 && happiness >= 30)) {
-          if (Constants.executionEnvironment !== 'storeClient') {
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Your pet needs care! 🧹',
-                body: 'Time to log a cleaning task and keep your pet happy.',
-                sound: 'default',
-              },
-              trigger: null, // Show immediately
-            });
-          }
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'Your pet needs care! 🧹',
+              body: 'Time to log a cleaning task and keep your pet happy.',
+              sound: 'default',
+            },
+            trigger: null, // Show immediately
+          });
         }
       },
     }),
