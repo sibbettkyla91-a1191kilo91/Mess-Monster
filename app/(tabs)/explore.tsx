@@ -239,11 +239,9 @@ export default function TasksScreen() {
     // Show celebration
     showCelebration(`\u2728 +${finalPoints} pts claimed!`);
   }, [taskProgress, earnPoints, trackEarned, addTask, recordActivity, checkStreakMilestones, care, showCelebration]);
-    }));
-  }, [taskProgress, addTask, recordActivity, care, checkStreakMilestones, earnPoints, trackEarned, buyItem, showCelebration]);
 
   const completedCount = Object.values(taskProgress).filter(
-    (p) => p.state === 'completed'
+    (p) => p.state === 'claimed'
   ).length;
 
   return (
