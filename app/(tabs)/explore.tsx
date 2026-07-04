@@ -46,15 +46,22 @@ const CATEGORY_EMOJI: Record<TaskCategory, string> = {
  * - idle: not started
  * - pending_photo: user tapped task, can take photo or skip
  * - waiting: time lock counting down before reward
- * - completed: reward claimed
+ * - reward_ready: timer done, waiting for user to claim reward
+ * - claimed: reward claimed
  */
-type TaskState = 'idle' | 'pending_photo' | 'waiting' | 'completed';
+type TaskState = 'idle' | 'pending_photo' | 'waiting' | 'reward_ready' | 'claimed';
 
 interface TaskProgress {
   state: TaskState;
   hasPhoto: boolean;
   photoUri?: string;
   waitStartedAt?: number; // unix ms when time lock started
+  rewardInfo?: {
+    basePoints: number;
+    pointsMultiplier: number;
+    finalPoints: number;
+    freeItemName?: string;
+  };
 }
 
 export default function TasksScreen() {
@@ -152,23 +159,15 @@ export default function TasksScreen() {
     }));
   }, []);
 
-  // Step 3: Time lock expires → claim reward
+  // Step 3: Time lock expires → show claim button (don't award yet)
   const handleTimerComplete = useCallback((task: PresetTask) => {
     const progress = taskProgress[task.id];
     if (!progress) return;
 
-    // Log the task
-    addTask({ ...task, completedAt: Date.now() });
-    recordActivity();
-    checkStreakMilestones(); // streak already updated — reads post-increment value
-    care();
-
     if (progress.hasPhoto) {
-      // Roll reward for photo-verified tasks
+      // Calculate photo reward
       const reward = rollReward();
-      const totalPoints = Math.round(task.pointValue * reward.pointsMultiplier);
-      earnPoints(totalPoints);
-      trackEarned(totalPoints, task.category);
+      const finalPoints = Math.round(task.pointValue * reward.pointsMultiplier);
 
       // Handle free item if applicable
       let freeItemName: string | undefined;
@@ -183,19 +182,63 @@ export default function TasksScreen() {
         }
       }
 
-      // Show reward modal
-      setRewardModal({ reward, basePoints: task.pointValue, freeItemName });
+      // Transition to reward_ready with reward info
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...prev[task.id],
+          state: 'reward_ready',
+          rewardInfo: {
+            basePoints: task.pointValue,
+            pointsMultiplier: reward.pointsMultiplier,
+            finalPoints,
+            freeItemName,
+          },
+        },
+      }));
     } else {
       // No photo — base points only
-      earnPoints(task.pointValue);
-      trackEarned(task.pointValue, task.category);
-      showCelebration(`\u2728 +${task.pointValue} pts (snap a photo next time for bonuses!)`);
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: {
+          ...prev[task.id],
+          state: 'reward_ready',
+          rewardInfo: {
+            basePoints: task.pointValue,
+            pointsMultiplier: 1,
+            finalPoints: task.pointValue,
+          },
+        },
+      }));
     }
+  }, [taskProgress, buyItem]);
 
-    // Mark completed
+  // Step 4: User claims reward → award points and mark as claimed
+  const handleClaimReward = useCallback((task: PresetTask) => {
+    const progress = taskProgress[task.id];
+    if (!progress || !progress.rewardInfo) return;
+
+    const { finalPoints } = progress.rewardInfo;
+
+    // Award points and track
+    earnPoints(finalPoints);
+    trackEarned(finalPoints, task.category);
+
+    // Log the task
+    addTask({ ...task, completedAt: Date.now() });
+    recordActivity();
+    checkStreakMilestones();
+    care();
+
+    // Mark as claimed
     setTaskProgress((prev) => ({
       ...prev,
-      [task.id]: { ...prev[task.id], state: 'completed' },
+      [task.id]: { ...prev[task.id], state: 'claimed' },
+    }));
+
+    // Show celebration
+    showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+  }, [taskProgress, earnPoints, trackEarned, addTask, recordActivity, checkStreakMilestones, care, showCelebration]);
     }));
   }, [taskProgress, addTask, recordActivity, care, checkStreakMilestones, earnPoints, trackEarned, buyItem, showCelebration]);
 
@@ -314,16 +357,49 @@ export default function TasksScreen() {
                     active={true}
                   />
                   <Text style={[styles.waitHint, { color: isDark ? '#888' : '#999' }]}>
-                    Reward in progress...
+                    Reward ready when timer expires...
                   </Text>
                 </View>
               )}
 
-              {/* State: completed — show verified badge */}
-              {progress.state === 'completed' && (
+              {/* State: reward_ready — show claim button with point breakdown */}
+              {progress.state === 'reward_ready' && progress.rewardInfo && (
+                <View style={styles.rewardSection}>
+                  <View style={[styles.rewardBreakdown, { backgroundColor: isDark ? '#2a2a3e' : '#f5f5f5' }]}>
+                    <Text style={[styles.rewardLabel, { color: isDark ? '#ccc' : '#555' }]}>
+                      Base: {progress.rewardInfo.basePoints} pts
+                    </Text>
+                    {progress.rewardInfo.pointsMultiplier > 1 && (
+                      <Text style={[styles.rewardLabel, { color: accent, fontWeight: '700' }]}>
+                        × {progress.rewardInfo.pointsMultiplier.toFixed(1)} bonus
+                      </Text>
+                    )}
+                    <Text style={[styles.rewardTotal, { color: accent }]}>
+                      = {progress.rewardInfo.finalPoints} pts
+                    </Text>
+                  </View>
+                  {progress.rewardInfo.freeItemName && (
+                    <Text style={[styles.freeItemText, { color: isDark ? '#aaa' : '#666' }]}>
+                      + {progress.rewardInfo.freeItemName}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.claimButton, { backgroundColor: accent }]}
+                    onPress={() => handleClaimReward(task)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.claimButtonText}>
+                      {'\ud83c\udf1f'} Claim Reward
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* State: claimed — show verified badge */}
+              {progress.state === 'claimed' && (
                 <View style={[styles.completedBadge, { backgroundColor: isDark ? accentDark : accentLight }]}>
                   <Text style={[styles.completedText, { color: accentText }]}>
-                    {progress.hasPhoto ? '\ud83d\udcf7 Verified & rewarded' : '\u2728 Completed'}
+                    {'\u2705'} Claimed
                   </Text>
                 </View>
               )}
@@ -457,5 +533,37 @@ const styles = StyleSheet.create({
   completedText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  rewardSection: {
+    gap: 10,
+  },
+  rewardBreakdown: {
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  rewardLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  rewardTotal: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  freeItemText: {
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  claimButton: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  claimButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });

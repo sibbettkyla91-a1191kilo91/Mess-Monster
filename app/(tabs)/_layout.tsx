@@ -53,6 +53,13 @@ export default function TabLayout() {
           tabBarBadgeStyle: { backgroundColor: tabTint },
         }}
       />
+      <Tabs.Screen
+        name="collection"
+        options={{
+          title: 'Collection',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />,
+        }}
+      />
       {__DEV__ && (
         <Tabs.Screen
           name="debug-sprites"

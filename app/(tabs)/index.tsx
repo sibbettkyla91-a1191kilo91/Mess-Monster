@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { PetMood, deriveMood, usePetStore } from '@/store/use-pet-store';
 import { usePlayerStore } from '@/store/use-player-store';
+import { useTasksStore } from '@/store/use-tasks-store';
 import { AdultVariant, EvolutionStage } from '@/store/types';
 
 // ─── Stage labels ────────────────────────────────────────────────────────
@@ -509,7 +510,13 @@ export default function HomeScreen() {
   const setPremium      = usePlayerStore((s) => s.setPremium);
   const router          = useRouter();
 
+  const tasks           = useTasksStore((s) => s.tasks);
+
   const [panelHeight, setPanelHeight] = useState(0);
+
+  // Count tasks completed today
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const doneToday = tasks.filter((t) => t.completedAt && new Date(t.completedAt).toISOString().slice(0, 10) === todayISO).length;
 
   const mood = deriveMood(health, happiness);
 
@@ -693,6 +700,13 @@ export default function HomeScreen() {
           <View style={styles.pillScrim}>
             <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
               🔥 {streak}d streak
+            </ThemedText>
+          </View>
+        )}
+        {doneToday > 0 && (
+          <View style={styles.pillScrim}>
+            <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
+              ✓ {doneToday}/6 done
             </ThemedText>
           </View>
         )}
