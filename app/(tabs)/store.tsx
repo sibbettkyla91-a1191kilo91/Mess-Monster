@@ -22,7 +22,7 @@ import {
 } from '@/store/store-items';
 
 export default function StoreScreen() {
-  const availablePoints = usePlayerStore((s) => s.availablePoints());
+  const availablePoints = usePlayerStore((s) => s.availablePointsValue);
   const spendPoints = usePlayerStore((s) => s.spendPoints);
   const care = usePetStore((s) => s.care);
   const buyItem = useStoreStore((s) => s.buyItem);

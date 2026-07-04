@@ -273,6 +273,7 @@ export const usePetStore = create<PetStore>()(
           premiumGateShownFor: null,
           ...persistedState,
           evolutionStage: migratedStage,
+          lastSessionAt: Date.now(),
         };
       },
       storage: createJSONStorage(() => AsyncStorage),
