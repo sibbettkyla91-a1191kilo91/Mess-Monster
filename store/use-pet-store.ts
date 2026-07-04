@@ -1,11 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { AdultVariant, EvolutionStage, PetState, TaskCategory } from './types';
 import { usePlayerStore } from './use-player-store';
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
+
+// Lazy-load notifications to avoid import-time crash in Expo Go
+async function scheduleDecayReminderAsync() {
+  try {
+    const Notifications = await import('expo-notifications');
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Your pet needs care! 🧹',
+        body: 'Time to log a cleaning task and keep your pet happy.',
+        sound: 'default',
+      },
+      trigger: null, // Show immediately
+    });
+  } catch (e) {
+    // Silently fail if notifications aren't available (Expo Go, etc.)
+  }
+}
 
 export type PetMood = 'thriving' | 'happy' | 'neutral' | 'sad' | 'sick';
 
@@ -228,14 +244,7 @@ export const usePetStore = create<PetStore>()(
         
         // Trigger notification if health or happiness drops below 30
         if ((newHealth < 30 || newHappiness < 30) && (health >= 30 && happiness >= 30)) {
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Your pet needs care! 🧹',
-              body: 'Time to log a cleaning task and keep your pet happy.',
-              sound: 'default',
-            },
-            trigger: null, // Show immediately
-          });
+          scheduleDecayReminderAsync(); // Fire and forget
         }
       },
     }),
