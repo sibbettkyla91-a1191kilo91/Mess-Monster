@@ -1,52 +1,83 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import { AdultVariant, EvolutionStage, PetState, TaskCategory } from './types';
-import { usePlayerStore } from './use-player-store';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { AdultVariant, EvolutionStage, PetState, TaskCategory } from "./types";
+import { usePlayerStore } from "./use-player-store";
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
 
 // Lazy-load notifications to avoid import-time crash in Expo Go
-async function scheduleDecayReminderAsync() {
+async function scheduleDecayReminderAsync(
+  healthLow: boolean,
+  happinessLow: boolean,
+  monsterName: string,
+) {
   try {
-    const Notifications = await import('expo-notifications');
+    const Notifications = await import("expo-notifications");
+
+    // Generate personalized message based on which stat is low
+    let title = "Your pet needs you! 🧹";
+    let body: string;
+
+    if (healthLow && happinessLow) {
+      body = `${monsterName} is struggling. Time to clean up and show some care!`;
+    } else if (healthLow) {
+      body = `${monsterName}'s health is declining. A quick cleaning task will help!`;
+    } else {
+      body = `${monsterName} is sad. Complete a cleaning task to brighten their day!`;
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Your pet needs care! 🧹',
-        body: 'Time to log a cleaning task and keep your pet happy.',
-        sound: 'default',
+        title,
+        body,
+        sound: "default",
+        // Android-specific: route to decay-reminders channel if available
+        android: {
+          channelId: "decay-reminders",
+          color: "#52b788", // Nilly's accent green
+          priority: "max",
+        },
       },
       trigger: null, // Show immediately
     });
   } catch (e) {
-    // Silently fail if notifications aren't available (Expo Go, etc.)
+    if (__DEV__) console.warn("Notification error:", e);
   }
 }
 
-export type PetMood = 'thriving' | 'happy' | 'neutral' | 'sad' | 'sick';
+export type PetMood = "thriving" | "happy" | "neutral" | "sad" | "sick";
 
 // Both points AND days must be met to evolve. Never de-evolve.
-const EVOLUTION_THRESHOLDS: Partial<Record<EvolutionStage, { points: number; days: number }>> = {
-  baby:  { points: 50,  days: 3  },
-  teen:  { points: 200, days: 7  },
+const EVOLUTION_THRESHOLDS: Partial<
+  Record<EvolutionStage, { points: number; days: number }>
+> = {
+  baby: { points: 50, days: 3 },
+  teen: { points: 200, days: 7 },
   adult: { points: 500, days: 14 },
 };
 
-const STAGE_ORDER: EvolutionStage[] = ['egg', 'baby', 'teen', 'adult', 'ascended'];
+const STAGE_ORDER: EvolutionStage[] = [
+  "egg",
+  "baby",
+  "teen",
+  "adult",
+  "ascended",
+];
 
 // Adult variant is determined by which room category the user has completed most (lifetime).
 const ROOM_CATEGORY_MAP: Partial<Record<TaskCategory, AdultVariant>> = {
-  kitchen:     'kitchen',
-  living_room: 'livingroom',
-  bedroom:     'bedroom',
-  bathroom:    'bathroom',
+  kitchen: "kitchen",
+  living_room: "livingroom",
+  bedroom: "bedroom",
+  bathroom: "bathroom",
 };
 
-const HEALTH_DECAY_RATE    = 1.5; // pts lost per hour
+const HEALTH_DECAY_RATE = 1.5; // pts lost per hour
 const HAPPINESS_DECAY_RATE = 2.0; // pts lost per hour
-const HEALTH_CARE_BOOST    = 15;
+const HEALTH_CARE_BOOST = 15;
 const HAPPINESS_CARE_BOOST = 20;
-const MIN_DECAY_HOURS      = 0.01; // ~36 s — skip trivially small gaps
+const MIN_DECAY_HOURS = 0.01; // ~36 s — skip trivially small gaps
 
 function clamp(v: number): number {
   return Math.min(100, Math.max(0, v));
@@ -54,11 +85,11 @@ function clamp(v: number): number {
 
 export function deriveMood(health: number, happiness: number): PetMood {
   const avg = (health + happiness) / 2;
-  if (avg >= 75) return 'thriving';
-  if (avg >= 55) return 'happy';
-  if (avg >= 35) return 'neutral';
-  if (avg >= 15) return 'sad';
-  return 'sick';
+  if (avg >= 75) return "thriving";
+  if (avg >= 55) return "happy";
+  if (avg >= 35) return "neutral";
+  if (avg >= 15) return "sad";
+  return "sick";
 }
 
 function nextStage(current: EvolutionStage): EvolutionStage | null {
@@ -74,7 +105,10 @@ function determineAdultVariant(
   let topCat: TaskCategory | null = null;
   let tied = false;
 
-  for (const [cat, count] of Object.entries(categoryCompletions) as [TaskCategory, number][]) {
+  for (const [cat, count] of Object.entries(categoryCompletions) as [
+    TaskCategory,
+    number,
+  ][]) {
     const variant = ROOM_CATEGORY_MAP[cat];
     if (!variant || !count) continue;
     if (count > maxCount) {
@@ -86,7 +120,7 @@ function determineAdultVariant(
     }
   }
 
-  if (!topCat || tied || !ROOM_CATEGORY_MAP[topCat]) return 'base';
+  if (!topCat || tied || !ROOM_CATEGORY_MAP[topCat]) return "base";
   return ROOM_CATEGORY_MAP[topCat]!;
 }
 
@@ -104,24 +138,25 @@ interface PetStore extends PetState {
 export const usePetStore = create<PetStore>()(
   persist(
     (set, get) => ({
-      health:                  100,
-      happiness:               100,
-      lastCaredAt:             Date.now(),
-      lastSessionAt:           Date.now(),
-      evolutionStage:          'egg' as EvolutionStage,
-      totalPointsEarned:       0,
-      adultVariant:            'base' as AdultVariant,
-      categoryCompletions:     {},
+      health: 100,
+      happiness: 100,
+      lastCaredAt: Date.now(),
+      lastSessionAt: Date.now(),
+      lastDecayReminderAt: 0,
+      evolutionStage: "egg" as EvolutionStage,
+      totalPointsEarned: 0,
+      adultVariant: "base" as AdultVariant,
+      categoryCompletions: {},
       claimedStreakMilestones: [],
-      pendingMilestoneBanner:  null,
-      pendingEvolution:        null,
-      pendingPremiumGate:      null,
-      premiumGateShownFor:     null,
+      pendingMilestoneBanner: null,
+      pendingEvolution: null,
+      pendingPremiumGate: null,
+      premiumGateShownFor: null,
 
       care: () =>
         set((s) => ({
-          health:      clamp(s.health    + HEALTH_CARE_BOOST),
-          happiness:   clamp(s.happiness + HAPPINESS_CARE_BOOST),
+          health: clamp(s.health + HEALTH_CARE_BOOST),
+          happiness: clamp(s.happiness + HAPPINESS_CARE_BOOST),
           lastCaredAt: Date.now(),
         })),
 
@@ -129,9 +164,13 @@ export const usePetStore = create<PetStore>()(
         set((s) => {
           const newTotal = s.totalPointsEarned + amount;
 
-          const newCategoryCompletions: Partial<Record<TaskCategory, number>> = category
-            ? { ...s.categoryCompletions, [category]: (s.categoryCompletions[category] ?? 0) + 1 }
-            : s.categoryCompletions;
+          const newCategoryCompletions: Partial<Record<TaskCategory, number>> =
+            category
+              ? {
+                  ...s.categoryCompletions,
+                  [category]: (s.categoryCompletions[category] ?? 0) + 1,
+                }
+              : s.categoryCompletions;
 
           const baseUpdate = {
             totalPointsEarned: newTotal,
@@ -141,7 +180,7 @@ export const usePetStore = create<PetStore>()(
           const next = nextStage(s.evolutionStage);
 
           // Already at max stage or ascended (not yet implemented)
-          if (!next || next === 'ascended') return baseUpdate;
+          if (!next || next === "ascended") return baseUpdate;
 
           const threshold = EVOLUTION_THRESHOLDS[next];
           if (!threshold) return baseUpdate;
@@ -152,7 +191,7 @@ export const usePetStore = create<PetStore>()(
           if (!meetsConditions) return baseUpdate;
 
           // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
-          if (next === 'adult') {
+          if (next === "adult") {
             if (!isPremium) {
               // Show gate once per stage — don't repeat if already shown
               if (s.premiumGateShownFor === next) return baseUpdate;
@@ -165,9 +204,10 @@ export const usePetStore = create<PetStore>()(
           }
 
           // Evolve!
-          const adultVariant = next === 'adult'
-            ? determineAdultVariant(newCategoryCompletions)
-            : s.adultVariant;
+          const adultVariant =
+            next === "adult"
+              ? determineAdultVariant(newCategoryCompletions)
+              : s.adultVariant;
 
           return {
             ...baseUpdate,
@@ -182,22 +222,27 @@ export const usePetStore = create<PetStore>()(
         const s = get();
         const { activeDaysCount, isPremium } = usePlayerStore.getState();
         const next = nextStage(s.evolutionStage);
-        if (!next || next === 'ascended') return;
+        if (!next || next === "ascended") return;
 
         const threshold = EVOLUTION_THRESHOLDS[next];
         if (!threshold) return;
-        if (s.totalPointsEarned < threshold.points || activeDaysCount < threshold.days) return;
+        if (
+          s.totalPointsEarned < threshold.points ||
+          activeDaysCount < threshold.days
+        )
+          return;
 
-        if (next === 'adult' && !isPremium) {
+        if (next === "adult" && !isPremium) {
           if (s.premiumGateShownFor !== next) {
             set({ pendingPremiumGate: next, premiumGateShownFor: next });
           }
           return;
         }
 
-        const adultVariant = next === 'adult'
-          ? determineAdultVariant(s.categoryCompletions)
-          : s.adultVariant;
+        const adultVariant =
+          next === "adult"
+            ? determineAdultVariant(s.categoryCompletions)
+            : s.adultVariant;
 
         set({
           evolutionStage: next,
@@ -229,45 +274,63 @@ export const usePetStore = create<PetStore>()(
 
       applyDecay: () => {
         const now = Date.now();
-        const { lastSessionAt, health, happiness } = get();
+        const { lastSessionAt, health, happiness, lastDecayReminderAt } = get();
         const elapsedHours = (now - lastSessionAt) / 3_600_000;
         if (elapsedHours < MIN_DECAY_HOURS) return;
-        
+
         const newHealth = clamp(health - HEALTH_DECAY_RATE * elapsedHours);
-        const newHappiness = clamp(happiness - HAPPINESS_DECAY_RATE * elapsedHours);
-        
+        const newHappiness = clamp(
+          happiness - HAPPINESS_DECAY_RATE * elapsedHours,
+        );
+
         set({
           health: newHealth,
           happiness: newHappiness,
           lastSessionAt: now,
         });
-        
+
         // Trigger notification if health or happiness drops below 30
-        if ((newHealth < 30 || newHappiness < 30) && (health >= 30 && happiness >= 30)) {
-          scheduleDecayReminderAsync(); // Fire and forget
+        // Only send once per hour to avoid notification spam
+        const timeSinceLastReminder = now - lastDecayReminderAt;
+        const oneHourMs = 60 * 60 * 1000;
+        const shouldThrottle = timeSinceLastReminder < oneHourMs;
+
+        if (
+          (newHealth < 30 || newHappiness < 30) &&
+          (health >= 30 || happiness >= 30) &&
+          !shouldThrottle
+        ) {
+          const { monsterName } = usePlayerStore.getState();
+          scheduleDecayReminderAsync(
+            newHealth < 30,
+            newHappiness < 30,
+            monsterName,
+          );
+          set({ lastDecayReminderAt: now });
         }
       },
     }),
     {
-      name: 'mm-pet',
+      name: "mm-pet",
       version: 1,
       migrate: (persistedState: any): any => {
         // Migrate from old integer stage (0=hatchling, 1=growing, 2=mature, 3=evolved)
         const STAGE_MAP: Record<number, EvolutionStage> = {
-          0: 'egg',
-          1: 'baby',
-          2: 'teen',
-          3: 'adult',
+          0: "egg",
+          1: "baby",
+          2: "teen",
+          3: "adult",
         };
         const oldStage = persistedState?.evolutionStage;
         const migratedStage: EvolutionStage =
-          typeof oldStage === 'number'
-            ? (STAGE_MAP[oldStage] ?? 'egg')
-            : (oldStage ?? 'egg');
+          typeof oldStage === "number"
+            ? (STAGE_MAP[oldStage] ?? "egg")
+            : (oldStage ?? "egg");
 
         return {
-          adultVariant: 'base',
+          adultVariant: "base",
           categoryCompletions: {},
+          lastDecayReminderAt: 0,
           pendingEvolution: null,
           pendingPremiumGate: null,
           premiumGateShownFor: null,
@@ -283,7 +346,7 @@ export const usePetStore = create<PetStore>()(
         if (state) {
           // Use setImmediate to schedule decay on the next event loop iteration.
           // This allows React to complete the initial render before we do heavy calculations.
-          if (typeof setImmediate !== 'undefined') {
+          if (typeof setImmediate !== "undefined") {
             setImmediate(() => state.applyDecay());
           } else {
             // Fallback for environments without setImmediate (e.g., some React Native setups)
