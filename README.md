@@ -5,7 +5,7 @@ A fun React Native app built with Expo where players can manage and care for vir
 ## Features (In Development)
 
 - 🏠 **Nilly and Luna's Homes** - Customize and decorate monster homes
-- 🎵 **Background Music** - Immersive audio experience  
+- 🎵 **Background Music** - Immersive audio experience
 - 💳 **Subscription Tiers** - Free and premium features
 - 📺 **Ad Support** - Optional ads on free tier
 
@@ -37,6 +37,7 @@ npm start
 ```
 
 Then choose your platform:
+
 - **iOS**: Press `i`
 - **Android**: Press `a`
 - **Web**: Press `w`
@@ -71,6 +72,7 @@ mess-monster/
 ## State Management
 
 The app uses **Zustand** for global state with separate stores for:
+
 - `monsterStore` - Monster state (Nilly & Luna)
 - `userStore` - User profile & preferences
 - `subscriptionStore` - Subscription & monetization
@@ -81,6 +83,7 @@ See `stores/` directory for implementation.
 ## Testing
 
 Run tests with:
+
 ```bash
 npm test
 ```

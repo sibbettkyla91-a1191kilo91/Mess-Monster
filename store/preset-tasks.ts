@@ -1,4 +1,4 @@
-import { TaskCategory } from './types';
+import { TaskCategory } from "./types";
 
 export interface PresetTask {
   id: string;
@@ -8,16 +8,66 @@ export interface PresetTask {
 }
 
 export const PRESET_TASKS: PresetTask[] = [
-  { id: 'wash-dishes',    label: 'Wash the dishes',    category: 'kitchen',     pointValue: 20 },
-  { id: 'wipe-counters',  label: 'Wipe down counters', category: 'kitchen',     pointValue: 15 },
-  { id: 'clean-stovetop', label: 'Clean the stovetop', category: 'kitchen',     pointValue: 30 },
-  { id: 'scrub-toilet',   label: 'Scrub the toilet',   category: 'bathroom',    pointValue: 40 },
-  { id: 'wipe-sink',      label: 'Wipe sink & mirror', category: 'bathroom',    pointValue: 20 },
-  { id: 'make-bed',       label: 'Make the bed',       category: 'bedroom',     pointValue: 10 },
-  { id: 'tidy-floor',     label: 'Tidy the floor',     category: 'bedroom',     pointValue: 15 },
-  { id: 'vacuum',         label: 'Vacuum the floor',   category: 'living_room', pointValue: 30 },
-  { id: 'dust-surfaces',  label: 'Dust surfaces',      category: 'living_room', pointValue: 20 },
-  { id: 'take-out-trash', label: 'Take out the trash', category: 'trash',       pointValue: 15 },
+  {
+    id: "wash-dishes",
+    label: "Wash the dishes",
+    category: "kitchen",
+    pointValue: 20,
+  },
+  {
+    id: "wipe-counters",
+    label: "Wipe down counters",
+    category: "kitchen",
+    pointValue: 15,
+  },
+  {
+    id: "clean-stovetop",
+    label: "Clean the stovetop",
+    category: "kitchen",
+    pointValue: 30,
+  },
+  {
+    id: "scrub-toilet",
+    label: "Scrub the toilet",
+    category: "bathroom",
+    pointValue: 40,
+  },
+  {
+    id: "wipe-sink",
+    label: "Wipe sink & mirror",
+    category: "bathroom",
+    pointValue: 20,
+  },
+  {
+    id: "make-bed",
+    label: "Make the bed",
+    category: "bedroom",
+    pointValue: 10,
+  },
+  {
+    id: "tidy-floor",
+    label: "Tidy the floor",
+    category: "bedroom",
+    pointValue: 15,
+  },
+  {
+    id: "vacuum",
+    label: "Vacuum the floor",
+    category: "living_room",
+    pointValue: 30,
+  },
+  {
+    id: "dust-surfaces",
+    label: "Dust surfaces",
+    category: "living_room",
+    pointValue: 20,
+  },
+  {
+    id: "take-out-trash",
+    label: "Take out the trash",
+    category: "trash",
+    pointValue: 15,
+  },
 ];
 
 // Mulberry32 — fast, high-quality 32-bit seeded RNG
@@ -49,7 +99,7 @@ export function getDailyRoll(
   pool: PresetTask[] = PRESET_TASKS,
   count = 6,
 ): PresetTask[] {
-  const seed = parseInt(dateStr.replace(/-/g, ''), 10);
+  const seed = parseInt(dateStr.replace(/-/g, ""), 10);
   const rng = makeRng(seed);
 
   // Group by category

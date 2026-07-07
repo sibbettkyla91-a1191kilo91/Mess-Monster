@@ -1,5 +1,5 @@
-import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import * as ImagePicker from "expo-image-picker";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -8,37 +8,37 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
-} from 'react-native';
+} from "react-native";
 
-import { PhotoRewardModal } from '@/components/photo-reward-modal';
-import { TaskTimer } from '@/components/task-timer';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { PhotoRewardModal } from "@/components/photo-reward-modal";
+import { TaskTimer } from "@/components/task-timer";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import {
   DEFAULT_MIN_TIME,
   FREE_ITEM_MAX_PRICE,
   RewardOutcome,
   TASK_MIN_TIMES,
   rollReward,
-} from '@/constants/task-timers';
-import { useMonsterTheme } from '@/hooks/use-monster-theme';
-import { usePetStore } from '@/store/use-pet-store';
-import { usePlayerStore } from '@/store/use-player-store';
-import { usePhotoStore } from '@/store/use-photo-store';
-import { useStoreStore } from '@/store/use-store-store';
-import { PresetTask } from '@/store/preset-tasks';
-import { useTasksStore } from '@/store/use-tasks-store';
-import { STORE_ITEMS } from '@/store/store-items';
-import { TaskCategory } from '@/store/types';
+} from "@/constants/task-timers";
+import { useMonsterTheme } from "@/hooks/use-monster-theme";
+import { usePetStore } from "@/store/use-pet-store";
+import { usePlayerStore } from "@/store/use-player-store";
+import { usePhotoStore } from "@/store/use-photo-store";
+import { useStoreStore } from "@/store/use-store-store";
+import { PresetTask } from "@/store/preset-tasks";
+import { useTasksStore } from "@/store/use-tasks-store";
+import { STORE_ITEMS } from "@/store/store-items";
+import { TaskCategory } from "@/store/types";
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
-  kitchen:     '\ud83c\udf73',
-  bathroom:    '\ud83d\udebf',
-  bedroom:     '\ud83d\udecf',
-  living_room: '\ud83d\udecb',
-  laundry:     '\ud83d\udc55',
-  trash:       '\ud83d\uddd1',
-  other:       '\ud83d\udce6',
+  kitchen: "\ud83c\udf73",
+  bathroom: "\ud83d\udebf",
+  bedroom: "\ud83d\udecf",
+  living_room: "\ud83d\udecb",
+  laundry: "\ud83d\udc55",
+  trash: "\ud83d\uddd1",
+  other: "\ud83d\udce6",
 };
 
 /**
@@ -49,7 +49,8 @@ const CATEGORY_EMOJI: Record<TaskCategory, string> = {
  * - reward_ready: timer done, waiting for user to claim reward
  * - claimed: reward claimed
  */
-type TaskState = 'idle' | 'pending_photo' | 'waiting' | 'reward_ready' | 'claimed';
+type TaskState =
+  "idle" | "pending_photo" | "waiting" | "reward_ready" | "claimed";
 
 interface TaskProgress {
   state: TaskState;
@@ -76,9 +77,16 @@ export default function TasksScreen() {
   const addPhoto = usePhotoStore((s) => s.addPhoto);
   const buyItem = useStoreStore((s) => s.buyItem);
   const scheme = useColorScheme();
-  const { accent, accentLight, accentDark, text: accentText } = useMonsterTheme();
+  const {
+    accent,
+    accentLight,
+    accentDark,
+    text: accentText,
+  } = useMonsterTheme();
 
-  const [taskProgress, setTaskProgress] = useState<Record<string, TaskProgress>>({});
+  const [taskProgress, setTaskProgress] = useState<
+    Record<string, TaskProgress>
+  >({});
   const [celebration, setCelebration] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<{
     reward: RewardOutcome;
@@ -87,13 +95,15 @@ export default function TasksScreen() {
   } | null>(null);
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isDark = scheme === 'dark';
+  const isDark = scheme === "dark";
 
   // Refresh the roll when the screen mounts in case the date ticked over
-  useEffect(() => { refreshDailyRoll(); }, [refreshDailyRoll]);
+  useEffect(() => {
+    refreshDailyRoll();
+  }, [refreshDailyRoll]);
 
   const getProgress = (taskId: string): TaskProgress => {
-    return taskProgress[taskId] ?? { state: 'idle', hasPhoto: false };
+    return taskProgress[taskId] ?? { state: "idle", hasPhoto: false };
   };
 
   const showCelebration = useCallback((message: string) => {
@@ -106,53 +116,56 @@ export default function TasksScreen() {
   const handleTapTask = useCallback((taskId: string) => {
     setTaskProgress((prev) => ({
       ...prev,
-      [taskId]: { state: 'pending_photo', hasPhoto: false },
+      [taskId]: { state: "pending_photo", hasPhoto: false },
     }));
   }, []);
 
   // Step 2a: User takes a photo → then starts time lock
-  const handleTakePhoto = useCallback(async (task: PresetTask) => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Camera Permission',
-        'Camera access is needed to verify completed tasks. You can still complete without a photo.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+  const handleTakePhoto = useCallback(
+    async (task: PresetTask) => {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Camera Permission",
+          "Camera access is needed to verify completed tasks. You can still complete without a photo.",
+          [{ text: "OK" }],
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-      allowsEditing: false,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 0.5,
+        allowsEditing: false,
+      });
 
-    if (result.canceled) return;
+      if (result.canceled) return;
 
-    const photoUri = result.assets[0].uri;
+      const photoUri = result.assets[0].uri;
 
-    // Save photo record
-    addPhoto({ taskId: task.id, photoUri, takenAt: Date.now() });
+      // Save photo record
+      addPhoto({ taskId: task.id, photoUri, takenAt: Date.now() });
 
-    // Move to waiting state (time lock starts)
-    setTaskProgress((prev) => ({
-      ...prev,
-      [task.id]: {
-        state: 'waiting',
-        hasPhoto: true,
-        photoUri,
-        waitStartedAt: Date.now(),
-      },
-    }));
-  }, [addPhoto]);
+      // Move to waiting state (time lock starts)
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: {
+          state: "waiting",
+          hasPhoto: true,
+          photoUri,
+          waitStartedAt: Date.now(),
+        },
+      }));
+    },
+    [addPhoto],
+  );
 
   // Step 2b: User skips photo → starts time lock anyway
   const handleSkipPhoto = useCallback((taskId: string) => {
     setTaskProgress((prev) => ({
       ...prev,
       [taskId]: {
-        state: 'waiting',
+        state: "waiting",
         hasPhoto: false,
         waitStartedAt: Date.now(),
       },
@@ -160,88 +173,108 @@ export default function TasksScreen() {
   }, []);
 
   // Step 3: Time lock expires → show claim button (don't award yet)
-  const handleTimerComplete = useCallback((task: PresetTask) => {
-    const progress = taskProgress[task.id];
-    if (!progress) return;
+  const handleTimerComplete = useCallback(
+    (task: PresetTask) => {
+      const progress = taskProgress[task.id];
+      if (!progress) return;
 
-    if (progress.hasPhoto) {
-      // Calculate photo reward
-      const reward = rollReward();
-      const finalPoints = Math.round(task.pointValue * reward.pointsMultiplier);
-
-      // Handle free item if applicable
-      let freeItemName: string | undefined;
-      if (reward.includesFreeItem) {
-        const affordableItems = STORE_ITEMS.filter(
-          (i) => i.price <= FREE_ITEM_MAX_PRICE && i.repeatable
+      if (progress.hasPhoto) {
+        // Calculate photo reward
+        const reward = rollReward();
+        const finalPoints = Math.round(
+          task.pointValue * reward.pointsMultiplier,
         );
-        if (affordableItems.length > 0) {
-          const randomItem = affordableItems[Math.floor(Math.random() * affordableItems.length)];
-          buyItem(randomItem);
-          freeItemName = `${randomItem.emoji} ${randomItem.name}`;
-        }
-      }
 
-      // Transition to reward_ready with reward info
-      setTaskProgress((prev) => ({
-        ...prev,
-        [task.id]: {
-          ...prev[task.id],
-          state: 'reward_ready',
-          rewardInfo: {
-            basePoints: task.pointValue,
-            pointsMultiplier: reward.pointsMultiplier,
-            finalPoints,
-            freeItemName,
+        // Handle free item if applicable
+        let freeItemName: string | undefined;
+        if (reward.includesFreeItem) {
+          const affordableItems = STORE_ITEMS.filter(
+            (i) => i.price <= FREE_ITEM_MAX_PRICE && i.repeatable,
+          );
+          if (affordableItems.length > 0) {
+            const randomItem =
+              affordableItems[
+                Math.floor(Math.random() * affordableItems.length)
+              ];
+            buyItem(randomItem);
+            freeItemName = `${randomItem.emoji} ${randomItem.name}`;
+          }
+        }
+
+        // Transition to reward_ready with reward info
+        setTaskProgress((prev) => ({
+          ...prev,
+          [task.id]: {
+            ...prev[task.id],
+            state: "reward_ready",
+            rewardInfo: {
+              basePoints: task.pointValue,
+              pointsMultiplier: reward.pointsMultiplier,
+              finalPoints,
+              freeItemName,
+            },
           },
-        },
-      }));
-    } else {
-      // No photo — base points only
-      setTaskProgress((prev) => ({
-        ...prev,
-        [task.id]: {
-          ...prev[task.id],
-          state: 'reward_ready',
-          rewardInfo: {
-            basePoints: task.pointValue,
-            pointsMultiplier: 1,
-            finalPoints: task.pointValue,
+        }));
+      } else {
+        // No photo — base points only
+        setTaskProgress((prev) => ({
+          ...prev,
+          [task.id]: {
+            ...prev[task.id],
+            state: "reward_ready",
+            rewardInfo: {
+              basePoints: task.pointValue,
+              pointsMultiplier: 1,
+              finalPoints: task.pointValue,
+            },
           },
-        },
-      }));
-    }
-  }, [taskProgress, buyItem]);
+        }));
+      }
+    },
+    [taskProgress, buyItem],
+  );
 
   // Step 4: User claims reward → award points and mark as claimed
-  const handleClaimReward = useCallback((task: PresetTask) => {
-    const progress = taskProgress[task.id];
-    if (!progress || !progress.rewardInfo) return;
+  const handleClaimReward = useCallback(
+    (task: PresetTask) => {
+      const progress = taskProgress[task.id];
+      if (!progress || !progress.rewardInfo) return;
 
-    const { finalPoints } = progress.rewardInfo;
+      const { finalPoints } = progress.rewardInfo;
 
-    // Award points and track
-    earnPoints(finalPoints);
-    trackEarned(finalPoints, task.category);
+      // Award points and track
+      earnPoints(finalPoints);
+      trackEarned(finalPoints, task.category);
 
-    // Log the task
-    addTask({ ...task, completedAt: Date.now() });
-    recordActivity();
-    checkStreakMilestones();
-    care();
+      // Log the task
+      addTask({ ...task, completedAt: Date.now() });
+      recordActivity();
+      checkStreakMilestones();
+      care();
 
-    // Mark as claimed
-    setTaskProgress((prev) => ({
-      ...prev,
-      [task.id]: { ...prev[task.id], state: 'claimed' },
-    }));
+      // Mark as claimed
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: { ...prev[task.id], state: "claimed" },
+      }));
 
-    // Show celebration
-    showCelebration(`\u2728 +${finalPoints} pts claimed!`);
-  }, [taskProgress, earnPoints, trackEarned, addTask, recordActivity, checkStreakMilestones, care, showCelebration]);
+      // Show celebration
+      showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+    },
+    [
+      taskProgress,
+      earnPoints,
+      trackEarned,
+      addTask,
+      recordActivity,
+      checkStreakMilestones,
+      care,
+      showCelebration,
+    ],
+  );
 
   const completedCount = Object.values(taskProgress).filter(
-    (p) => p.state === 'claimed'
+    (p) => p.state === "claimed",
   ).length;
 
   return (
@@ -253,8 +286,18 @@ export default function TasksScreen() {
             {completedCount}/{dailyRoll.length} done
           </ThemedText>
           {celebration && (
-            <View style={[styles.celebrationPill, { backgroundColor: isDark ? accentDark : accentLight }]}>
-              <Text style={[styles.celebrationText, { color: isDark ? accentLight : accentText }]}>
+            <View
+              style={[
+                styles.celebrationPill,
+                { backgroundColor: isDark ? accentDark : accentLight },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.celebrationText,
+                  { color: isDark ? accentLight : accentText },
+                ]}
+              >
                 {celebration}
               </Text>
             </View>
@@ -262,7 +305,10 @@ export default function TasksScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      >
         {dailyRoll.map((task) => {
           const progress = getProgress(task.id);
           const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
@@ -273,47 +319,72 @@ export default function TasksScreen() {
               style={[
                 styles.taskCard,
                 isDark ? styles.taskCardDark : styles.taskCardLight,
-                progress.state === 'completed' && styles.taskCardCompleted,
+                progress.state === "completed" && styles.taskCardCompleted,
               ]}
             >
               {/* Task header row */}
               <View style={styles.taskRow}>
-                <View style={[
-                  styles.checkbox,
-                  progress.state === 'completed' && { backgroundColor: accent, borderColor: accent },
-                ]}>
-                  {progress.state === 'completed' && <Text style={styles.checkmark}>{'\u2713'}</Text>}
+                <View
+                  style={[
+                    styles.checkbox,
+                    progress.state === "completed" && {
+                      backgroundColor: accent,
+                      borderColor: accent,
+                    },
+                  ]}
+                >
+                  {progress.state === "completed" && (
+                    <Text style={styles.checkmark}>{"\u2713"}</Text>
+                  )}
                 </View>
                 <View style={styles.taskInfo}>
-                  <ThemedText style={[styles.taskLabel, progress.state === 'completed' && styles.taskLabelDone]}>
+                  <ThemedText
+                    style={[
+                      styles.taskLabel,
+                      progress.state === "completed" && styles.taskLabelDone,
+                    ]}
+                  >
                     {task.label}
                   </ThemedText>
                   <ThemedText style={styles.categoryLabel}>
-                    {CATEGORY_EMOJI[task.category]} {task.category.replace('_', ' ')}
+                    {CATEGORY_EMOJI[task.category]}{" "}
+                    {task.category.replace("_", " ")}
                   </ThemedText>
                 </View>
-                <Text style={[styles.pointsText, progress.state === 'completed' ? { color: accent } : styles.pointsPending]}>
+                <Text
+                  style={[
+                    styles.pointsText,
+                    progress.state === "completed"
+                      ? { color: accent }
+                      : styles.pointsPending,
+                  ]}
+                >
                   +{task.pointValue}
                 </Text>
               </View>
 
               {/* State: idle — show "Mark Done" button */}
-              {progress.state === 'idle' && (
+              {progress.state === "idle" && (
                 <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: accent }]}
                   onPress={() => handleTapTask(task.id)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.actionButtonText}>
-                    {'\u2705'} Mark Done
+                    {"\u2705"} Mark Done
                   </Text>
                 </TouchableOpacity>
               )}
 
               {/* State: pending_photo — show photo + skip options */}
-              {progress.state === 'pending_photo' && (
+              {progress.state === "pending_photo" && (
                 <View style={styles.photoSection}>
-                  <Text style={[styles.photoPrompt, { color: isDark ? '#ccc' : '#555' }]}>
+                  <Text
+                    style={[
+                      styles.photoPrompt,
+                      { color: isDark ? "#ccc" : "#555" },
+                    ]}
+                  >
                     Take a photo for bonus rewards!
                   </Text>
                   <View style={styles.photoActions}>
@@ -323,7 +394,7 @@ export default function TasksScreen() {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.photoButtonText}>
-                        {'\ud83d\udcf8'} Snap Photo
+                        {"\ud83d\udcf8"} Snap Photo
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -331,7 +402,12 @@ export default function TasksScreen() {
                       onPress={() => handleSkipPhoto(task.id)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.skipButtonText, { color: isDark ? '#888' : '#999' }]}>
+                      <Text
+                        style={[
+                          styles.skipButtonText,
+                          { color: isDark ? "#888" : "#999" },
+                        ]}
+                      >
                         Skip
                       </Text>
                     </TouchableOpacity>
@@ -340,12 +416,19 @@ export default function TasksScreen() {
               )}
 
               {/* State: waiting — show timer countdown */}
-              {progress.state === 'waiting' && (
+              {progress.state === "waiting" && (
                 <View style={styles.waitingSection}>
                   {progress.hasPhoto && (
-                    <View style={[styles.photoBadge, { backgroundColor: isDark ? accentDark : accentLight }]}>
-                      <Text style={[styles.photoBadgeText, { color: accentText }]}>
-                        {'\ud83d\udcf7'} Photo saved
+                    <View
+                      style={[
+                        styles.photoBadge,
+                        { backgroundColor: isDark ? accentDark : accentLight },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.photoBadgeText, { color: accentText }]}
+                      >
+                        {"\ud83d\udcf7"} Photo saved
                       </Text>
                     </View>
                   )}
@@ -354,22 +437,43 @@ export default function TasksScreen() {
                     onComplete={() => handleTimerComplete(task)}
                     active={true}
                   />
-                  <Text style={[styles.waitHint, { color: isDark ? '#888' : '#999' }]}>
+                  <Text
+                    style={[
+                      styles.waitHint,
+                      { color: isDark ? "#888" : "#999" },
+                    ]}
+                  >
                     Reward ready when timer expires...
                   </Text>
                 </View>
               )}
 
               {/* State: reward_ready — show claim button with point breakdown */}
-              {progress.state === 'reward_ready' && progress.rewardInfo && (
+              {progress.state === "reward_ready" && progress.rewardInfo && (
                 <View style={styles.rewardSection}>
-                  <View style={[styles.rewardBreakdown, { backgroundColor: isDark ? '#2a2a3e' : '#f5f5f5' }]}>
-                    <Text style={[styles.rewardLabel, { color: isDark ? '#ccc' : '#555' }]}>
+                  <View
+                    style={[
+                      styles.rewardBreakdown,
+                      { backgroundColor: isDark ? "#2a2a3e" : "#f5f5f5" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rewardLabel,
+                        { color: isDark ? "#ccc" : "#555" },
+                      ]}
+                    >
                       Base: {progress.rewardInfo.basePoints} pts
                     </Text>
                     {progress.rewardInfo.pointsMultiplier > 1 && (
-                      <Text style={[styles.rewardLabel, { color: accent, fontWeight: '700' }]}>
-                        × {progress.rewardInfo.pointsMultiplier.toFixed(1)} bonus
+                      <Text
+                        style={[
+                          styles.rewardLabel,
+                          { color: accent, fontWeight: "700" },
+                        ]}
+                      >
+                        × {progress.rewardInfo.pointsMultiplier.toFixed(1)}{" "}
+                        bonus
                       </Text>
                     )}
                     <Text style={[styles.rewardTotal, { color: accent }]}>
@@ -377,7 +481,12 @@ export default function TasksScreen() {
                     </Text>
                   </View>
                   {progress.rewardInfo.freeItemName && (
-                    <Text style={[styles.freeItemText, { color: isDark ? '#aaa' : '#666' }]}>
+                    <Text
+                      style={[
+                        styles.freeItemText,
+                        { color: isDark ? "#aaa" : "#666" },
+                      ]}
+                    >
                       + {progress.rewardInfo.freeItemName}
                     </Text>
                   )}
@@ -387,17 +496,22 @@ export default function TasksScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.claimButtonText}>
-                      {'\ud83c\udf1f'} Claim Reward
+                      {"\ud83c\udf1f"} Claim Reward
                     </Text>
                   </TouchableOpacity>
                 </View>
               )}
 
               {/* State: claimed — show verified badge */}
-              {progress.state === 'claimed' && (
-                <View style={[styles.completedBadge, { backgroundColor: isDark ? accentDark : accentLight }]}>
+              {progress.state === "claimed" && (
+                <View
+                  style={[
+                    styles.completedBadge,
+                    { backgroundColor: isDark ? accentDark : accentLight },
+                  ]}
+                >
                   <Text style={[styles.completedText, { color: accentText }]}>
-                    {'\u2705'} Claimed
+                    {"\u2705"} Claimed
                   </Text>
                 </View>
               )}
@@ -422,7 +536,7 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
   header: { marginBottom: 20, gap: 8 },
-  subrow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  subrow: { flexDirection: "row", alignItems: "center", gap: 10 },
   count: { opacity: 0.5, fontSize: 14 },
   celebrationPill: {
     borderRadius: 20,
@@ -430,7 +544,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     flexShrink: 1,
   },
-  celebrationText: { fontWeight: '600', fontSize: 12 },
+  celebrationText: { fontWeight: "600", fontSize: 12 },
   list: { gap: 12, paddingBottom: 40 },
   taskCard: {
     borderRadius: 16,
@@ -438,12 +552,12 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
-  taskCardLight: { backgroundColor: '#f8f9fa', borderColor: '#e2e5e8' },
-  taskCardDark: { backgroundColor: '#1e2124', borderColor: '#2e3236' },
+  taskCardLight: { backgroundColor: "#f8f9fa", borderColor: "#e2e5e8" },
+  taskCardDark: { backgroundColor: "#1e2124", borderColor: "#2e3236" },
   taskCardCompleted: { opacity: 0.7 },
   taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   checkbox: {
@@ -451,25 +565,25 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#aaa',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: "#aaa",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  checkmark: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  checkmark: { color: "#fff", fontSize: 13, fontWeight: "700" },
   taskInfo: { flex: 1, gap: 3 },
-  taskLabel: { fontSize: 16, fontWeight: '500' },
+  taskLabel: { fontSize: 16, fontWeight: "500" },
   taskLabelDone: { opacity: 0.45 },
-  categoryLabel: { fontSize: 12, opacity: 0.5, textTransform: 'capitalize' },
-  pointsText: { fontWeight: '700', fontSize: 15 },
-  pointsPending: { color: '#0a7ea4' },
+  categoryLabel: { fontSize: 12, opacity: 0.5, textTransform: "capitalize" },
+  pointsText: { fontWeight: "700", fontSize: 15 },
+  pointsPending: { color: "#0a7ea4" },
   actionButton: {
     paddingVertical: 10,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 14,
   },
   photoSection: {
@@ -477,23 +591,23 @@ const styles = StyleSheet.create({
   },
   photoPrompt: {
     fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontWeight: "500",
+    textAlign: "center",
   },
   photoActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   photoButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   photoButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 14,
   },
   skipButton: {
@@ -502,35 +616,35 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   waitingSection: {
     gap: 6,
   },
   photoBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   photoBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   waitHint: {
     fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    textAlign: "center",
+    fontStyle: "italic",
   },
   completedBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
   },
   completedText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   rewardSection: {
     gap: 10,
@@ -542,26 +656,26 @@ const styles = StyleSheet.create({
   },
   rewardLabel: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   rewardTotal: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: 4,
   },
   freeItemText: {
     fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    textAlign: "center",
+    fontStyle: "italic",
   },
   claimButton: {
     paddingVertical: 14,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   claimButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 15,
   },
 });

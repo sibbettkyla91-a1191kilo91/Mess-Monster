@@ -4,7 +4,7 @@
 **Tagline:** Your mess isn't a failure. It's your monster's next meal.
 **Goal:** $5,000 | **Platform:** Android (Google Play) | **Delivery:** Q4 2026
 
-*Copy-paste into Indiegogo's rich-text editor. Replace all [PLACEHOLDER] sections with your own words. Images and GIFs are noted inline.*
+_Copy-paste into Indiegogo's rich-text editor. Replace all [PLACEHOLDER] sections with your own words. Images and GIFs are noted inline._
 
 ---
 
@@ -54,11 +54,11 @@ Two monsters. Two aesthetics. One zero-shame mission.
 
 [SIDE-BY-SIDE ILLUSTRATION: Nilly left, Luna right, both in thriving state with particle effects]
 
-### 🌿 Nilly — *"kawaii & clean"*
+### 🌿 Nilly — _"kawaii & clean"_
 
 Mint-green, soft, sparkly. Nilly is your wholesome little buddy — the kind of creature that makes you want to make your bed just so it has a nicer view. Leaf-and-sparkle particle effects, warm habitat, gentle glow.
 
-### 🌑 Luna — *"dark & witchy"*
+### 🌑 Luna — _"dark & witchy"_
 
 Dark, mysterious, a little spooky. Luna doesn't judge your mess — it's seen worse. Star-ember particles, shadow habitat, quiet intensity. For anyone who finds pastel aesthetics exhausting.
 
@@ -74,13 +74,14 @@ Watch it transform from a tiny hatchling into something increasingly magnificent
 
 [EVOLUTION IMAGE: Three visible silhouettes in sequence, increasing in size and presence → fourth silhouette replaced with a "?" or glowing shadow shape]
 
-*👀 The final form is a secret. Only the most consistent cleaners will ever unlock it.*
+_👀 The final form is a secret. Only the most consistent cleaners will ever unlock it._
 
 ---
 
 ## Zero Shame. Always.
 
 **What Mess Monster will never do:**
+
 - ❌ Show you a wall of "OVERDUE" tasks
 - ❌ Scold you for missing a day
 - ❌ De-evolve your monster as punishment
@@ -88,6 +89,7 @@ Watch it transform from a tiny hatchling into something increasingly magnificent
 - ❌ Guilt-trip you back into the app
 
 **What it does instead:**
+
 - ✅ Your monster gets a little sad when you've been away — then bounces right back the moment you return
 - ✅ Streak milestones reward you at 3, 7, 14, and 30 days — bonus points, no penalty for missing
 - ✅ Six fresh tasks every day — no overdue count, no calendar pressure
@@ -112,13 +114,13 @@ Mess Monster is built around small wins. One task. One point. One happier monste
 
 The core app is already built and working — you can download it right now. What your support funds is everything needed to get it to launch quality and deliver the premium features you've been promised:
 
-| What | Amount | Details |
-|------|--------|---------|
-| Professional art assets | $1,500 | App icon, evolution stage illustrations, Play Store screenshots and feature graphics |
-| Play Store launch | $500 | ASO promotional artwork and Google Play setup |
-| Development runway | $2,000 | Focused full-time development time to build Spotify integration, push notifications, and Google Play Billing infrastructure |
-| Testing & contingency | $1,000 | Multi-device testing, bug fixes, and unexpected costs |
-| **Total** | **$5,000** | |
+| What                    | Amount     | Details                                                                                                                     |
+| ----------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Professional art assets | $1,500     | App icon, evolution stage illustrations, Play Store screenshots and feature graphics                                        |
+| Play Store launch       | $500       | ASO promotional artwork and Google Play setup                                                                               |
+| Development runway      | $2,000     | Focused full-time development time to build Spotify integration, push notifications, and Google Play Billing infrastructure |
+| Testing & contingency   | $1,000     | Multi-device testing, bug fixes, and unexpected costs                                                                       |
+| **Total**               | **$5,000** |                                                                                                                             |
 
 Everything beyond $5,000 goes directly into new content: more store items, more evolution content, and eventually Roommate/Partner Sync for people who clean better with a buddy.
 
@@ -129,21 +131,22 @@ Everything beyond $5,000 goes directly into new content: more store items, more 
 ---
 
 ### 🌱 $3 — Monster Believer
+
 Your name in the app credits. The monster appreciates you.
 
-*Estimated delivery: Q4 2026*
+_Estimated delivery: Q4 2026_
 
 ---
 
-### ⭐ $24.99 — Founding Member *(Most Popular)*
+### ⭐ $24.99 — Founding Member _(Most Popular)_
 
 - **1 year of Mess Monster Premium** locked at the Founding Member rate
-  *(normally $4.99/month = $59.88/year — you're saving 58%)*
+  _(normally $4.99/month = $59.88/year — you're saving 58%)_
 - Access to all premium features at launch: Spotify cleaning playlists, push notification reminders, and all future premium content
 - Permanent **Founding Member** in-app badge
 - Early access before public Play Store launch
 
-*Estimated delivery: Q4 2026*
+_Estimated delivery: Q4 2026_
 
 ---
 
@@ -156,7 +159,7 @@ Everything in Founding Member, plus:
 - **Your monster's name added to the in-app name randomizer** — future players may name their monster after yours, permanently
 - Early beta access to test features before launch
 
-*Estimated delivery: Q4 2026*
+_Estimated delivery: Q4 2026_
 
 ---
 
@@ -168,13 +171,14 @@ Everything in Founding Monster, plus:
 - A personal **thank-you voice memo** from the developer
 - Credited as a founding legend in all future press and promotional materials
 
-*Estimated delivery: Q4 2026*
+_Estimated delivery: Q4 2026_
 
 ---
 
 ## The Roadmap
 
 ### Available Now
+
 - Core cleaning loop (tasks, points, care)
 - Nilly and Luna with full animated habitats
 - Evolution system (visible stages + secret final form)
@@ -185,6 +189,7 @@ Everything in Founding Monster, plus:
 - Offline-first, no account required, all data local
 
 ### Q4 2026 — With Your Support
+
 - Professional app icon and Play Store artwork
 - Spotify integration for premium subscribers (curated cleaning playlists)
 - Push notifications (gentle monster mood reminders, never nagging)
@@ -192,6 +197,7 @@ Everything in Founding Monster, plus:
 - Public Google Play launch
 
 ### Post-Launch Stretch Goals
+
 - Roommate/Partner Sync — optional shared accountability with a housemate or partner
 - Seasonal events and limited-time store items
 - Additional monster variants and aesthetic packs
@@ -252,5 +258,5 @@ Your home doesn't have to be perfect. Your streak doesn't have to be unbroken. Y
 
 ---
 
-*Questions? [INSERT CONTACT EMAIL]*
-*Follow development updates on [INSERT SOCIAL LINKS]*
+_Questions? [INSERT CONTACT EMAIL]_
+_Follow development updates on [INSERT SOCIAL LINKS]_

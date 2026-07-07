@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
-import { useMonsterTheme } from '@/hooks/use-monster-theme';
+import { useMonsterTheme } from "@/hooks/use-monster-theme";
 
 interface TaskTimerProps {
   /** Total seconds for the countdown */
@@ -12,7 +12,11 @@ interface TaskTimerProps {
   active: boolean;
 }
 
-export function TaskTimer({ totalSeconds, onComplete, active }: TaskTimerProps) {
+export function TaskTimer({
+  totalSeconds,
+  onComplete,
+  active,
+}: TaskTimerProps) {
   const [remaining, setRemaining] = useState(totalSeconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Keep a stable ref to onComplete so the timer never restarts just because
@@ -69,8 +73,8 @@ export function TaskTimer({ totalSeconds, onComplete, active }: TaskTimerProps) 
       </View>
       <Text style={[styles.timeText, { color: accent }]}>
         {remaining > 0
-          ? `${minutes}:${seconds.toString().padStart(2, '0')} remaining`
-          : 'Timer complete!'}
+          ? `${minutes}:${seconds.toString().padStart(2, "0")} remaining`
+          : "Timer complete!"}
       </Text>
     </View>
   );
@@ -84,16 +88,16 @@ const styles = StyleSheet.create({
   barBackground: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#e0e0e0',
-    overflow: 'hidden',
+    backgroundColor: "#e0e0e0",
+    overflow: "hidden",
   },
   barFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 3,
   },
   timeText: {
     fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

@@ -1,6 +1,11 @@
-import { useMemo } from 'react';
-import { DEFAULT_PALETTE, LUNA_PALETTE, MonsterPalette, NILLY_PALETTE } from '@/monster-theme';
-import { usePlayerStore } from '@/store/use-player-store';
+import { useMemo } from "react";
+import {
+  DEFAULT_PALETTE,
+  LUNA_PALETTE,
+  MonsterPalette,
+  NILLY_PALETTE,
+} from "@/monster-theme";
+import { usePlayerStore } from "@/store/use-player-store";
 
 /**
  * Returns the active monster's color palette.
@@ -12,8 +17,8 @@ import { usePlayerStore } from '@/store/use-player-store';
 export function useMonsterTheme(): MonsterPalette {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster);
   return useMemo(() => {
-    if (selectedMonster === 'luna') return LUNA_PALETTE;
-    if (selectedMonster === 'nilly') return NILLY_PALETTE;
+    if (selectedMonster === "luna") return LUNA_PALETTE;
+    if (selectedMonster === "nilly") return NILLY_PALETTE;
     return DEFAULT_PALETTE;
   }, [selectedMonster]);
 }

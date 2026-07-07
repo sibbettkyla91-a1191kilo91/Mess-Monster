@@ -1,1 +1,146 @@
-import { create } from 'zustand';\n\nexport interface SpotifySong {\n  id: string;\n  name: string;\n  artist: string;\n  album: string;\n  imageUrl: string;\n  previewUrl: string | null; // May be null if preview unavailable\n  externalUrl: string;\n}\n\ninterface MusicState {\n  // Current playback\n  currentSong: SpotifySong | null;\n  isPlaying: boolean;\n  playlist: SpotifySong[];\n  currentIndex: number;\n  \n  // UI state\n  isLoading: boolean;\n  error: string | null;\n  lastFetchedAt: number | null;\n}\n\ninterface MusicStore extends MusicState {\n  // Playlist management\n  fetchPopularHits: () => Promise<void>;\n  nextSong: () => void;\n  previousSong: () => void;\n  togglePlay: () => void;\n  setSong: (song: SpotifySong) => void;\n  \n  // Helpers\n  getCurrentSong: () => SpotifySong | null;\n  getPlaylistLength: () => number;\n}\n\nexport const useMusicStore = create<MusicStore>((set, get) => ({\n  currentSong: null,\n  isPlaying: false,\n  playlist: [],\n  currentIndex: 0,\n  isLoading: false,\n  error: null,\n  lastFetchedAt: null,\n\n  // Fetch popular hits from Spotify free API\n  fetchPopularHits: async () => {\n    set({ isLoading: true, error: null });\n    try {\n      // Using Spotify's public API (no authentication required for some endpoints)\n      // This fetches the top 50 tracks globally\n      const response = await fetch(\n        'https://api.spotify.com/v1/browse/new-releases?country=US&limit=50',\n        {\n          headers: {\n            'Accept': 'application/json',\n          },\n        }\n      );\n\n      if (!response.ok) {\n        throw new Error(`Spotify API error: ${response.status}`);\n      }\n\n      const data = await response.json();\n      \n      // Transform Spotify albums/tracks to our format\n      const songs: SpotifySong[] = data.albums?.items?.slice(0, 30).map((album: any) => ({\n        id: album.id,\n        name: album.name,\n        artist: album.artists?.[0]?.name || 'Unknown',\n        album: album.name,\n        imageUrl: album.images?.[0]?.url || '',\n        previewUrl: null, // New releases don't have preview URLs\n        externalUrl: album.external_urls?.spotify || '',\n      })) || [];\n\n      if (songs.length === 0) {\n        throw new Error('No songs fetched from Spotify');\n      }\n\n      set({\n        playlist: songs,\n        currentSong: songs[0],\n        currentIndex: 0,\n        isLoading: false,\n        lastFetchedAt: Date.now(),\n      });\n    } catch (error) {\n      console.error('Failed to fetch Spotify songs:', error);\n      set({\n        error: error instanceof Error ? error.message : 'Failed to load music',\n        isLoading: false,\n      });\n    }\n  },\n\n  // Skip to next song\n  nextSong: () => {\n    const state = get();\n    const nextIndex = (state.currentIndex + 1) % state.playlist.length;\n    set({\n      currentIndex: nextIndex,\n      currentSong: state.playlist[nextIndex] || null,\n    });\n  },\n\n  // Go to previous song\n  previousSong: () => {\n    const state = get();\n    const prevIndex = state.currentIndex === 0 ? state.playlist.length - 1 : state.currentIndex - 1;\n    set({\n      currentIndex: prevIndex,\n      currentSong: state.playlist[prevIndex] || null,\n    });\n  },\n\n  // Toggle play/pause\n  togglePlay: () => {\n    set((state) => ({\n      isPlaying: !state.isPlaying,\n    }));\n  },\n\n  // Manually set current song\n  setSong: (song: SpotifySong) => {\n    const state = get();\n    const index = state.playlist.findIndex((s) => s.id === song.id);\n    set({\n      currentSong: song,\n      currentIndex: index >= 0 ? index : 0,\n    });\n  },\n\n  // Get current song\n  getCurrentSong: () => get().currentSong,\n\n  // Get playlist length\n  getPlaylistLength: () => get().playlist.length,\n}));\n
+import { create } from "zustand";
+
+export interface SpotifySong {
+  id: string;
+  name: string;
+  artist: string;
+  album: string;
+  imageUrl: string;
+  previewUrl: string | null; // May be null if preview unavailable
+  externalUrl: string;
+}
+
+interface MusicState {
+  // Current playback
+  currentSong: SpotifySong | null;
+  isPlaying: boolean;
+  playlist: SpotifySong[];
+  currentIndex: number;
+
+  // UI state
+  isLoading: boolean;
+  error: string | null;
+  lastFetchedAt: number | null;
+}
+
+interface MusicStore extends MusicState {
+  // Playlist management
+  fetchPopularHits: () => Promise<void>;
+  nextSong: () => void;
+  previousSong: () => void;
+  togglePlay: () => void;
+  setSong: (song: SpotifySong) => void;
+
+  // Helpers
+  getCurrentSong: () => SpotifySong | null;
+  getPlaylistLength: () => number;
+}
+
+export const useMusicStore = create<MusicStore>((set, get) => ({
+  currentSong: null,
+  isPlaying: false,
+  playlist: [],
+  currentIndex: 0,
+  isLoading: false,
+  error: null,
+  lastFetchedAt: null,
+
+  // Fetch popular hits from Spotify free API
+  fetchPopularHits: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      // Using Spotify's public API (no authentication required for some endpoints)
+      // This fetches the top 50 tracks globally
+      const response = await fetch(
+        "https://api.spotify.com/v1/browse/new-releases?country=US&limit=50",
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Spotify API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Transform Spotify albums/tracks to our format
+      const songs: SpotifySong[] =
+        data.albums?.items?.slice(0, 30).map((album: any) => ({
+          id: album.id,
+          name: album.name,
+          artist: album.artists?.[0]?.name || "Unknown",
+          album: album.name,
+          imageUrl: album.images?.[0]?.url || "",
+          previewUrl: null, // New releases don't have preview URLs
+          externalUrl: album.external_urls?.spotify || "",
+        })) || [];
+
+      if (songs.length === 0) {
+        throw new Error("No songs fetched from Spotify");
+      }
+
+      set({
+        playlist: songs,
+        currentSong: songs[0],
+        currentIndex: 0,
+        isLoading: false,
+        lastFetchedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to fetch Spotify songs:", error);
+      set({
+        error: error instanceof Error ? error.message : "Failed to load music",
+        isLoading: false,
+      });
+    }
+  },
+
+  // Skip to next song
+  nextSong: () => {
+    const state = get();
+    const nextIndex = (state.currentIndex + 1) % state.playlist.length;
+    set({
+      currentIndex: nextIndex,
+      currentSong: state.playlist[nextIndex] || null,
+    });
+  },
+
+  // Go to previous song
+  previousSong: () => {
+    const state = get();
+    const prevIndex =
+      state.currentIndex === 0
+        ? state.playlist.length - 1
+        : state.currentIndex - 1;
+    set({
+      currentIndex: prevIndex,
+      currentSong: state.playlist[prevIndex] || null,
+    });
+  },
+
+  // Toggle play/pause
+  togglePlay: () => {
+    set((state) => ({
+      isPlaying: !state.isPlaying,
+    }));
+  },
+
+  // Manually set current song
+  setSong: (song: SpotifySong) => {
+    const state = get();
+    const index = state.playlist.findIndex((s) => s.id === song.id);
+    set({
+      currentSong: song,
+      currentIndex: index >= 0 ? index : 0,
+    });
+  },
+
+  // Get current song
+  getCurrentSong: () => get().currentSong,
+
+  // Get playlist length
+  getPlaylistLength: () => get().playlist.length,
+}));

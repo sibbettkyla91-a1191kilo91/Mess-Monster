@@ -1,6 +1,6 @@
 # Mess Monster: Crowdfunding Pitch Positioning
 
-*Source: Manus competitive research. Reviewed and corrected June 11, 2026.*
+_Source: Manus competitive research. Reviewed and corrected June 11, 2026._
 
 ---
 
@@ -35,14 +35,14 @@ The two nearest competitor categories are growing but each has a critical flaw:
 
 ### What Makes It Different
 
-| Competitor Weakness | Mess Monster Answer |
-|---------------------|---------------------|
-| Guilt & punishment for missed days | Monster gets sad, never de-evolves; come back anytime |
-| Aggressive paywalls | Core care + task loop free forever |
-| Joyless, utilitarian UI | Two full monster aesthetics (kawaii Nilly, witchy Luna) |
-| One-size-fits-all | Kawaii and dark/witchy modes for distinct audiences |
-| Data sync failures, crashes | Offline-first, no account required, local-only storage |
-| Rigid overdue scheduling | Six daily tasks, mood-based, no calendar pressure |
+| Competitor Weakness                | Mess Monster Answer                                     |
+| ---------------------------------- | ------------------------------------------------------- |
+| Guilt & punishment for missed days | Monster gets sad, never de-evolves; come back anytime   |
+| Aggressive paywalls                | Core care + task loop free forever                      |
+| Joyless, utilitarian UI            | Two full monster aesthetics (kawaii Nilly, witchy Luna) |
+| One-size-fits-all                  | Kawaii and dark/witchy modes for distinct audiences     |
+| Data sync failures, crashes        | Offline-first, no account required, local-only storage  |
+| Rigid overdue scheduling           | Six daily tasks, mood-based, no calendar pressure       |
 
 ---
 
@@ -58,11 +58,11 @@ Both monsters evolve through stages of growth. A secret final form awaits those 
 
 ## Pricing Strategy (Recommended)
 
-| Tier | Price | Content |
-|------|-------|---------|
-| Free | $0 | Full core loop: all daily tasks, monster care, store, streaks |
+| Tier            | Price       | Content                                                             |
+| --------------- | ----------- | ------------------------------------------------------------------- |
+| Free            | $0          | Full core loop: all daily tasks, monster care, store, streaks       |
 | Premium Monthly | $4.99/month | Spotify cleaning playlists, push notifications, extra customization |
-| Premium Annual | $24.99/year | Same as monthly — "Founding Member" introductory rate |
+| Premium Annual  | $24.99/year | Same as monthly — "Founding Member" introductory rate               |
 
 > **Awaiting decision:** Whether to adopt the $24.99/year Founding Member plan — see launch-prep review summary.
 
@@ -84,10 +84,10 @@ The $24.99/year price point bridges the gap between cleaning utility apps ($9.99
 
 The following features are **not included at v1.0 launch.** They must not appear as current features in any campaign copy, screenshot, or demo video:
 
-| Feature | Description | When |
-|---------|-------------|------|
+| Feature               | Description                                                                                   | When                     |
+| --------------------- | --------------------------------------------------------------------------------------------- | ------------------------ |
 | Roommate/Partner Sync | Share a monster or coordinate cleaning tasks with a housemate; optional shared accountability | Post-launch stretch goal |
-| Spotify Integration | OAuth-linked auto-play of curated cleaning playlists for premium subscribers | Planned for premium tier |
-| Push Notifications | Gentle monster mood alerts and cleaning nudges | Planned for premium tier |
+| Spotify Integration   | OAuth-linked auto-play of curated cleaning playlists for premium subscribers                  | Planned for premium tier |
+| Push Notifications    | Gentle monster mood alerts and cleaning nudges                                                | Planned for premium tier |
 
 > **Correction (June 2026):** The original competitive brief listed "Roommate/Partner Sync" as a core premium feature at launch. This is incorrect — it does not exist in the app and has no implementation timeline. It may only appear in clearly-labeled roadmap/stretch goal sections.

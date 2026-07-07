@@ -7,10 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Mess Monster is a gamified Android cleaning motivation app. A virtual pet (the "mess monster") is tied to real-world cleaning: players log cleaning tasks, earn points, and spend points to care for their monster. Neglect causes the monster to become sad/sick; consistent cleaning makes it thrive.
 
 **Mascots:**
+
 - **Nilly** — primary mascot, mint green, kawaii aesthetic
 - **Luna** — secondary mascot, dark witchy aesthetic
 
 **Tiers:**
+
 - Free: basic pet states, cleaning coach
 - Premium (~$4.99/month): Spotify integration, extra customization
 
@@ -37,6 +39,7 @@ This is a React Native app built with **Expo SDK 54** and **Expo Router v6** (fi
 ### Routing
 
 Expo Router uses the `app/` directory for file-based routing:
+
 - `app/_layout.tsx` — root Stack navigator; wraps everything in `ThemeProvider` for dark/light mode
 - `app/(tabs)/_layout.tsx` — bottom tab navigator with Home and Explore tabs
 - `app/modal.tsx` — modal screen accessible as a stack push from any tab

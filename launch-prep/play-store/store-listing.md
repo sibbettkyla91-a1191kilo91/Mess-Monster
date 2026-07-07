@@ -1,7 +1,7 @@
 # Play Store Listing — Mess Monster
 
-*Character limits: Title 30 | Short description 80 | Full description 4,000*
-*All counts are Unicode code points (how Google Play counts).*
+_Character limits: Title 30 | Short description 80 | Full description 4,000_
+_All counts are Unicode code points (how Google Play counts)._
 
 ---
 

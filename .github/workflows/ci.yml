@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           # cache: 'npm' requires a lock file; omit until package-lock.json is committed
 
       - name: Install dependencies

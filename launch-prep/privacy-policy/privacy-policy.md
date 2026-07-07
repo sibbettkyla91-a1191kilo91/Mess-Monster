@@ -98,4 +98,4 @@ Questions or concerns about this privacy policy?
 
 ---
 
-*This privacy policy covers the App's full intended feature set at launch. Features marked as premium (Google Play Billing, Spotify, push notifications) use the data practices described above only when those features are active.*
+_This privacy policy covers the App's full intended feature set at launch. Features marked as premium (Google Play Billing, Spotify, push notifications) use the data practices described above only when those features are active._

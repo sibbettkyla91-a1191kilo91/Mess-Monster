@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface PhotoRecord {
   taskId: string;
@@ -44,8 +44,8 @@ export const usePhotoStore = create<PhotoState>()(
       },
     }),
     {
-      name: 'mm-photos',
+      name: "mm-photos",
       storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    },
+  ),
 );

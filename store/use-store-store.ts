@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-import { StoreItem } from './store-items';
+import { StoreItem } from "./store-items";
 
 export interface OwnedEntry {
   item: StoreItem;
@@ -67,11 +67,12 @@ export const useStoreStore = create<StoreStore>()(
         return true;
       },
 
-      getOwnedItems: () => Object.values(get().owned).filter((e) => e.quantity > 0),
+      getOwnedItems: () =>
+        Object.values(get().owned).filter((e) => e.quantity > 0),
     }),
     {
-      name: 'mm-store-owned',
+      name: "mm-store-owned",
       storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
+    },
+  ),
 );

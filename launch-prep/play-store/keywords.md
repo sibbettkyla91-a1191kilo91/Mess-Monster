@@ -1,23 +1,23 @@
 # Play Store ASO Keywords
 
-*Source: Manus competitive brief + CSV competitor data. Reviewed June 11, 2026.*
+_Source: Manus competitive brief + CSV competitor data. Reviewed June 11, 2026._
 
 ---
 
 ## Priority Keyword Targets
 
-| # | Keyword | Rationale | Primary Competitors Ranking |
-|---|---------|-----------|----------------------------|
-| 1 | Cleaning Motivation | High intent; users actively seeking motivation help | Sweepy, FlyLady |
-| 2 | ADHD Organizer | Loyal niche; "helps with ADHD" is a top praise theme across almost every competitor | RoutineFlow, Sweepy, FlyLady |
-| 3 | Gamified Habit Tracker | Core category; Habitica (1M+) owns this but has paywall backlash we can exploit | Habitica, Finch |
-| 4 | Virtual Pet Care | Crossover from Group B — Finch (10M+), Amaru (500K+) dominate; we differentiate on cleaning tie-in | Finch, Amaru, Pou |
-| 5 | Chore Chart | High-volume family/household search; broad funnel entry point | Home Tasker, OurHome, Flatastic |
-| 6 | Executive Dysfunction | Problem-aware searchers; converts well because they know exactly what they need | RoutineFlow, FlyLady |
-| 7 | Home Organizer | High-volume utility search; may cannibalize with lower-intent users | Sweepy, Tody |
-| 8 | Self-Care Pet | Mental health crossover; Finch's core market — their #1 complaint is aggressive pricing | Finch, Amaru |
-| 9 | Daily Routine Planner | Retention-oriented searchers; habit-builders who want structure without rigidity | FlyLady, RoutineFlow |
-| 10 | Zero-Shame Cleaning | **Blue-ocean keyword** — no competitor owns it; directly speaks to our UVP | (none) |
+| #   | Keyword                | Rationale                                                                                          | Primary Competitors Ranking     |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------- |
+| 1   | Cleaning Motivation    | High intent; users actively seeking motivation help                                                | Sweepy, FlyLady                 |
+| 2   | ADHD Organizer         | Loyal niche; "helps with ADHD" is a top praise theme across almost every competitor                | RoutineFlow, Sweepy, FlyLady    |
+| 3   | Gamified Habit Tracker | Core category; Habitica (1M+) owns this but has paywall backlash we can exploit                    | Habitica, Finch                 |
+| 4   | Virtual Pet Care       | Crossover from Group B — Finch (10M+), Amaru (500K+) dominate; we differentiate on cleaning tie-in | Finch, Amaru, Pou               |
+| 5   | Chore Chart            | High-volume family/household search; broad funnel entry point                                      | Home Tasker, OurHome, Flatastic |
+| 6   | Executive Dysfunction  | Problem-aware searchers; converts well because they know exactly what they need                    | RoutineFlow, FlyLady            |
+| 7   | Home Organizer         | High-volume utility search; may cannibalize with lower-intent users                                | Sweepy, Tody                    |
+| 8   | Self-Care Pet          | Mental health crossover; Finch's core market — their #1 complaint is aggressive pricing            | Finch, Amaru                    |
+| 9   | Daily Routine Planner  | Retention-oriented searchers; habit-builders who want structure without rigidity                   | FlyLady, RoutineFlow            |
+| 10  | Zero-Shame Cleaning    | **Blue-ocean keyword** — no competitor owns it; directly speaks to our UVP                         | (none)                          |
 
 ---
 

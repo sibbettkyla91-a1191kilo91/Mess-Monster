@@ -2,7 +2,7 @@
  * Centralised error handling utility for Mess Monster.
  */
 
-export type Severity = 'error' | 'warning' | 'info';
+export type Severity = "error" | "warning" | "info";
 
 export interface LogEntry {
   message: string;
@@ -24,14 +24,14 @@ export class AppError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'AppError';
+    this.name = "AppError";
   }
 }
 
 const USER_MESSAGES: Record<string, string> = {
-  AUTH_ERROR:    'Authentication failed. Please try signing in again.',
-  NETWORK_ERROR: 'Connection failed. Check your internet and try again.',
-  STORAGE_ERROR: 'Could not save your data. Please try again.',
+  AUTH_ERROR: "Authentication failed. Please try signing in again.",
+  NETWORK_ERROR: "Connection failed. Check your internet and try again.",
+  STORAGE_ERROR: "Could not save your data. Please try again.",
 };
 
 class ErrorHandler {
@@ -40,7 +40,7 @@ class ErrorHandler {
   /** Record an error or warning with optional context. */
   log(
     error: Error | string,
-    severity: Severity = 'error',
+    severity: Severity = "error",
     context?: Record<string, unknown>,
   ): void {
     const message = error instanceof Error ? error.message : error;
@@ -68,7 +68,7 @@ class ErrorHandler {
     } catch (err) {
       const entry: LogEntry = {
         message: err instanceof Error ? err.message : String(err),
-        severity: 'error',
+        severity: "error",
         timestamp: Date.now(),
       };
       this.logs.push(entry);
@@ -85,8 +85,8 @@ class ErrorHandler {
       return USER_MESSAGES[error.code] ?? error.message;
     }
     if (error instanceof Error) return error.message;
-    if (typeof error === 'string') return error;
-    return 'Something went wrong. Please try again.';
+    if (typeof error === "string") return error;
+    return "Something went wrong. Please try again.";
   }
 }
 

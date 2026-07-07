@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -6,20 +6,20 @@ import {
   TouchableOpacity,
   View,
   useColorScheme,
-} from 'react-native';
+} from "react-native";
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useMonsterTheme } from '@/hooks/use-monster-theme';
-import { usePetStore } from '@/store/use-pet-store';
-import { usePlayerStore } from '@/store/use-player-store';
-import { useStoreStore } from '@/store/use-store-store';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useMonsterTheme } from "@/hooks/use-monster-theme";
+import { usePetStore } from "@/store/use-pet-store";
+import { usePlayerStore } from "@/store/use-player-store";
+import { useStoreStore } from "@/store/use-store-store";
 import {
   STORE_CATEGORIES,
   STORE_ITEMS,
   StoreCategory,
   StoreItem,
-} from '@/store/store-items';
+} from "@/store/store-items";
 
 export default function StoreScreen() {
   const availablePoints = usePlayerStore((s) => s.availablePointsValue);
@@ -29,10 +29,15 @@ export default function StoreScreen() {
   const isOwned = useStoreStore((s) => s.isOwned);
   const consumeItem = useStoreStore((s) => s.useItem);
   const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-  const { accent, accentLight, accentDark, text: accentText } = useMonsterTheme();
+  const isDark = scheme === "dark";
+  const {
+    accent,
+    accentLight,
+    accentDark,
+    text: accentText,
+  } = useMonsterTheme();
 
-  const [activeCategory, setActiveCategory] = useState<StoreCategory>('food');
+  const [activeCategory, setActiveCategory] = useState<StoreCategory>("food");
   const [feedback, setFeedback] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,26 +51,26 @@ export default function StoreScreen() {
     (item: StoreItem) => {
       // Check if non-repeatable and already owned
       if (!item.repeatable && isOwned(item.id)) {
-        showFeedback('\u2705 Already owned!');
+        showFeedback("\u2705 Already owned!");
         return;
       }
 
       // Check if player can afford it
       if (availablePoints < item.price) {
-        showFeedback('\ud83d\ude05 Not enough points!');
+        showFeedback("\ud83d\ude05 Not enough points!");
         return;
       }
 
       // Process purchase
       const spent = spendPoints(item.price);
       if (!spent) {
-        showFeedback('\ud83d\ude05 Not enough points!');
+        showFeedback("\ud83d\ude05 Not enough points!");
         return;
       }
 
       const bought = buyItem(item);
       if (!bought) {
-        showFeedback('\u274c Something went wrong');
+        showFeedback("\u274c Something went wrong");
         return;
       }
 
@@ -79,10 +84,20 @@ export default function StoreScreen() {
         showFeedback(`\ud83d\udecd\ufe0f ${item.name} added to collection!`);
       }
     },
-    [availablePoints, spendPoints, buyItem, isOwned, consumeItem, care, showFeedback]
+    [
+      availablePoints,
+      spendPoints,
+      buyItem,
+      isOwned,
+      consumeItem,
+      care,
+      showFeedback,
+    ],
   );
 
-  const filteredItems = STORE_ITEMS.filter((i) => i.category === activeCategory);
+  const filteredItems = STORE_ITEMS.filter(
+    (i) => i.category === activeCategory,
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -90,20 +105,26 @@ export default function StoreScreen() {
       <View style={styles.header}>
         <ThemedText type="title">Points Store</ThemedText>
         <View style={styles.pointsBadge}>
-          <Text style={styles.pointsBadgeText}>{'\u2b50'} {availablePoints} pts</Text>
+          <Text style={styles.pointsBadgeText}>
+            {"\u2b50"} {availablePoints} pts
+          </Text>
         </View>
       </View>
 
       {/* Feedback pill */}
       {feedback && (
-        <View style={[
-          styles.feedbackPill,
-          { backgroundColor: isDark ? accentDark : accentLight },
-        ]}>
-          <Text style={[
-            styles.feedbackText,
-            { color: isDark ? accentLight : accentText },
-          ]}>
+        <View
+          style={[
+            styles.feedbackPill,
+            { backgroundColor: isDark ? accentDark : accentLight },
+          ]}
+        >
+          <Text
+            style={[
+              styles.feedbackText,
+              { color: isDark ? accentLight : accentText },
+            ]}
+          >
             {feedback}
           </Text>
         </View>
@@ -117,7 +138,9 @@ export default function StoreScreen() {
             style={[
               styles.categoryTab,
               isDark && styles.categoryTabDark,
-              activeCategory === cat.key && { backgroundColor: isDark ? accentDark : accentLight },
+              activeCategory === cat.key && {
+                backgroundColor: isDark ? accentDark : accentLight,
+              },
             ]}
             onPress={() => setActiveCategory(cat.key)}
             activeOpacity={0.7}
@@ -156,12 +179,21 @@ export default function StoreScreen() {
             >
               <Text style={styles.itemEmoji}>{item.emoji}</Text>
               <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-              <ThemedText style={styles.itemDesc}>{item.description}</ThemedText>
+              <ThemedText style={styles.itemDesc}>
+                {item.description}
+              </ThemedText>
 
               <View style={styles.itemFooter}>
                 {owned ? (
-                  <View style={[styles.ownedBadge, { backgroundColor: isDark ? accentDark : accentLight }]}>
-                    <Text style={[styles.ownedText, { color: accentText }]}>{'\u2713'} Owned</Text>
+                  <View
+                    style={[
+                      styles.ownedBadge,
+                      { backgroundColor: isDark ? accentDark : accentLight },
+                    ]}
+                  >
+                    <Text style={[styles.ownedText, { color: accentText }]}>
+                      {"\u2713"} Owned
+                    </Text>
                   </View>
                 ) : (
                   <TouchableOpacity
@@ -180,7 +212,10 @@ export default function StoreScreen() {
                         !canAfford && styles.buyButtonTextDisabled,
                       ]}
                     >
-                      {item.repeatable ? '\ud83c\udf74 Use' : '\ud83d\uded2 Buy'} {'\u00b7'} {item.price} pts
+                      {item.repeatable
+                        ? "\ud83c\udf74 Use"
+                        : "\ud83d\uded2 Buy"}{" "}
+                      {"\u00b7"} {item.price} pts
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -200,59 +235,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   pointsBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: "#fef3c7",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   pointsBadgeText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#92400e',
+    fontWeight: "700",
+    color: "#92400e",
   },
   feedbackPill: {
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 10,
   },
   feedbackText: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
   },
   categoryRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 16,
   },
   categoryTab: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
     gap: 2,
   },
   categoryTabDark: {
-    backgroundColor: '#1e2124',
+    backgroundColor: "#1e2124",
   },
   categoryEmoji: {
     fontSize: 18,
   },
   categoryLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   categoryLabelDark: {
-    color: '#aaa',
+    color: "#aaa",
   },
   itemsGrid: {
     gap: 12,
@@ -264,12 +299,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   itemCardLight: {
-    backgroundColor: '#fafafa',
-    borderColor: '#e8e8e8',
+    backgroundColor: "#fafafa",
+    borderColor: "#e8e8e8",
   },
   itemCardDark: {
-    backgroundColor: '#1e2124',
-    borderColor: '#2e3236',
+    backgroundColor: "#1e2124",
+    borderColor: "#2e3236",
   },
   itemCardOwned: {
     opacity: 0.7,
@@ -280,7 +315,7 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 2,
   },
   itemDesc: {
@@ -289,8 +324,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "flex-end",
   },
   buyButton: {
     paddingHorizontal: 16,
@@ -298,15 +333,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   buyButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: "#ccc",
   },
   buyButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 13,
   },
   buyButtonTextDisabled: {
-    color: '#888',
+    color: "#888",
   },
   ownedBadge: {
     paddingHorizontal: 14,
@@ -314,7 +349,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   ownedText: {
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 13,
   },
 });

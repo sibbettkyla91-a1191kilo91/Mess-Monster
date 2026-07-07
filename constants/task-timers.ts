@@ -7,23 +7,23 @@
 
 /** Minimum completion time per task (seconds) */
 export const TASK_MIN_TIMES: Record<string, number> = {
-  'wash-dishes':    300, // 5 min
-  'wipe-counters':  180, // 3 min
-  'clean-stovetop': 240, // 4 min
-  'scrub-toilet':   240, // 4 min
-  'wipe-sink':      180, // 3 min
-  'make-bed':       120, // 2 min
-  'tidy-floor':     180, // 3 min
-  'vacuum':         300, // 5 min
-  'dust-surfaces':  180, // 3 min
-  'take-out-trash': 120, // 2 min
+  "wash-dishes": 300, // 5 min
+  "wipe-counters": 180, // 3 min
+  "clean-stovetop": 240, // 4 min
+  "scrub-toilet": 240, // 4 min
+  "wipe-sink": 180, // 3 min
+  "make-bed": 120, // 2 min
+  "tidy-floor": 180, // 3 min
+  vacuum: 300, // 5 min
+  "dust-surfaces": 180, // 3 min
+  "take-out-trash": 120, // 2 min
 };
 
 /** Default time for any task not in the map */
 export const DEFAULT_MIN_TIME = 180; // 3 min
 
 /** Reward tiers with probability weights (must sum to 100) */
-export type RewardTier = 'base' | 'bonus_points' | 'free_item' | 'jackpot';
+export type RewardTier = "base" | "bonus_points" | "free_item" | "jackpot";
 
 export interface RewardOutcome {
   tier: RewardTier;
@@ -40,10 +40,10 @@ export const REWARD_TABLE: { weight: number; outcome: RewardOutcome }[] = [
   {
     weight: 40,
     outcome: {
-      tier: 'base',
-      label: 'Nice Work!',
-      emoji: '✨',
-      description: 'Task verified — points earned!',
+      tier: "base",
+      label: "Nice Work!",
+      emoji: "✨",
+      description: "Task verified — points earned!",
       pointsMultiplier: 1.0,
       includesFreeItem: false,
     },
@@ -51,10 +51,10 @@ export const REWARD_TABLE: { weight: number; outcome: RewardOutcome }[] = [
   {
     weight: 35,
     outcome: {
-      tier: 'bonus_points',
-      label: 'Bonus Points!',
-      emoji: '🎉',
-      description: 'Extra effort pays off!',
+      tier: "bonus_points",
+      label: "Bonus Points!",
+      emoji: "🎉",
+      description: "Extra effort pays off!",
       pointsMultiplier: 1.5,
       includesFreeItem: false,
     },
@@ -62,10 +62,10 @@ export const REWARD_TABLE: { weight: number; outcome: RewardOutcome }[] = [
   {
     weight: 20,
     outcome: {
-      tier: 'free_item',
-      label: 'Free Item!',
-      emoji: '🎁',
-      description: 'You unlocked a surprise gift!',
+      tier: "free_item",
+      label: "Free Item!",
+      emoji: "🎁",
+      description: "You unlocked a surprise gift!",
       pointsMultiplier: 1.0,
       includesFreeItem: true,
     },
@@ -73,10 +73,10 @@ export const REWARD_TABLE: { weight: number; outcome: RewardOutcome }[] = [
   {
     weight: 5,
     outcome: {
-      tier: 'jackpot',
-      label: 'JACKPOT!',
-      emoji: '🏆',
-      description: 'Double points AND a free item!',
+      tier: "jackpot",
+      label: "JACKPOT!",
+      emoji: "🏆",
+      description: "Double points AND a free item!",
       pointsMultiplier: 2.0,
       includesFreeItem: true,
     },

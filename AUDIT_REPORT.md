@@ -1,30 +1,31 @@
 # Mess Monster — Code Audit Report
+
 **Date:** 2026-06-26 | **Auditor:** Claude Code (claude-sonnet-4-6) | **Branch:** main
 
 ---
 
 ## 1. FEATURE STATUS
 
-| Feature | File Path | Status |
-|---|---|---|
-| Monster selection / onboarding | `app/onboarding.tsx` | Full |
-| Home / pet view | `app/(tabs)/index.tsx` | Full |
-| Task logging | `app/(tabs)/explore.tsx` | Full |
-| Points store | `app/(tabs)/store.tsx` | Full |
-| Zustand + AsyncStorage data layer | `store/use-player-store.ts`, `store/use-pet-store.ts`, `store/use-tasks-store.ts`, `store/use-store-store.ts`, `store/use-photo-store.ts` | Full |
-| Stat decay + offline catch-up | `store/use-pet-store.ts` (`applyDecay`, rehydration hook) | Partial |
-| Daily chore roll (date-seeded, category-balanced) | `store/preset-tasks.ts` (`getDailyRoll`), `store/use-tasks-store.ts` (`refreshDailyRoll`) | Full |
-| Health/happiness bars | `app/(tabs)/index.tsx` (stat bar section) | Full |
-| Mood overlays | `app/(tabs)/index.tsx` (`MOOD_CONFIG`, `deriveMood`) | Full |
-| Custom naming | `app/onboarding.tsx` (name input + dice), `store/use-player-store.ts` (`setMonsterName`) | Full |
-| Streak rewards | `store/use-pet-store.ts` (`checkStreakMilestones`), `app/(tabs)/index.tsx` (milestone banner) | Full |
-| Habitat backgrounds (Luna gothic lair / Nilly cozy mint room) | `app/(tabs)/index.tsx` (`HABITAT_IMAGES`) | Full |
-| Base sprites (Egg, Baby, Teen, Adult) | `assets/images/` (nilly_*/luna_* PNGs) | Full |
-| 8 adult room variants | `assets/images/` (*_adult_kitchen/livingroom/bedroom/bathroom) | Partial |
-| Evolution thresholds / rules (Egg→Baby→Teen→Adult→Ascended) | `store/use-pet-store.ts` (`checkEvolution`) | Partial |
-| Adult variant logic (dominant category or fallback) | `store/use-pet-store.ts` (adult variant determination block) | Full |
-| Ascended form (silhouette + "?" only) | `store/use-pet-store.ts` (threshold defined, no trigger), `app/(tabs)/index.tsx` (no sprite/overlay) | Missing |
-| Premium gating (`setPremium(true)`) | `store/use-player-store.ts` (`setPremium`), `store/use-pet-store.ts` (`pendingPremiumGate`) | Partial |
+| Feature                                                       | File Path                                                                                                                                 | Status  |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Monster selection / onboarding                                | `app/onboarding.tsx`                                                                                                                      | Full    |
+| Home / pet view                                               | `app/(tabs)/index.tsx`                                                                                                                    | Full    |
+| Task logging                                                  | `app/(tabs)/explore.tsx`                                                                                                                  | Full    |
+| Points store                                                  | `app/(tabs)/store.tsx`                                                                                                                    | Full    |
+| Zustand + AsyncStorage data layer                             | `store/use-player-store.ts`, `store/use-pet-store.ts`, `store/use-tasks-store.ts`, `store/use-store-store.ts`, `store/use-photo-store.ts` | Full    |
+| Stat decay + offline catch-up                                 | `store/use-pet-store.ts` (`applyDecay`, rehydration hook)                                                                                 | Partial |
+| Daily chore roll (date-seeded, category-balanced)             | `store/preset-tasks.ts` (`getDailyRoll`), `store/use-tasks-store.ts` (`refreshDailyRoll`)                                                 | Full    |
+| Health/happiness bars                                         | `app/(tabs)/index.tsx` (stat bar section)                                                                                                 | Full    |
+| Mood overlays                                                 | `app/(tabs)/index.tsx` (`MOOD_CONFIG`, `deriveMood`)                                                                                      | Full    |
+| Custom naming                                                 | `app/onboarding.tsx` (name input + dice), `store/use-player-store.ts` (`setMonsterName`)                                                  | Full    |
+| Streak rewards                                                | `store/use-pet-store.ts` (`checkStreakMilestones`), `app/(tabs)/index.tsx` (milestone banner)                                             | Full    |
+| Habitat backgrounds (Luna gothic lair / Nilly cozy mint room) | `app/(tabs)/index.tsx` (`HABITAT_IMAGES`)                                                                                                 | Full    |
+| Base sprites (Egg, Baby, Teen, Adult)                         | `assets/images/` (nilly__/luna__ PNGs)                                                                                                    | Full    |
+| 8 adult room variants                                         | `assets/images/` (*_adult_kitchen/livingroom/bedroom/bathroom)                                                                            | Partial |
+| Evolution thresholds / rules (Egg→Baby→Teen→Adult→Ascended)   | `store/use-pet-store.ts` (`checkEvolution`)                                                                                               | Partial |
+| Adult variant logic (dominant category or fallback)           | `store/use-pet-store.ts` (adult variant determination block)                                                                              | Full    |
+| Ascended form (silhouette + "?" only)                         | `store/use-pet-store.ts` (threshold defined, no trigger), `app/(tabs)/index.tsx` (no sprite/overlay)                                      | Missing |
+| Premium gating (`setPremium(true)`)                           | `store/use-player-store.ts` (`setPremium`), `store/use-pet-store.ts` (`pendingPremiumGate`)                                               | Partial |
 
 ---
 
@@ -33,7 +34,7 @@
 **[High] `store/use-pet-store.ts` (`applyDecay`) — Decay can produce negative stat values**
 No floor clamp is applied after subtracting hours × rate. If `lastCaredAt` is very old (e.g., 100+ hours), `health` and `happiness` will go deeply negative, not stop at 0. This causes `deriveMood` to receive values below its `< 15` threshold correctly, but downstream display and care calculations assume 0–100 range. Any future arithmetic on raw stat values (e.g., percentage display) will render negative numbers or NaN if divided.
 
-**[High] `store/use-pet-store.ts` (`applyDecay`) — Offline catch-up ignores elapsed time since last *session*, not last care**
+**[High] `store/use-pet-store.ts` (`applyDecay`) — Offline catch-up ignores elapsed time since last _session_, not last care**
 `applyDecay` uses `lastCaredAt` as the decay origin. If the user cares for the pet and then opens the app 48 hours later without caring, decay is correctly calculated. However, if `lastCaredAt` is `null` or `0` (new saves before first care action), `Date.now() - 0` yields a ~57-year elapsed time, causing instant maximum decay or negative stats on first launch. The initial `lastCaredAt` is not set to `Date.now()` at store initialization; it is set to `0` via the `PetState` default shape inferred from the type.
 
 **[High] `store/use-pet-store.ts` — Ascended evolution threshold defined but never triggered**
@@ -65,6 +66,7 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 ## 3. MISSING ARCHITECTURE & ASSETS
 
 ### Gameplay
+
 - **12 neglect/sick sprites** (per mascot): Only standard stage sprites exist; no sad/sick visual variants in `assets/images/`. The `sad_luna_*` and `sad_nilly_*` files visible in git status (`sad_luna_baby.jpg`, `sad_luna_egg.jpg`, `sad_luna_teen.jpg`, `sad_nilly_egg.jpg`) are untracked and not referenced in any sprite map.
 - **Ascended form:** No silhouette sprite, no "?" overlay, no evolution trigger, no UI branch.
 - **Placeable habitat items (decor):** Decor items exist in the store catalog (`store/store-items.ts`) and can be purchased, but there is no rendering layer in `app/(tabs)/index.tsx` to display owned decor items in the habitat. Purchased decor has zero visible effect.
@@ -73,12 +75,14 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 - **Task category coverage:** Only 7 categories defined in types; `other` category exists but no preset tasks use it. `laundry` category exists in types but has zero preset tasks and no `TASK_MIN_TIMES` entry.
 
 ### Monetisation
+
 - **RevenueCat integration:** Entirely absent. `setPremium(true)` in `store/use-player-store.ts` is a boolean flag with no payment flow, receipt validation, restore purchases, or entitlement check.
 - **Premium wall UI:** The premium gate modal in `app/(tabs)/index.tsx` has an "Upgrade" button that calls `setPremium(true)` directly — no paywall screen, no pricing display, no SKU.
 - **$24.99/yr pricing:** Not referenced anywhere in code, UI, or `app.json`.
 - **Subscription management:** No restore-purchases flow, no subscription status polling, no lapsed-subscription handling (premium flag stays `true` forever once set).
 
 ### Infrastructure
+
 - **Push notifications:** No `expo-notifications` dependency, no permission request, no scheduling for decay reminders or streak nudges.
 - **App icon:** `assets/images/icon.png` exists but adaptive Android icons (foreground/background/monochrome) need verification against Play Store density requirements.
 - **Splash screen:** `splash-icon.png` exists; `expo-splash-screen` plugin configured. Functional but not audited for brand quality.
@@ -88,6 +92,7 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 - **Production `app.json`:** Missing `android.package`, `ios.bundleIdentifier`, `android.versionCode`, EAS project ID, and submission config. Current `app.json` is development-only.
 
 ### Compliance / Store
+
 - **Release build config:** No `eas.json`, no EAS build profiles, no signing key configuration.
 - **Privacy policy:** No URL referenced in `app.json` or any screen. Required by Google Play and Apple App Store for apps collecting photos and usage data.
 - **Content rating:** No IARC questionnaire or age rating metadata in `app.json`.
@@ -99,14 +104,14 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 
 ## 4. QUALITY RATING (1–5)
 
-| Area | Rating | Justification |
-|---|---|---|
-| Core loop | 4 | Task → reward → care → evolution loop is coherent and well-implemented; blocked only by missing ascended stage and decor rendering. |
-| UI / screens | 4 | Home screen is polished with particle system, animations, mood overlays, and themed variants; explore and store screens are functional but lack animation polish. |
-| Data persistence | 3 | Five Zustand stores with AsyncStorage are well-structured, but cross-store rehydration ordering is unsafe and the negative-stat decay bug is a data-integrity risk. |
-| Evolution system | 3 | Egg→Baby→Teen→Adult thresholds and adult variant logic are solid; ascended stage is entirely unimplemented and the premium-gate desync bug can permanently block adult evolution. |
-| Premium gating | 1 | Gate UI exists but `setPremium(true)` bypasses all payment — shipping this is a revenue loss and potential store policy violation. |
-| Production readiness | 1 | No EAS config, no real IAP, no crash reporting, no privacy policy, missing Play Store assets, and a dev-only tab that crashes on launch. Not shippable in current state. |
+| Area                 | Rating | Justification                                                                                                                                                                     |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core loop            | 4      | Task → reward → care → evolution loop is coherent and well-implemented; blocked only by missing ascended stage and decor rendering.                                               |
+| UI / screens         | 4      | Home screen is polished with particle system, animations, mood overlays, and themed variants; explore and store screens are functional but lack animation polish.                 |
+| Data persistence     | 3      | Five Zustand stores with AsyncStorage are well-structured, but cross-store rehydration ordering is unsafe and the negative-stat decay bug is a data-integrity risk.               |
+| Evolution system     | 3      | Egg→Baby→Teen→Adult thresholds and adult variant logic are solid; ascended stage is entirely unimplemented and the premium-gate desync bug can permanently block adult evolution. |
+| Premium gating       | 1      | Gate UI exists but `setPremium(true)` bypasses all payment — shipping this is a revenue loss and potential store policy violation.                                                |
+| Production readiness | 1      | No EAS config, no real IAP, no crash reporting, no privacy policy, missing Play Store assets, and a dev-only tab that crashes on launch. Not shippable in current state.          |
 
 ---
 

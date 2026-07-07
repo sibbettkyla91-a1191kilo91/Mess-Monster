@@ -1,20 +1,20 @@
 module.exports = {
-  preset: 'jest-expo',
-  testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testMatch: ['**/__tests__/**/*.test.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
+  preset: "jest-expo",
+  testEnvironment: "node",
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  testMatch: ["**/__tests__/**/*.test.ts?(x)", "**/?(*.)+(spec|test).ts?(x)"],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    "^@/(.*)$": "<rootDir>/$1",
   },
   transform: {
-    '^.+\\.(ts|tsx)$': ['babel-jest', { presets: ['babel-preset-expo'] }],
+    "^.+\\.(ts|tsx)$": ["babel-jest", { presets: ["babel-preset-expo"] }],
   },
   collectCoverageFrom: [
-    'stores/**/*.{ts,tsx}',
-    'utils/**/*.{ts,tsx}',
-    'components/**/*.{ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
+    "stores/**/*.{ts,tsx}",
+    "utils/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "!**/*.d.ts",
+    "!**/node_modules/**",
   ],
   coverageThreshold: {
     global: {

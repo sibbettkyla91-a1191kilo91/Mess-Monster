@@ -1,2 +1,186 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';\nimport { createJSONStorage, persist } from 'zustand/middleware';\n\nexport type SubscriptionTier = 'free' | 'monthly' | 'yearly';\nexport type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'none';\n\ninterface SubscriptionState {\n  // Subscription metadata\n  tier: SubscriptionTier;\n  status: SubscriptionStatus;\n  trialStartedAt: number | null; // unix ms when trial began\n  trialExpiresAt: number | null; // unix ms when trial ends (3 days from start)\n  subscriptionExpiresAt: number | null; // unix ms when subscription ends\n  receiptToken: string | null; // IAP receipt from Google Play\n  lastReceiptRefreshAt: number | null; // unix ms of last receipt validation\n}\n\ninterface SubscriptionStore extends SubscriptionState {\n  // Trial management\n  startFreeTrial: () => void;\n  checkTrialStatus: () => void;\n  getTrialDaysRemaining: () => number;\n  \n  // Subscription management\n  purchaseSubscription: (tier: 'monthly' | 'yearly', receiptToken: string) => void;\n  renewSubscription: (receiptToken: string) => void;\n  cancelSubscription: () => void;\n  \n  // Feature gates\n  isPremium: () => boolean;\n  isOnTrial: () => boolean;\n  canUseMusic: () => boolean;\n  canSkipAds: () => boolean;\n  canEvolveToAdult: () => boolean;\n  canUseShortTimer: () => boolean;\n  \n  // Receipt validation\n  validateReceipt: (receiptToken: string) => Promise<boolean>;\n}\n\nconst TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds\n\nexport const useSubscriptionStore = create<SubscriptionStore>()(\n  persist(\n    (set, get) => ({\n      tier: 'free',\n      status: 'none',\n      trialStartedAt: null,\n      trialExpiresAt: null,\n      subscriptionExpiresAt: null,\n      receiptToken: null,\n      lastReceiptRefreshAt: null,\n\n      // Start the 3-day free trial\n      startFreeTrial: () => {\n        const now = Date.now();\n        const expiresAt = now + TRIAL_DURATION_MS;\n        set({\n          tier: 'free',\n          status: 'trial',\n          trialStartedAt: now,\n          trialExpiresAt: expiresAt,\n        });\n      },\n\n      // Check if trial has expired and update status\n      checkTrialStatus: () => {\n        const state = get();\n        if (state.status !== 'trial') return;\n        \n        const now = Date.now();\n        if (state.trialExpiresAt && now >= state.trialExpiresAt) {\n          // Trial expired\n          set({\n            status: 'expired',\n          });\n        }\n      },\n\n      // Get remaining trial days (0 if expired or not on trial)\n      getTrialDaysRemaining: () => {\n        const state = get();\n        if (state.status !== 'trial' || !state.trialExpiresAt) return 0;\n        \n        const now = Date.now();\n        const remainingMs = state.trialExpiresAt - now;\n        if (remainingMs <= 0) return 0;\n        \n        return Math.ceil(remainingMs / (24 * 60 * 60 * 1000)); // Convert to days\n      },\n\n      // Record a subscription purchase\n      purchaseSubscription: (tier: 'monthly' | 'yearly', receiptToken: string) => {\n        const now = Date.now();\n        // Set expiration: 30 days for monthly, 365 days for yearly\n        const expirationMs = tier === 'monthly' \n          ? 30 * 24 * 60 * 60 * 1000 \n          : 365 * 24 * 60 * 60 * 1000;\n        \n        set({\n          tier,\n          status: 'active',\n          subscriptionExpiresAt: now + expirationMs,\n          receiptToken,\n          lastReceiptRefreshAt: now,\n          // End trial when subscription starts\n          trialExpiresAt: null,\n        });\n      },\n\n      // Renew subscription with new receipt\n      renewSubscription: (receiptToken: string) => {\n        const state = get();\n        if (state.tier === 'free') return; // Can't renew free tier\n        \n        const now = Date.now();\n        const expirationMs = state.tier === 'monthly'\n          ? 30 * 24 * 60 * 60 * 1000\n          : 365 * 24 * 60 * 60 * 1000;\n        \n        set({\n          status: 'active',\n          subscriptionExpiresAt: now + expirationMs,\n          receiptToken,\n          lastReceiptRefreshAt: now,\n        });\n      },\n\n      // Cancel subscription\n      cancelSubscription: () => {\n        set({\n          tier: 'free',\n          status: 'expired',\n          subscriptionExpiresAt: null,\n          receiptToken: null,\n        });\n      },\n\n      // Feature gates\n      isPremium: () => {\n        const state = get();\n        if (state.status === 'active') return true;\n        if (state.status === 'trial') return true;\n        return false;\n      },\n\n      isOnTrial: () => get().status === 'trial',\n\n      canUseMusic: () => get().isPremium(),\n\n      canSkipAds: () => get().isPremium(),\n\n      canEvolveToAdult: () => get().isPremium(),\n\n      canUseShortTimer: () => get().isPremium(),\n\n      // Validate receipt with Google Play (simplified for now)\n      // In production, this would call your backend to verify with Google\n      validateReceipt: async (receiptToken: string) => {\n        try {\n          // TODO: Implement actual receipt validation with Google Play API\n          // For now, we accept all receipts as valid\n          console.log('Receipt validation:', receiptToken);\n          return true;\n        } catch (error) {\n          console.error('Receipt validation failed:', error);\n          return false;\n        }\n      },\n    }),\n    {\n      name: 'mm-subscription',\n      version: 1,\n      storage: createJSONStorage(() => AsyncStorage),\n    }\n  )\n);\n
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+export type SubscriptionTier = "free" | "monthly" | "yearly";
+export type SubscriptionStatus = "trial" | "active" | "expired" | "none";
+
+interface SubscriptionState {
+  // Subscription metadata
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  trialStartedAt: number | null; // unix ms when trial began
+  trialExpiresAt: number | null; // unix ms when trial ends (3 days from start)
+  subscriptionExpiresAt: number | null; // unix ms when subscription ends
+  receiptToken: string | null; // IAP receipt from Google Play
+  lastReceiptRefreshAt: number | null; // unix ms of last receipt validation
+}
+
+interface SubscriptionStore extends SubscriptionState {
+  // Trial management
+  startFreeTrial: () => void;
+  checkTrialStatus: () => void;
+  getTrialDaysRemaining: () => number;
+
+  // Subscription management
+  purchaseSubscription: (
+    tier: "monthly" | "yearly",
+    receiptToken: string,
+  ) => void;
+  renewSubscription: (receiptToken: string) => void;
+  cancelSubscription: () => void;
+
+  // Feature gates
+  isPremium: () => boolean;
+  isOnTrial: () => boolean;
+  canUseMusic: () => boolean;
+  canSkipAds: () => boolean;
+  canEvolveToAdult: () => boolean;
+  canUseShortTimer: () => boolean;
+
+  // Receipt validation
+  validateReceipt: (receiptToken: string) => Promise<boolean>;
+}
+
+const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+
+export const useSubscriptionStore = create<SubscriptionStore>()(
+  persist(
+    (set, get) => ({
+      tier: "free",
+      status: "none",
+      trialStartedAt: null,
+      trialExpiresAt: null,
+      subscriptionExpiresAt: null,
+      receiptToken: null,
+      lastReceiptRefreshAt: null,
+
+      // Start the 3-day free trial
+      startFreeTrial: () => {
+        const now = Date.now();
+        const expiresAt = now + TRIAL_DURATION_MS;
+        set({
+          tier: "free",
+          status: "trial",
+          trialStartedAt: now,
+          trialExpiresAt: expiresAt,
+        });
+      },
+
+      // Check if trial has expired and update status
+      checkTrialStatus: () => {
+        const state = get();
+        if (state.status !== "trial") return;
+
+        const now = Date.now();
+        if (state.trialExpiresAt && now >= state.trialExpiresAt) {
+          // Trial expired
+          set({
+            status: "expired",
+          });
+        }
+      },
+
+      // Get remaining trial days (0 if expired or not on trial)
+      getTrialDaysRemaining: () => {
+        const state = get();
+        if (state.status !== "trial" || !state.trialExpiresAt) return 0;
+
+        const now = Date.now();
+        const remainingMs = state.trialExpiresAt - now;
+        if (remainingMs <= 0) return 0;
+
+        return Math.ceil(remainingMs / (24 * 60 * 60 * 1000)); // Convert to days
+      },
+
+      // Record a subscription purchase
+      purchaseSubscription: (
+        tier: "monthly" | "yearly",
+        receiptToken: string,
+      ) => {
+        const now = Date.now();
+        // Set expiration: 30 days for monthly, 365 days for yearly
+        const expirationMs =
+          tier === "monthly"
+            ? 30 * 24 * 60 * 60 * 1000
+            : 365 * 24 * 60 * 60 * 1000;
+
+        set({
+          tier,
+          status: "active",
+          subscriptionExpiresAt: now + expirationMs,
+          receiptToken,
+          lastReceiptRefreshAt: now,
+          // End trial when subscription starts
+          trialExpiresAt: null,
+        });
+      },
+
+      // Renew subscription with new receipt
+      renewSubscription: (receiptToken: string) => {
+        const state = get();
+        if (state.tier === "free") return; // Can't renew free tier
+
+        const now = Date.now();
+        const expirationMs =
+          state.tier === "monthly"
+            ? 30 * 24 * 60 * 60 * 1000
+            : 365 * 24 * 60 * 60 * 1000;
+
+        set({
+          status: "active",
+          subscriptionExpiresAt: now + expirationMs,
+          receiptToken,
+          lastReceiptRefreshAt: now,
+        });
+      },
+
+      // Cancel subscription
+      cancelSubscription: () => {
+        set({
+          tier: "free",
+          status: "expired",
+          subscriptionExpiresAt: null,
+          receiptToken: null,
+        });
+      },
+
+      // Feature gates
+      isPremium: () => {
+        const state = get();
+        if (state.status === "active") return true;
+        if (state.status === "trial") return true;
+        return false;
+      },
+
+      isOnTrial: () => get().status === "trial",
+
+      canUseMusic: () => get().isPremium(),
+
+      canSkipAds: () => get().isPremium(),
+
+      canEvolveToAdult: () => get().isPremium(),
+
+      canUseShortTimer: () => get().isPremium(),
+
+      // Validate receipt with Google Play (simplified for now)
+      // In production, this would call your backend to verify with Google
+      validateReceipt: async (receiptToken: string) => {
+        try {
+          // TODO: Implement actual receipt validation with Google Play API
+          // For now, we accept all receipts as valid
+          console.log("Receipt validation:", receiptToken);
+          return true;
+        } catch (error) {
+          console.error("Receipt validation failed:", error);
+          return false;
+        }
+      },
+    }),
+    {
+      name: "mm-subscription",
+      version: 1,
+      storage: createJSONStorage(() => AsyncStorage),
+    },
+  ),
+);

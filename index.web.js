@@ -6,11 +6,11 @@
  * expo-router tree.  This gives CI a real bundle to verify while keeping the
  * native app unaffected.
  */
-import { AppRegistry } from 'react-native';
-import App from './web/App';
+import { AppRegistry } from "react-native";
+import App from "./web/App";
 
-AppRegistry.registerComponent('mess-monster', () => App);
-AppRegistry.runApplication('mess-monster', {
-  rootTag: document.getElementById('root'),
+AppRegistry.registerComponent("mess-monster", () => App);
+AppRegistry.runApplication("mess-monster", {
+  rootTag: document.getElementById("root"),
   initialProps: {},
 });

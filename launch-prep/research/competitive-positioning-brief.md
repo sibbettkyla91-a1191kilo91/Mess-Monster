@@ -1,6 +1,6 @@
 # Mess Monster: Competitive Positioning Brief
 
-*Source: Manus research. Reviewed and corrected June 11, 2026 — see correction notes inline.*
+_Source: Manus research. Reviewed and corrected June 11, 2026 — see correction notes inline._
 
 ---
 
@@ -72,11 +72,11 @@ While some apps have family sharing, it's often clunky or expensive.
 
 The following features are **not included at v1.0 launch** and must not be presented as current features in any marketing copy, App Store listing, or press materials:
 
-| Feature | Description | Status |
-|---------|-------------|--------|
+| Feature               | Description                                                                                | Status               |
+| --------------------- | ------------------------------------------------------------------------------------------ | -------------------- |
 | Roommate/Partner Sync | Share a monster or coordinate tasks with a partner; shared accountability without pressure | Planned, post-launch |
-| Spotify Integration | Curated cleaning playlists for premium subscribers | Planned, post-launch |
-| Push Notifications | Gentle monster mood alerts and cleaning reminders | Planned, post-launch |
+| Spotify Integration   | Curated cleaning playlists for premium subscribers                                         | Planned, post-launch |
+| Push Notifications    | Gentle monster mood alerts and cleaning reminders                                          | Planned, post-launch |
 
 ---
 

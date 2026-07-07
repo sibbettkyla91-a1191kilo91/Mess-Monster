@@ -1,6 +1,7 @@
 # 🧟 Mess Monster — Master Project Document
-*Last updated: May 17, 2026 | Maintained by: Kilo (Kyla Sibbett)*
-*This document is the single source of truth for Mess Monster. Share it with any AI assistant (Claude, Manus, Gemini, Claude Code) to bring them up to speed.*
+
+_Last updated: May 17, 2026 | Maintained by: Kilo (Kyla Sibbett)_
+_This document is the single source of truth for Mess Monster. Share it with any AI assistant (Claude, Manus, Gemini, Claude Code) to bring them up to speed._
 
 ---
 
@@ -25,13 +26,14 @@ It's a gamified cleaning coach designed for people who struggle with motivation,
 - Clean consistently → monster thrives, levels up, unlocks items
 - Real-world cleaning = in-app progress (two-layer anti-cheat planned — see below)
 
-**The emotional hook:** You're not cleaning for yourself (that's hard). You're cleaning *for your monster* (that's easier).
+**The emotional hook:** You're not cleaning for yourself (that's hard). You're cleaning _for your monster_ (that's easier).
 
 ---
 
 ## ✨ Features
 
 ### Free Tier
+
 - Virtual pet (mess monster) with mood states (thriving, happy, sad, sick, messy)
 - Step-by-step cleaning coach (breaks tasks into small, doable steps)
 - Points system for completing cleaning tasks
@@ -40,31 +42,34 @@ It's a gamified cleaning coach designed for people who struggle with motivation,
 - Royalty-free background music
 
 ### Premium Tier (~$4.99/month)
+
 - Spotify integration for background music
 - Additional monster customization options
 - Expanded points store inventory
 - AR "Scan to Feed" feature (v2 — doubles as premium anti-cheat)
-- *(Additional premium features TBD)*
+- _(Additional premium features TBD)_
 
 ---
 
 ## 🧟 Mascots & Characters
 
-### Nilly *(Kilo's personal monster, primary mascot)*
+### Nilly _(Kilo's personal monster, primary mascot)_
+
 - **Vibe:** Mint green, kawaii, soft and cute
 - **Personality:** Sweet, encouraging, a little goofy
 - **Role:** Primary mascot, face of the app
 - **Design:** Approved via Leonardo AI
 - **Status in app:** Implemented (using placeholder image — real artwork pending)
 
-### Luna *(secondary mascot)*
+### Luna _(secondary mascot)_
+
 - **Vibe:** Dark witchy aesthetic — black, red, and gold
 - **Personality:** Mysterious, moody, dramatically unbothered
 - **Role:** Alternate monster choice (pick-one at first launch)
 - **Design:** Approved via Leonardo AI
 - **Status in app:** Implemented in onboarding (using placeholder image — real artwork pending)
 
-> 💡 *Mascot artwork finalized. Both Nilly and Luna designs approved. In-app, the user picks ONE monster at first launch — they don't share a screen except in marketing materials.*
+> 💡 _Mascot artwork finalized. Both Nilly and Luna designs approved. In-app, the user picks ONE monster at first launch — they don't share a screen except in marketing materials._
 
 ---
 
@@ -81,11 +86,12 @@ It's a gamified cleaning coach designed for people who struggle with motivation,
 
 ---
 
-## 🧪 Mess Evolution System *(monster state mechanic)*
+## 🧪 Mess Evolution System _(monster state mechanic)_
 
-The monster's appearance evolves based on the *type* of mess being ignored — not just how long it's been since cleaning. This makes the visual feedback feel intuitive and personal.
+The monster's appearance evolves based on the _type_ of mess being ignored — not just how long it's been since cleaning. This makes the visual feedback feel intuitive and personal.
 
 **Currently implemented mood states (auto-derived from time since last care):**
+
 - **Thriving** — recent cleaning, monster glowing/happy
 - **Happy** — doing well, recent activity
 - **Sad** — neglected for moderate time
@@ -93,15 +99,16 @@ The monster's appearance evolves based on the *type* of mess being ignored — n
 - **Messy** — combined state when multiple task types ignored
 
 **Visual feedback:**
+
 - Mint green tones when monster is happy/thriving (Nilly)
 - Red tones when monster is sad/sick (Nilly)
 - Luna's palette inverts this with her dark/red/gold scheme
 
-**Future expansion:** The *type* of mess ignored could change the monster's appearance differently (e.g., dishes-neglected monster looks different from laundry-neglected monster). This is a planned v1.5 / v2 enhancement.
+**Future expansion:** The _type_ of mess ignored could change the monster's appearance differently (e.g., dishes-neglected monster looks different from laundry-neglected monster). This is a planned v1.5 / v2 enhancement.
 
 ---
 
-## 🛡️ Anti-Cheat System *(planned — not yet built)*
+## 🛡️ Anti-Cheat System _(planned — not yet built)_
 
 A two-layer system designed to verify real-world cleaning without being annoying:
 
@@ -112,9 +119,10 @@ A two-layer system designed to verify real-world cleaning without being annoying
 
 ---
 
-## 🔔 Push Notification Strategy *(planned — not yet built)*
+## 🔔 Push Notification Strategy _(planned — not yet built)_
 
 Escalation cadence, themed to match the chosen monster's voice:
+
 - **Gentle reminders** → "Nilly's getting bored 💚"
 - **More urgent** → "Nilly hasn't eaten in a while 🥺"
 - **Last resort** → "Nilly is feeling really sick 😢"
@@ -126,54 +134,56 @@ Tone stays warm and never shame-based. User can adjust frequency.
 
 ## 🛠️ Tech Stack
 
-| Layer | Tool | Status |
-|---|---|---|
-| Framework | React Native | ✅ Installed |
-| Build System | Expo | ✅ Scaffolded |
-| Target Platform | Android (Google Play) | — |
-| Node.js | v24.15.0 | ✅ Installed |
-| npm | 11.12.1 | ✅ Installed |
-| State management | Zustand | ✅ Installed |
-| Local persistence | AsyncStorage | ✅ Installed |
-| Project location | `C:\Users\kylas\mess-monster` | ✅ Created |
-| AI build partner | Claude Code | ✅ Authenticated |
-| Phone preview | Expo Go (Android) | ✅ Installed + tested |
-| AI planning partner | Claude (this project) + Gemini (second brain) | ✅ Active |
-| Autonomous agent (new) | Manus | 🆕 Being added |
-| Asset creation | Leonardo AI | ✅ Mascot art done |
-| Music (free) | Royalty-free library TBD | ⬜ |
-| Music (premium) | Spotify integration | ⬜ |
+| Layer                  | Tool                                          | Status                |
+| ---------------------- | --------------------------------------------- | --------------------- |
+| Framework              | React Native                                  | ✅ Installed          |
+| Build System           | Expo                                          | ✅ Scaffolded         |
+| Target Platform        | Android (Google Play)                         | —                     |
+| Node.js                | v24.15.0                                      | ✅ Installed          |
+| npm                    | 11.12.1                                       | ✅ Installed          |
+| State management       | Zustand                                       | ✅ Installed          |
+| Local persistence      | AsyncStorage                                  | ✅ Installed          |
+| Project location       | `C:\Users\kylas\mess-monster`                 | ✅ Created            |
+| AI build partner       | Claude Code                                   | ✅ Authenticated      |
+| Phone preview          | Expo Go (Android)                             | ✅ Installed + tested |
+| AI planning partner    | Claude (this project) + Gemini (second brain) | ✅ Active             |
+| Autonomous agent (new) | Manus                                         | 🆕 Being added        |
+| Asset creation         | Leonardo AI                                   | ✅ Mascot art done    |
+| Music (free)           | Royalty-free library TBD                      | ⬜                    |
+| Music (premium)        | Spotify integration                           | ⬜                    |
 
 ---
 
-## 🏗️ Dev Status & Build Log *(as of May 17, 2026)*
+## 🏗️ Dev Status & Build Log _(as of May 17, 2026)_
 
 ### ✅ Completed
-| Milestone | Date |
-|---|---|
-| App concept finalized | Earlier |
-| Core mechanic defined | Earlier |
-| Mascot designs approved (Nilly + Luna) | Earlier |
-| Master project doc created | Earlier |
-| Master doc merged with Gemini second-brain notes | May 8 |
-| Node.js + npm installed | May 9 |
-| PowerShell execution policy set (RemoteSigned) | May 9 |
-| Expo project scaffolded (`mess-monster` folder, 911 packages) | May 9 |
-| Expo Go installed on Android phone | May 9 |
-| First app preview on phone (blank scaffold) | May 9 |
-| Claude Code installed + authenticated | May 11 |
-| Data layer built (Zustand + AsyncStorage) | May 11 |
-| Pet mood system (5 states, auto-derived from time since care) | May 11 |
-| Task history with AsyncStorage persistence | May 11 |
-| Points system (earn, spend, streak tracking) | May 11 |
-| Nilly's pet screen (5 mood states, color feedback) | May 11 |
-| Task logging screen (8-10 preset tasks across categories) | May 11 |
-| Core game loop end-to-end (check task → points → mood update) | May 11 |
-| App preview confirmed working on phone | May 12 |
-| Luna design decision: pick-one at first launch | May 12 |
-| Monster selection / onboarding screen built | May 12 |
+
+| Milestone                                                     | Date    |
+| ------------------------------------------------------------- | ------- |
+| App concept finalized                                         | Earlier |
+| Core mechanic defined                                         | Earlier |
+| Mascot designs approved (Nilly + Luna)                        | Earlier |
+| Master project doc created                                    | Earlier |
+| Master doc merged with Gemini second-brain notes              | May 8   |
+| Node.js + npm installed                                       | May 9   |
+| PowerShell execution policy set (RemoteSigned)                | May 9   |
+| Expo project scaffolded (`mess-monster` folder, 911 packages) | May 9   |
+| Expo Go installed on Android phone                            | May 9   |
+| First app preview on phone (blank scaffold)                   | May 9   |
+| Claude Code installed + authenticated                         | May 11  |
+| Data layer built (Zustand + AsyncStorage)                     | May 11  |
+| Pet mood system (5 states, auto-derived from time since care) | May 11  |
+| Task history with AsyncStorage persistence                    | May 11  |
+| Points system (earn, spend, streak tracking)                  | May 11  |
+| Nilly's pet screen (5 mood states, color feedback)            | May 11  |
+| Task logging screen (8-10 preset tasks across categories)     | May 11  |
+| Core game loop end-to-end (check task → points → mood update) | May 11  |
+| App preview confirmed working on phone                        | May 12  |
+| Luna design decision: pick-one at first launch                | May 12  |
+| Monster selection / onboarding screen built                   | May 12  |
 
 ### ⬜ Not started
+
 - Onboarding screen previewed on phone
 - Real artwork (Nilly + Luna) swapped in for placeholders
 - Points store (spend points on monster care items)
@@ -226,13 +236,13 @@ Tone stays warm and never shame-based. User can adjust frequency.
 
 ---
 
-## 💡 Future Ideas Bank *(v2+ — from Gemini second brain)*
+## 💡 Future Ideas Bank _(v2+ — from Gemini second brain)_
 
-- **AR "Scan to Feed"** — Use phone camera to scan cleaned areas; monster "eats" the mess. Doubles as premium anti-cheat. *(High priority for v2)*
+- **AR "Scan to Feed"** — Use phone camera to scan cleaned areas; monster "eats" the mess. Doubles as premium anti-cheat. _(High priority for v2)_
 - **Body Double Mode** — "Clean with a Friend" — two users run a shared Pomodoro session, their monsters visit each other. Strong for the ADHD market but needs real-time backend infrastructure.
-- **Community World Bosses** — A giant "Dust Bunny" appears periodically; community cleans together to defeat it. Limited-edition rewards. *(Great Indiegogo hook)*
-- **Mini-Boss Rooms** — Rooms framed as dungeon levels with boss challenges. *(Needs UX review — must stay low-pressure and not feel like failure if user can't "defeat" a room.)*
-- **Expanded Mess Evolution** — Monster appearance changes based on *type* of mess ignored, not just total time. (e.g., dishes-neglected look ≠ laundry-neglected look.)
+- **Community World Bosses** — A giant "Dust Bunny" appears periodically; community cleans together to defeat it. Limited-edition rewards. _(Great Indiegogo hook)_
+- **Mini-Boss Rooms** — Rooms framed as dungeon levels with boss challenges. _(Needs UX review — must stay low-pressure and not feel like failure if user can't "defeat" a room.)_
+- **Expanded Mess Evolution** — Monster appearance changes based on _type_ of mess ignored, not just total time. (e.g., dishes-neglected look ≠ laundry-neglected look.)
 
 ---
 
@@ -259,6 +269,7 @@ Tone stays warm and never shame-based. User can adjust frequency.
 ## 📝 Notes for AI Build Partners
 
 ### For Claude Code (in-terminal build agent)
+
 - **Project location:** `C:\Users\kylas\mess-monster`
 - **Resume command:** `cd mess-monster` then `claude`
 - **Android only** — no iOS to start
@@ -269,6 +280,7 @@ Tone stays warm and never shame-based. User can adjust frequency.
 - **Build order:** Follow Dev Status & Build Log sequence above
 
 ### For Manus (autonomous agent — new addition)
+
 - **Read this doc in full before acting** — it's the only source of truth
 - **Codebase is at:** `C:\Users\kylas\mess-monster` (React Native + Expo)
 - **What's already built:** See ✅ items in Dev Status & Build Log
@@ -285,6 +297,7 @@ Tone stays warm and never shame-based. User can adjust frequency.
   - Commit work in git after each feature
 
 ### For Gemini (second brain / planning)
+
 - Used for brainstorming, idea generation, and broad strategic thinking
 - Major contributions so far: Mess Evolution mechanic, AR Scan to Feed concept, World Bosses concept, Body Double Mode, notification escalation system
 
@@ -292,14 +305,14 @@ Tone stays warm and never shame-based. User can adjust frequency.
 
 ## 🔗 External Resources & Links
 
-- Mascot artwork (Leonardo AI): *[add file locations]*
-- Indiegogo draft: *[add when created]*
-- Google Play Developer account: *[add]*
+- Mascot artwork (Leonardo AI): _[add file locations]_
+- Indiegogo draft: _[add when created]_
+- Google Play Developer account: _[add]_
 - Expo project: `C:\Users\kylas\mess-monster`
-- GitHub repo: *[add if pushed to remote]*
-- Gemini Second Brain: *[add link]*
+- GitHub repo: _[add if pushed to remote]_
+- Gemini Second Brain: _[add link]_
 - Master doc origin chat: https://claude.ai/chat/a9d8b6c2-1af1-4bb8-88fa-7a250ff6ed74
 
 ---
 
-*This is a living document. Update it as the project evolves.*
+_This is a living document. Update it as the project evolves._

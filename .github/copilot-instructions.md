@@ -6,6 +6,7 @@ Completed: all 7 Zustand stores, evolution system, task system, timer rewards, U
 Still needed: onboarding.tsx implementation, real IAP wiring, notifications for decay reminders.
 
 Rules:
+
 - Only edit the file(s) I name in my prompt. Do not modify other files unless I ask.
 - Do not install new packages unless I explicitly say so.
 - Keep changes small and scoped to exactly what I ask for.

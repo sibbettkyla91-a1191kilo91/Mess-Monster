@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import { getDailyRoll, PresetTask } from './preset-tasks';
-import { CleaningTask } from './types';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { getDailyRoll, PresetTask } from "./preset-tasks";
+import { CleaningTask } from "./types";
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -26,7 +26,8 @@ export const useTasksStore = create<TasksState>()(
       dailyRollDate: todayStr(),
 
       addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
-      removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+      removeTask: (id) =>
+        set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
       clearHistory: () => set({ tasks: [] }),
 
       refreshDailyRoll: () => {
@@ -37,7 +38,7 @@ export const useTasksStore = create<TasksState>()(
       },
     }),
     {
-      name: 'mm-tasks',
+      name: "mm-tasks",
       storage: createJSONStorage(() => AsyncStorage),
       // After AsyncStorage rehydration, refresh the roll if the device date has
       // moved past the stored roll date (e.g. app left open overnight).
