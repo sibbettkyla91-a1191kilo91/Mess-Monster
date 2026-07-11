@@ -927,7 +927,12 @@ export default function HomeScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);
   const setPremium = usePlayerStore((s) => s.setPremium);
+  const isPremium = usePlayerStore((s) => s.isPremium);
   const router = useRouter();
+
+  // Manual entry point for the upgrade modal — the auto-popup only shows
+  // once per stage, so non-premium users need a way to reopen it anytime.
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const tasks = useTasksStore((s) => s.tasks);
 
@@ -1336,6 +1341,26 @@ export default function HomeScreen() {
               {STAGE_LABELS[evolutionStage]}
             </ThemedText>
           </View>
+          {!isPremium && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.unlockButton,
+                { borderColor: theme.accent, opacity: pressed ? 0.7 : 1 },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowUpgradeModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Learn about Premium"
+            >
+              <ThemedText
+                style={[styles.unlockButtonText, { color: theme.accent }]}
+              >
+                ✨ Unlock more
+              </ThemedText>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.statBars}>
@@ -1411,16 +1436,20 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* ── Premium gate modal ── */}
-      {pendingPremiumGate !== null && (
+      {/* ── Premium gate modal (auto-popup or manual "Unlock more") ── */}
+      {(pendingPremiumGate !== null || showUpgradeModal) && (
         <PremiumGateModal
-          stage={pendingPremiumGate}
+          stage={pendingPremiumGate ?? "adult"}
           theme={theme}
-          onDismiss={clearPremiumGate}
+          onDismiss={() => {
+            clearPremiumGate();
+            setShowUpgradeModal(false);
+          }}
           onUpgrade={() => {
             // Placeholder: set premium true; real IAP wired in a future update
             setPremium(true);
             clearPremiumGate();
+            setShowUpgradeModal(false);
             recheckEvolution();
           }}
         />
@@ -1500,6 +1529,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  unlockButton: {
+    marginLeft: "auto",
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  unlockButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   statBars: {
     gap: 8,
