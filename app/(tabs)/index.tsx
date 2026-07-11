@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -11,13 +13,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
+import { AdultVariant, EvolutionStage } from "@/store/types";
 import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useTasksStore } from "@/store/use-tasks-store";
-import { AdultVariant, EvolutionStage } from "@/store/types";
 
 // ─── Stage labels ────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ const STAGE_LABELS: Record<EvolutionStage, string> = {
   baby: "Baby",
   teen: "Teen",
   adult: "Adult",
-  ascended: "Ascended ✨",
+  ascended: "???",
 };
 
 // ─── Dimensions ─────────────────────────────────────────────────────────
@@ -130,6 +131,9 @@ const STAGE_SPRITES = {
     adult_livingroom: require("../../assets/images/luna_adult_livingroom.png"),
     adult_bedroom: require("../../assets/images/luna_adult_bedroom.png"),
     adult_bathroom: require("../../assets/images/luna_adult_bathroom.png"),
+    sad_egg: require("../../assets/images/sad_luna_egg.jpg"),
+    sad_baby: require("../../assets/images/sad_luna_baby.jpg"),
+    sad_teen: require("../../assets/images/sad_luna_teen.jpg"),
   },
   nilly: {
     egg: require("../../assets/images/nilly_egg.png"),
@@ -140,6 +144,9 @@ const STAGE_SPRITES = {
     adult_livingroom: require("../../assets/images/nilly_adult_livingroom.png"),
     adult_bedroom: require("../../assets/images/nilly_adult_bedroom.png"),
     adult_bathroom: require("../../assets/images/nilly_adult_bathroom.png"),
+    sad_egg: require("../../assets/images/sad_nilly_egg.png"),
+    sad_baby: require("../../assets/images/sad_nilly_baby.png"),
+    sad_teen: require("../../assets/images/sad_nilly_teen.png"),
   },
 } as const;
 
@@ -152,16 +159,29 @@ function getMonsterSprite(
   monster: "nilly" | "luna",
   stage: EvolutionStage,
   adultVariant: AdultVariant,
+  mood: PetMood,
 ): ImageSourcePropType {
   const sprites = STAGE_SPRITES[monster];
+  // Use sad sprite variant for sad or sick mood
+  const isSadMood = mood === "sad" || mood === "sick";
+
   if (stage === "adult" || stage === "ascended") {
     // Ascended shows adult sprite until its own art is implemented
     const key =
       adultVariant === "base"
         ? "adult"
         : (`adult_${adultVariant}` as keyof typeof sprites);
+    // No sad variant for adult, fall back to regular adult
     return (sprites[key] ?? sprites.adult) as ImageSourcePropType;
   }
+
+  // For egg, baby, teen: use sad variant if applicable
+  if (isSadMood) {
+    const sadKey = `sad_${stage}` as keyof typeof sprites;
+    const sadSprite = sprites[sadKey];
+    if (sadSprite) return sadSprite as ImageSourcePropType;
+  }
+
   return (sprites[stage as keyof typeof sprites] ??
     sprites.egg) as ImageSourcePropType;
 }
@@ -484,6 +504,44 @@ function MonsterHabitat({ monster }: { monster: "nilly" | "luna" }) {
   );
 }
 
+// ─── TapReactionHeart ─────────────────────────────────────────────────────
+// Floating heart that appears when pet is tapped; animates upward and fades
+
+function TapReactionHeart({ x, y }: { x: number; y: number }) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -80,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [translateY, opacity]);
+
+  return (
+    <Animated.Text
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        fontSize: 32,
+        opacity,
+        transform: [{ translateY }],
+      }}
+    >
+      ❤️
+    </Animated.Text>
+  );
+}
+
 // ─── StatBar ──────────────────────────────────────────────────────────
 
 function StatBar({
@@ -604,7 +662,10 @@ function EvolutionCelebration({
   return (
     <Pressable
       style={[StyleSheet.absoluteFillObject, evolutionStyles.overlay]}
-      onPress={onDismiss}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onDismiss();
+      }}
       accessibilityRole="button"
       accessibilityLabel="Evolution celebration — tap to continue"
     >
@@ -733,8 +794,8 @@ function PremiumGateModal({
           {stageName} form and beyond require Premium.
         </ThemedText>
         <ThemedText style={[premiumStyles.body, { color: theme.text }]}>
-          Your monster is ready to evolve! Unlock Adult and Ascended forms by
-          upgrading to Premium (~$4.99/month).
+          Your monster is ready to evolve! Unlock Adult and a mysterious locked
+          form by upgrading to Premium (~$4.99/month).
         </ThemedText>
         <Pressable
           style={[
@@ -819,6 +880,20 @@ export default function HomeScreen() {
 
   const [panelHeight, setPanelHeight] = useState(0);
 
+  // Tap-to-react state
+  const [tapHearts, setTapHearts] = useState<
+    Array<{ id: string; x: number; y: number }>
+  >([]);
+  const tapScaleAnim = useRef(new Animated.Value(1)).current;
+  const earnPoints = usePlayerStore((s) => s.earnPoints);
+  const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
+  const lastTapReactionDate = usePlayerStore((s) => s.lastTapReactionDate);
+  const tapReactionCount = usePlayerStore((s) => s.tapReactionCount);
+  const addHappiness = usePetStore((s) => s.addHappiness);
+
+  // Calculate taps remaining today
+  const tapsRemaining = Math.max(0, 5 - tapReactionCount);
+
   // Count tasks completed today
   const todayISO = new Date().toISOString().slice(0, 10);
   const doneToday = tasks.filter(
@@ -831,12 +906,64 @@ export default function HomeScreen() {
 
   const monster = selectedMonster === "luna" ? "luna" : "nilly";
   const theme = THEMES[monster];
-  const moodCfg = MOOD_CONFIG[monster][mood];
+  // Display sick as sad to player (internal state stays sick for effects)
+  const displayMood = mood === "sick" ? "sad" : mood;
+  const moodCfg = MOOD_CONFIG[monster][displayMood];
 
   const displayName = monsterName || (monster === "nilly" ? "Nilly" : "Luna");
 
+  // ── Tap-to-react handler ────────────────────────────────────────────────────
+  const handlePetTap = () => {
+    const canTap = recordTapReaction();
+    if (!canTap) return; // Tap limit reached, do nothing
+
+    // Trigger haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Trigger bounce animation
+    Animated.sequence([
+      Animated.timing(tapScaleAnim, {
+        toValue: 1.12,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tapScaleAnim, {
+        toValue: 1.0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Award rewards
+    earnPoints(2);
+    addHappiness(3);
+
+    // Create heart animation at center of pet
+    const heartId = `heart-${Date.now()}`;
+    setTapHearts((prev) => [
+      ...prev,
+      {
+        id: heartId,
+        x: SCREEN_WIDTH / 2 - 16,
+        y: SCREEN_HEIGHT * 0.35,
+      },
+    ]);
+
+    // Remove heart after animation completes
+    setTimeout(() => {
+      setTapHearts((prev) => prev.filter((h) => h.id !== heartId));
+    }, 1200);
+  };
+
   // ── Bob ────────────────────────────────────────────────────────────────────
   const bobAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    return () => {
+      // PERFORMANCE: Reset animation values on cleanup to prevent leaks
+      tapScaleAnim.setValue(1);
+    };
+  }, [tapScaleAnim]);
 
   useEffect(() => {
     const isSad = mood === "sad" || mood === "sick";
@@ -1044,9 +1171,10 @@ export default function HomeScreen() {
   });
 
   // Egg stage: slightly faded to convey "not yet hatched"
+  // Sick mood: also faded to convey distress
   const wrapperOpacity = Math.min(
     evolutionStage === "egg" ? 0.75 : 1,
-    mood === "neutral" ? 0.9 : 1,
+    mood === "neutral" || mood === "sick" ? 0.75 : 1,
   );
 
   // Stage-based shadow intensity
@@ -1069,7 +1197,12 @@ export default function HomeScreen() {
         }
       : null;
 
-  const monsterSource = getMonsterSprite(monster, evolutionStage, adultVariant);
+  const monsterSource = getMonsterSprite(
+    monster,
+    evolutionStage,
+    adultVariant,
+    mood,
+  );
 
   return (
     <View style={styles.container}>
@@ -1107,29 +1240,37 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Monster ── */}
-      <Animated.View
-        style={[
-          styles.monsterImageWrapper,
-          panelHeight > 0 && { bottom: panelHeight + 16 },
-          { opacity: wrapperOpacity },
-          shadowStyle,
-          {
-            transform: [
-              { translateY: bobAnim },
-              { scale: scaleAnim },
-              { scale: evoScaleAnim },
-              { rotateZ: wiggleRot },
-              { rotateZ: sickWobbleRot },
-            ],
-          },
-        ]}
-      >
-        <Image
-          source={monsterSource}
-          style={styles.monsterImage}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      <Pressable onPress={handlePetTap}>
+        <Animated.View
+          style={[
+            styles.monsterImageWrapper,
+            panelHeight > 0 && { bottom: panelHeight + 16 },
+            { opacity: wrapperOpacity },
+            shadowStyle,
+            {
+              transform: [
+                { translateY: bobAnim },
+                { scale: scaleAnim },
+                { scale: evoScaleAnim },
+                { scale: tapScaleAnim },
+                { rotateZ: wiggleRot },
+                { rotateZ: sickWobbleRot },
+              ],
+            },
+          ]}
+        >
+          <Image
+            source={monsterSource}
+            style={styles.monsterImage}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </Pressable>
+
+      {/* ── Tap reaction hearts ── */}
+      {tapHearts.map((heart) => (
+        <TapReactionHeart key={heart.id} x={heart.x} y={heart.y} />
+      ))}
 
       {/* ── Bottom panel ── */}
       <View
@@ -1180,7 +1321,10 @@ export default function HomeScreen() {
             styles.ctaButton,
             { backgroundColor: theme.accent, opacity: pressed ? 0.82 : 1 },
           ]}
-          onPress={() => router.navigate("/(tabs)/explore")}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.navigate("/(tabs)/explore");
+          }}
           accessibilityRole="button"
           accessibilityLabel="Go clean something"
         >
@@ -1194,7 +1338,10 @@ export default function HomeScreen() {
       {pendingMilestoneBanner !== null && (
         <Pressable
           style={[styles.milestoneBanner, { backgroundColor: theme.accent }]}
-          onPress={clearMilestoneBanner}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            clearMilestoneBanner();
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${pendingMilestoneBanner}-day streak milestone`}
         >
