@@ -1,4 +1,7 @@
+import * as Haptics from "expo-haptics";
+import { useMemo } from "react";
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +15,13 @@ import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { useStoreStore } from "@/store/use-store-store";
 
 export default function CollectionScreen() {
-  const ownedItems = useStoreStore((s) => s.getOwnedItems());
+  const owned = useStoreStore((s) => s.owned);
+  const placed = useStoreStore((s) => s.placed);
+  const togglePlaced = useStoreStore((s) => s.togglePlaced);
+  const ownedItems = useMemo(
+    () => Object.values(owned).filter((e) => e.quantity > 0),
+    [owned],
+  );
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const {
@@ -41,6 +50,8 @@ export default function CollectionScreen() {
         >
           {collectionItems.map((entry) => {
             const { item } = entry;
+            const isDecor = item.category === "decor";
+            const isPlaced = !!placed[item.id];
             return (
               <View
                 key={item.id}
@@ -56,6 +67,39 @@ export default function CollectionScreen() {
                 </ThemedText>
 
                 <View style={styles.itemFooter}>
+                  {isDecor && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.placeButton,
+                        isPlaced
+                          ? { backgroundColor: accent }
+                          : {
+                              borderWidth: 1.5,
+                              borderColor: accent,
+                            },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        togglePlaced(item.id);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        isPlaced
+                          ? `Remove ${item.name} from the room`
+                          : `Place ${item.name} in the room`
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.placeButtonText,
+                          { color: isPlaced ? accentText : accent },
+                        ]}
+                      >
+                        {isPlaced ? "In the room \u2713" : "Place in room"}
+                      </Text>
+                    </Pressable>
+                  )}
                   <View
                     style={[
                       styles.ownedBadge,
@@ -127,6 +171,17 @@ const styles = StyleSheet.create({
   itemFooter: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 8,
+  },
+  placeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  placeButtonText: {
+    fontWeight: "700",
+    fontSize: 13,
   },
   ownedBadge: {
     paddingHorizontal: 14,
