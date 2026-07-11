@@ -89,8 +89,8 @@ const MOOD_CONFIG = {
       message: "Nilly is feeling neglected… she misses seeing you clean.",
     },
     sick: {
-      label: "Sick",
-      message: "Nilly is sick. Please help her by completing some tasks!",
+      label: "Sad",
+      message: "Nilly is really struggling. Even a small task will help her feel better.",
     },
   },
   luna: {
@@ -112,8 +112,8 @@ const MOOD_CONFIG = {
       message: "Luna fades. Neglect weakens her magic — she needs you.",
     },
     sick: {
-      label: "Sick",
-      message: "Luna is ill. The mess has won. Only you can restore order.",
+      label: "Sad",
+      message: "Luna's magic dims. A little cleaning is all it takes to bring her back.",
     },
   },
 } as const;
