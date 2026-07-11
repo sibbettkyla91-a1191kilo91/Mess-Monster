@@ -1293,11 +1293,19 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Monster ── */}
-      <Pressable onPress={handlePetTap}>
+      {/* Positioning lives on the Pressable: position "absolute" anchors to
+          the direct parent in RN, so it must sit on the container's child —
+          on the inner Animated.View it would anchor to the zero-height
+          Pressable and render offscreen. */}
+      <Pressable
+        onPress={handlePetTap}
+        style={[
+          styles.monsterImageWrapper,
+          panelHeight > 0 && { bottom: panelHeight + 16 },
+        ]}
+      >
         <Animated.View
           style={[
-            styles.monsterImageWrapper,
-            panelHeight > 0 && { bottom: panelHeight + 16 },
             { opacity: wrapperOpacity },
             shadowStyle,
             {
