@@ -28,6 +28,7 @@ export default function StoreScreen() {
   const buyItem = useStoreStore((s) => s.buyItem);
   const isOwned = useStoreStore((s) => s.isOwned);
   const consumeItem = useStoreStore((s) => s.useItem);
+  const owned = useStoreStore((s) => s.owned);
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const {
@@ -52,6 +53,15 @@ export default function StoreScreen() {
       // Check if non-repeatable and already owned
       if (!item.repeatable && isOwned(item.id)) {
         showFeedback("\u2705 Already owned!");
+        return;
+      }
+
+      // Repeatable items: use a gifted unit from inventory first (free items
+      // won from photo rewards) before charging any points.
+      if (item.repeatable && (owned[item.id]?.quantity ?? 0) > 0) {
+        consumeItem(item.id);
+        care();
+        showFeedback(`\ud83c\udf81 ${item.name} used from your gifts!`);
         return;
       }
 
@@ -92,6 +102,7 @@ export default function StoreScreen() {
       consumeItem,
       care,
       showFeedback,
+      owned,
     ],
   );
 
@@ -165,7 +176,10 @@ export default function StoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         {filteredItems.map((item) => {
-          const owned = !item.repeatable && isOwned(item.id);
+          const ownedForever = !item.repeatable && isOwned(item.id);
+          const giftCount = item.repeatable
+            ? (owned[item.id]?.quantity ?? 0)
+            : 0;
           const canAfford = availablePoints >= item.price;
 
           return (
@@ -174,7 +188,7 @@ export default function StoreScreen() {
               style={[
                 styles.itemCard,
                 isDark ? styles.itemCardDark : styles.itemCardLight,
-                owned && styles.itemCardOwned,
+                ownedForever && styles.itemCardOwned,
               ]}
             >
               <Text style={styles.itemEmoji}>{item.emoji}</Text>
@@ -184,7 +198,20 @@ export default function StoreScreen() {
               </ThemedText>
 
               <View style={styles.itemFooter}>
-                {owned ? (
+                {giftCount > 0 && (
+                  <View
+                    style={[
+                      styles.giftBadge,
+                      { backgroundColor: isDark ? accentDark : accentLight },
+                    ]}
+                  >
+                    <Text style={[styles.giftText, { color: accentText }]}>
+                      {"🎁"} {giftCount} gift
+                      {giftCount > 1 ? "s" : ""} ready
+                    </Text>
+                  </View>
+                )}
+                {ownedForever ? (
                   <View
                     style={[
                       styles.ownedBadge,
@@ -200,22 +227,23 @@ export default function StoreScreen() {
                     style={[
                       styles.buyButton,
                       { backgroundColor: accent },
-                      !canAfford && styles.buyButtonDisabled,
+                      !canAfford && giftCount === 0 && styles.buyButtonDisabled,
                     ]}
                     onPress={() => handleBuy(item)}
                     activeOpacity={0.7}
-                    disabled={!canAfford && !owned}
+                    disabled={!canAfford && giftCount === 0}
                   >
                     <Text
                       style={[
                         styles.buyButtonText,
-                        !canAfford && styles.buyButtonTextDisabled,
+                        !canAfford &&
+                          giftCount === 0 &&
+                          styles.buyButtonTextDisabled,
                       ]}
                     >
-                      {item.repeatable
-                        ? "\ud83c\udf74 Use"
-                        : "\ud83d\uded2 Buy"}{" "}
-                      {"\u00b7"} {item.price} pts
+                      {giftCount > 0
+                        ? "\ud83c\udf81 Use a gift \u00b7 free"
+                        : `${item.repeatable ? "\ud83c\udf74 Use" : "\ud83d\uded2 Buy"} \u00b7 ${item.price} pts`}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -326,6 +354,18 @@ const styles = StyleSheet.create({
   itemFooter: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 8,
+  },
+  giftBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginRight: "auto",
+  },
+  giftText: {
+    fontWeight: "600",
+    fontSize: 12,
   },
   buyButton: {
     paddingHorizontal: 16,
