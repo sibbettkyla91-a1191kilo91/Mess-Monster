@@ -21,6 +21,7 @@ import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
+import { localDayString } from "@/utils/local-day";
 
 // ─── Stage labels ────────────────────────────────────────────────────────
 
@@ -940,12 +941,11 @@ export default function HomeScreen() {
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
   const addHappiness = usePetStore((s) => s.addHappiness);
 
-  // Count tasks completed today
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Count tasks completed today (local calendar day)
+  const todayLocal = localDayString();
   const doneToday = tasks.filter(
     (t) =>
-      t.completedAt &&
-      new Date(t.completedAt).toISOString().slice(0, 10) === todayISO,
+      t.completedAt && localDayString(new Date(t.completedAt)) === todayLocal,
   ).length;
 
   const mood = deriveMood(health, happiness);

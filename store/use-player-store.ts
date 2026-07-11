@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+
+import { localDayString, localYesterdayString } from "@/utils/local-day";
+
 import { PlayerProfile } from "./types";
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localDayString();
 }
 
 interface PlayerStore extends PlayerProfile {
@@ -66,9 +69,7 @@ export const usePlayerStore = create<PlayerStore>()(
         const today = todayISO();
         set((s) => {
           if (s.lastActiveDay === today) return {};
-          const yesterday = new Date(Date.now() - 86_400_000)
-            .toISOString()
-            .slice(0, 10);
+          const yesterday = localYesterdayString();
           const newStreak = s.lastActiveDay === yesterday ? s.streak + 1 : 1;
           return {
             streak: newStreak,

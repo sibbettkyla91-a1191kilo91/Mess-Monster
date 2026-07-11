@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { localDayString } from "@/utils/local-day";
+
 import { getDailyRoll, PresetTask } from "./preset-tasks";
 import { CleaningTask } from "./types";
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDayString();
 }
 
 /**

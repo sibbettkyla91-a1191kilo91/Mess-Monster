@@ -1,6 +1,7 @@
 import { getDailyRoll, PRESET_TASKS } from "@/store/preset-tasks";
-import { useTasksStore } from "@/store/use-tasks-store";
 import { CleaningTask } from "@/store/types";
+import { useTasksStore } from "@/store/use-tasks-store";
+import { localDayString } from "@/utils/local-day";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -20,8 +21,9 @@ const makeTask = (overrides: Partial<CleaningTask> = {}): CleaningTask => ({
 beforeEach(() => {
   useTasksStore.setState({
     tasks: [],
-    dailyRoll: getDailyRoll(new Date().toISOString().slice(0, 10)),
-    dailyRollDate: new Date().toISOString().slice(0, 10),
+    dailyRoll: getDailyRoll(localDayString()),
+    dailyRollDate: localDayString(),
+    taskProgress: {},
   });
 });
 
@@ -155,7 +157,7 @@ describe("dailyRoll store state", () => {
   });
 
   it("initialises dailyRollDate to today", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDayString();
     expect(useTasksStore.getState().dailyRollDate).toBe(today);
   });
 
@@ -167,7 +169,7 @@ describe("dailyRoll store state", () => {
   });
 
   it("refreshDailyRoll recomputes when dailyRollDate is stale", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDayString();
     useTasksStore.setState({ dailyRollDate: "2020-01-01", dailyRoll: [] });
     useTasksStore.getState().refreshDailyRoll();
     expect(useTasksStore.getState().dailyRollDate).toBe(today);
