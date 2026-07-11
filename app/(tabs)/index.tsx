@@ -885,14 +885,8 @@ export default function HomeScreen() {
     Array<{ id: string; x: number; y: number }>
   >([]);
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
-  const earnPoints = usePlayerStore((s) => s.earnPoints);
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
-  const lastTapReactionDate = usePlayerStore((s) => s.lastTapReactionDate);
-  const tapReactionCount = usePlayerStore((s) => s.tapReactionCount);
   const addHappiness = usePetStore((s) => s.addHappiness);
-
-  // Calculate taps remaining today
-  const tapsRemaining = Math.max(0, 5 - tapReactionCount);
 
   // Count tasks completed today
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -934,8 +928,7 @@ export default function HomeScreen() {
       }),
     ]).start();
 
-    // Award rewards
-    earnPoints(2);
+    // Boost happiness (no points — tapping is affection, not cleaning)
     addHappiness(3);
 
     // Create heart animation at center of pet

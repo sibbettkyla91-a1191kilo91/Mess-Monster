@@ -9,10 +9,13 @@ function todayISO() {
 
 interface PlayerStore extends PlayerProfile {
   availablePointsValue: number; // Computed field: totalPoints - spentPoints
+  lastTapReactionDate: string; // ISO date of last tap reaction
+  tapReactionCount: number; // taps used today (resets daily)
   availablePoints: () => number; // Selector function for backward compatibility
   earnPoints: (amount: number) => void;
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
   recordActivity: () => void; // call after a task is logged; updates streak + activeDaysCount
+  recordTapReaction: () => boolean; // Returns true if tap was recorded (under 5/day), false if limit reached
   selectMonster: (monster: "nilly" | "luna") => void;
   setMonsterName: (name: string) => void;
   setPremium: (value: boolean) => void;
@@ -31,6 +34,8 @@ export const usePlayerStore = create<PlayerStore>()(
       selectedMonster: null,
       monsterName: "",
       hasCompletedOnboarding: false,
+      lastTapReactionDate: "",
+      tapReactionCount: 0,
       availablePointsValue: 100, // Initial value: 100 - 0
 
       // PERFORMANCE: Computed property updated whenever points change.
@@ -76,17 +81,47 @@ export const usePlayerStore = create<PlayerStore>()(
       selectMonster: (monster) => set({ selectedMonster: monster }),
       setMonsterName: (name) => set({ monsterName: name }),
       setPremium: (value) => set({ isPremium: value }),
+
+      recordTapReaction: () => {
+        const today = todayISO();
+        const state = get();
+        const TAP_LIMIT = 5;
+
+        // Check if we're still on the same day
+        if (state.lastTapReactionDate !== today) {
+          // New day, reset counter
+          set({
+            lastTapReactionDate: today,
+            tapReactionCount: 1,
+          });
+          return true;
+        }
+
+        // Same day — check if we've hit the limit
+        if (state.tapReactionCount >= TAP_LIMIT) {
+          return false; // Limit reached, no tap recorded
+        }
+
+        // Increment counter and return success
+        set((s) => ({
+          tapReactionCount: s.tapReactionCount + 1,
+        }));
+        return true;
+      },
+
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),
     {
       name: "mm-player",
-      version: 1,
+      version: 2,
       migrate: (persistedState: any): any => {
         const totalPoints = persistedState?.totalPoints ?? 100;
         const spentPoints = persistedState?.spentPoints ?? 0;
         return {
           activeDaysCount: 0,
           isPremium: false,
+          lastTapReactionDate: "",
+          tapReactionCount: 0,
           availablePointsValue: totalPoints - spentPoints,
           ...persistedState,
         };
