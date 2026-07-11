@@ -15,9 +15,11 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { getDecorSlot } from "@/store/decor-slots";
 import { AdultVariant, EvolutionStage } from "@/store/types";
 import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
+import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
 
 // ─── Stage labels ────────────────────────────────────────────────────────
@@ -486,6 +488,56 @@ function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
     >
       {def.char}
     </Animated.Text>
+  );
+}
+
+// ─── DecorLayer ───────────────────────────────────────────────────────────
+// Placed decor items rendered at their fixed slots, behind the monster.
+// Slot geometry comes from store/decor-slots.ts; each slot shows the item's
+// sprite art when available, otherwise its catalog emoji.
+
+function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
+  const owned = useStoreStore((s) => s.owned);
+  const placed = useStoreStore((s) => s.placed);
+
+  const placedIds = Object.keys(placed).filter(
+    (id) => (owned[id]?.quantity ?? 0) > 0,
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {placedIds.map((id) => {
+        const slot = getDecorSlot(id, monster);
+        if (!slot) return null;
+        const sizePx = Math.round(slot.size * SCREEN_WIDTH);
+        return (
+          <View
+            key={id}
+            style={{
+              position: "absolute",
+              left: slot.x * SCREEN_WIDTH - sizePx / 2,
+              top: slot.y * SCREEN_HEIGHT - sizePx / 2,
+              width: sizePx,
+              height: sizePx,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {slot.image ? (
+              <Image
+                source={slot.image}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={{ fontSize: sizePx * 0.7 }}>
+                {owned[id].item.emoji}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -1205,6 +1257,9 @@ export default function HomeScreen() {
         style={StyleSheet.absoluteFillObject}
         resizeMode="cover"
       />
+
+      {/* ── Placed decor items ── */}
+      <DecorLayer monster={monster} />
 
       {/* ── Floating particles overlay ── */}
       <MonsterHabitat monster={monster} />
