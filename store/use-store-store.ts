@@ -15,6 +15,9 @@ export interface OwnedEntry {
 interface StoreStore {
   owned: Record<string, OwnedEntry>;
 
+  /** Item ids currently placed in the habitat room (decor items only). */
+  placed: Record<string, true>;
+
   /** Add an item to the owned collection. Returns true on success. */
   buyItem: (item: StoreItem) => boolean;
 
@@ -26,12 +29,19 @@ interface StoreStore {
 
   /** Get all owned entries with quantity > 0. */
   getOwnedItems: () => OwnedEntry[];
+
+  /** Place or remove an owned item in the habitat room. No-op if not owned. */
+  togglePlaced: (id: string) => void;
+
+  /** Returns true if the item is currently placed in the room. */
+  isPlaced: (id: string) => boolean;
 }
 
 export const useStoreStore = create<StoreStore>()(
   persist(
     (set, get) => ({
       owned: {},
+      placed: {},
 
       buyItem: (item) => {
         set((s) => {
@@ -69,10 +79,33 @@ export const useStoreStore = create<StoreStore>()(
 
       getOwnedItems: () =>
         Object.values(get().owned).filter((e) => e.quantity > 0),
+
+      togglePlaced: (id) => {
+        const entry = get().owned[id];
+        if (!entry || entry.quantity <= 0) return;
+        set((s) => {
+          const placed = { ...s.placed };
+          if (placed[id]) {
+            delete placed[id];
+          } else {
+            placed[id] = true;
+          }
+          return { placed };
+        });
+      },
+
+      isPlaced: (id) => !!get().placed[id],
     }),
     {
       name: "mm-store-owned",
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      // v0 → v1: decor placement added. Items owned before this feature
+      // simply become placeable (unplaced); nothing is lost.
+      migrate: (persistedState: any): any => ({
+        ...persistedState,
+        placed: persistedState?.placed ?? {},
+      }),
     },
   ),
 );
