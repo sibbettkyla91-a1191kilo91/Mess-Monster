@@ -2,9 +2,37 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { localDayString, localYesterdayString } from "@/utils/local-day";
+import {
+  localDayString,
+  localTomorrowString,
+  localYesterdayString,
+} from "@/utils/local-day";
 
 import { PlayerProfile } from "./types";
+
+// Exported for tests.
+export function migratePlayerState(persistedState: any, version: number): any {
+  const totalPoints = persistedState?.totalPoints ?? 100;
+  const spentPoints = persistedState?.spentPoints ?? 0;
+  const migrated = {
+    activeDaysCount: 0,
+    isPremium: false,
+    lastTapReactionDate: "",
+    tapReactionCount: 0,
+    availablePointsValue: totalPoints - spentPoints,
+    ...persistedState,
+  };
+  // v2 -> v3: lastActiveDay used to be derived from toISOString() (UTC),
+  // which for users west of UTC can be one day AHEAD of their local day.
+  // Left as-is, that value fails both the "today" and "yesterday" checks
+  // in recordActivity and wrongly resets the streak. Clamp an
+  // exactly-tomorrow value back to today; today's or genuinely stale
+  // dates pass through so real broken streaks still reset.
+  if (version < 3 && migrated.lastActiveDay === localTomorrowString()) {
+    migrated.lastActiveDay = localDayString();
+  }
+  return migrated;
+}
 
 function todayISO() {
   return localDayString();
@@ -114,19 +142,8 @@ export const usePlayerStore = create<PlayerStore>()(
     }),
     {
       name: "mm-player",
-      version: 2,
-      migrate: (persistedState: any): any => {
-        const totalPoints = persistedState?.totalPoints ?? 100;
-        const spentPoints = persistedState?.spentPoints ?? 0;
-        return {
-          activeDaysCount: 0,
-          isPremium: false,
-          lastTapReactionDate: "",
-          tapReactionCount: 0,
-          availablePointsValue: totalPoints - spentPoints,
-          ...persistedState,
-        };
-      },
+      version: 3,
+      migrate: migratePlayerState,
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

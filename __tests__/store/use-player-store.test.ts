@@ -1,4 +1,9 @@
-import { usePlayerStore } from "@/store/use-player-store";
+import { migratePlayerState, usePlayerStore } from "@/store/use-player-store";
+import {
+  localDayString,
+  localTomorrowString,
+  localYesterdayString,
+} from "@/utils/local-day";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -167,5 +172,63 @@ describe("recordActivity", () => {
     usePlayerStore.getState().recordActivity();
 
     expect(usePlayerStore.getState().lastActiveDay).toBe("2026-06-01");
+  });
+});
+
+// ─── migratePlayerState (persist migration) ──────────────────────────────────
+
+describe("migratePlayerState", () => {
+  it("clamps a lastActiveDay stored as tomorrow (UTC skew) back to today on v2 -> v3", () => {
+    const out = migratePlayerState(
+      { lastActiveDay: localTomorrowString(), streak: 6 },
+      2,
+    );
+
+    expect(out.lastActiveDay).toBe(localDayString());
+    expect(out.streak).toBe(6); // streak itself is preserved
+  });
+
+  it("leaves an already-correct lastActiveDay (today) untouched", () => {
+    const out = migratePlayerState(
+      { lastActiveDay: localDayString(), streak: 3 },
+      2,
+    );
+
+    expect(out.lastActiveDay).toBe(localDayString());
+    expect(out.streak).toBe(3);
+  });
+
+  it("leaves a genuinely stale lastActiveDay untouched so a real broken streak still resets", () => {
+    const stale = migratePlayerState({ lastActiveDay: "2026-01-15" }, 2);
+    expect(stale.lastActiveDay).toBe("2026-01-15");
+
+    const yesterday = migratePlayerState(
+      { lastActiveDay: localYesterdayString() },
+      2,
+    );
+    expect(yesterday.lastActiveDay).toBe(localYesterdayString());
+  });
+
+  it("leaves an empty lastActiveDay untouched", () => {
+    const out = migratePlayerState({ lastActiveDay: "" }, 2);
+    expect(out.lastActiveDay).toBe("");
+  });
+
+  it("does not clamp for already-migrated versions (one-time only)", () => {
+    const out = migratePlayerState(
+      { lastActiveDay: localTomorrowString() },
+      3,
+    );
+    expect(out.lastActiveDay).toBe(localTomorrowString());
+  });
+
+  it("still applies the v2 shape defaults", () => {
+    const out = migratePlayerState({ totalPoints: 150, spentPoints: 30 }, 1);
+
+    expect(out.availablePointsValue).toBe(120);
+    expect(out.activeDaysCount).toBe(0);
+    expect(out.isPremium).toBe(false);
+    expect(out.lastTapReactionDate).toBe("");
+    expect(out.tapReactionCount).toBe(0);
   });
 });

@@ -21,3 +21,10 @@ export function localYesterdayString(): string {
   d.setDate(d.getDate() - 1);
   return localDayString(d);
 }
+
+/** YYYY-MM-DD for the local calendar day after today (DST-safe). */
+export function localTomorrowString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return localDayString(d);
+}
