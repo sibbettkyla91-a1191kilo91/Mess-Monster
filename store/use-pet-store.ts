@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { AdultVariant, EvolutionStage, PetState, TaskCategory } from "./types";
@@ -6,12 +7,25 @@ import { usePlayerStore } from "./use-player-store";
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
 
-// Lazy-load notifications to avoid import-time crash in Expo Go
+/**
+ * Lazy-load notifications to avoid import-time crash in Expo Go.
+ * Skip entirely in Expo Go — push notifications removed in SDK 53+.
+ * Dynamic import prevents auto-registration side effect from running.
+ */
 async function scheduleDecayReminderAsync(
   healthLow: boolean,
   happinessLow: boolean,
   monsterName: string,
 ) {
+  // Skip in Expo Go — notifications not supported and import triggers crash
+  if (Constants.appOwnership === "expo") {
+    if (__DEV__)
+      console.log(
+        "[Decay Reminder] Running in Expo Go; skipping notification (SDK 53+)",
+      );
+    return;
+  }
+
   try {
     const Notifications = await import("expo-notifications");
 
@@ -126,6 +140,7 @@ function determineAdultVariant(
 
 interface PetStore extends PetState {
   care: () => void;
+  addHappiness: (amount: number) => void;
   applyDecay: () => void;
   trackEarned: (amount: number, category?: TaskCategory) => void;
   recheckEvolution: () => void; // re-run evolution check (e.g., after premium unlock)
@@ -158,6 +173,11 @@ export const usePetStore = create<PetStore>()(
           health: clamp(s.health + HEALTH_CARE_BOOST),
           happiness: clamp(s.happiness + HAPPINESS_CARE_BOOST),
           lastCaredAt: Date.now(),
+        })),
+
+      addHappiness: (amount: number) =>
+        set((s) => ({
+          happiness: clamp(s.happiness + amount),
         })),
 
       trackEarned: (amount, category) =>
@@ -289,17 +309,16 @@ export const usePetStore = create<PetStore>()(
           lastSessionAt: now,
         });
 
-        // Trigger notification if health or happiness drops below 30
-        // Only send once per hour to avoid notification spam
+        // Trigger notification the moment a stat crosses below 30 (edge-triggered,
+        // not level-triggered). Per-stat: fires if health just crossed OR happiness
+        // just crossed, regardless of the other stat's state. Throttled to once/hour.
         const timeSinceLastReminder = now - lastDecayReminderAt;
         const oneHourMs = 60 * 60 * 1000;
         const shouldThrottle = timeSinceLastReminder < oneHourMs;
+        const healthCrossed = newHealth < 30 && health >= 30;
+        const happinessCrossed = newHappiness < 30 && happiness >= 30;
 
-        if (
-          (newHealth < 30 || newHappiness < 30) &&
-          (health >= 30 || happiness >= 30) &&
-          !shouldThrottle
-        ) {
+        if ((healthCrossed || happinessCrossed) && !shouldThrottle) {
           const { monsterName } = usePlayerStore.getState();
           scheduleDecayReminderAsync(
             newHealth < 30,
