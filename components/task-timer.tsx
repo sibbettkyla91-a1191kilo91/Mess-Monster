@@ -1,24 +1,33 @@
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, Text, View } from "react-native";
 
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 
 interface TaskTimerProps {
   /** Total seconds for the countdown */
   totalSeconds: number;
+  /** Unix ms when the wait started — remaining time is wall-clock based */
+  startedAt: number;
   /** Called when the timer reaches zero */
   onComplete: () => void;
   /** Whether the timer is actively running */
   active: boolean;
 }
 
+function remainingSeconds(startedAt: number, totalSeconds: number): number {
+  const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  return Math.max(0, totalSeconds - elapsed);
+}
+
 export function TaskTimer({
   totalSeconds,
+  startedAt,
   onComplete,
   active,
 }: TaskTimerProps) {
-  const [remaining, setRemaining] = useState(totalSeconds);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [remaining, setRemaining] = useState(() =>
+    remainingSeconds(startedAt, totalSeconds),
+  );
   // Keep a stable ref to onComplete so the timer never restarts just because
   // the parent passed a new inline arrow function.
   const onCompleteRef = useRef(onComplete);
@@ -30,21 +39,24 @@ export function TaskTimer({
     if (!active) return;
 
     firedRef.current = false;
-    setRemaining(totalSeconds);
-    intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+
+    // Wall-clock based: recompute from startedAt on every tick, so time spent
+    // backgrounded (where JS timers are suspended) still counts toward the wait.
+    const tick = () =>
+      setRemaining(remainingSeconds(startedAt, totalSeconds));
+    tick();
+    const interval = setInterval(tick, 1000);
+    // Recompute the moment the app returns to the foreground instead of
+    // waiting up to a second for the next interval tick.
+    const appStateSub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") tick();
+    });
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      clearInterval(interval);
+      appStateSub.remove();
     };
-  }, [active, totalSeconds]); // onComplete intentionally omitted — we use onCompleteRef
+  }, [active, totalSeconds, startedAt]); // onComplete intentionally omitted — we use onCompleteRef
 
   // Call onComplete outside the state updater (pure updaters only) and guard
   // against React Strict Mode's double-invocation of effects.

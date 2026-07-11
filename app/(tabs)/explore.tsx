@@ -1,13 +1,14 @@
+import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useColorScheme,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    useColorScheme,
 } from "react-native";
 
 import { PhotoRewardModal } from "@/components/photo-reward-modal";
@@ -15,21 +16,21 @@ import { TaskTimer } from "@/components/task-timer";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
-  DEFAULT_MIN_TIME,
-  FREE_ITEM_MAX_PRICE,
-  RewardOutcome,
-  TASK_MIN_TIMES,
-  rollReward,
+    DEFAULT_MIN_TIME,
+    FREE_ITEM_MAX_PRICE,
+    RewardOutcome,
+    TASK_MIN_TIMES,
+    rollReward,
 } from "@/constants/task-timers";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
-import { usePetStore } from "@/store/use-pet-store";
-import { usePlayerStore } from "@/store/use-player-store";
-import { usePhotoStore } from "@/store/use-photo-store";
-import { useStoreStore } from "@/store/use-store-store";
 import { PresetTask } from "@/store/preset-tasks";
-import { useTasksStore } from "@/store/use-tasks-store";
 import { STORE_ITEMS } from "@/store/store-items";
 import { TaskCategory } from "@/store/types";
+import { usePetStore } from "@/store/use-pet-store";
+import { usePhotoStore } from "@/store/use-photo-store";
+import { usePlayerStore } from "@/store/use-player-store";
+import { useStoreStore } from "@/store/use-store-store";
+import { TaskProgress, useTasksStore } from "@/store/use-tasks-store";
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
   kitchen: "\ud83c\udf73",
@@ -40,30 +41,6 @@ const CATEGORY_EMOJI: Record<TaskCategory, string> = {
   trash: "\ud83d\uddd1",
   other: "\ud83d\udce6",
 };
-
-/**
- * Task states:
- * - idle: not started
- * - pending_photo: user tapped task, can take photo or skip
- * - waiting: time lock counting down before reward
- * - reward_ready: timer done, waiting for user to claim reward
- * - claimed: reward claimed
- */
-type TaskState =
-  "idle" | "pending_photo" | "waiting" | "reward_ready" | "claimed";
-
-interface TaskProgress {
-  state: TaskState;
-  hasPhoto: boolean;
-  photoUri?: string;
-  waitStartedAt?: number; // unix ms when time lock started
-  rewardInfo?: {
-    basePoints: number;
-    pointsMultiplier: number;
-    finalPoints: number;
-    freeItemName?: string;
-  };
-}
 
 export default function TasksScreen() {
   const addTask = useTasksStore((s) => s.addTask);
@@ -84,9 +61,10 @@ export default function TasksScreen() {
     text: accentText,
   } = useMonsterTheme();
 
-  const [taskProgress, setTaskProgress] = useState<
-    Record<string, TaskProgress>
-  >({});
+  // Persisted in the tasks store so a restart mid-wait resumes the time lock
+  const taskProgress = useTasksStore((s) => s.taskProgress);
+  const setTaskProgress = useTasksStore((s) => s.setTaskProgress);
+
   const [celebration, setCelebration] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<{
     reward: RewardOutcome;
@@ -113,12 +91,13 @@ export default function TasksScreen() {
   }, []);
 
   // Step 1: User taps a task → moves to pending_photo state
-  const handleTapTask = useCallback((taskId: string) => {
-    setTaskProgress((prev) => ({
-      ...prev,
-      [taskId]: { state: "pending_photo", hasPhoto: false },
-    }));
-  }, []);
+  const handleTapTask = useCallback(
+    (taskId: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setTaskProgress(taskId, { state: "pending_photo", hasPhoto: false });
+    },
+    [setTaskProgress],
+  );
 
   // Step 2a: User takes a photo → then starts time lock
   const handleTakePhoto = useCallback(
@@ -143,40 +122,43 @@ export default function TasksScreen() {
 
       const photoUri = result.assets[0].uri;
 
+      // Haptic feedback for photo capture
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
       // Save photo record
       addPhoto({ taskId: task.id, photoUri, takenAt: Date.now() });
 
       // Move to waiting state (time lock starts)
-      setTaskProgress((prev) => ({
-        ...prev,
-        [task.id]: {
-          state: "waiting",
-          hasPhoto: true,
-          photoUri,
-          waitStartedAt: Date.now(),
-        },
-      }));
+      setTaskProgress(task.id, {
+        state: "waiting",
+        hasPhoto: true,
+        photoUri,
+        waitStartedAt: Date.now(),
+      });
     },
-    [addPhoto],
+    [addPhoto, setTaskProgress],
   );
 
   // Step 2b: User skips photo → starts time lock anyway
-  const handleSkipPhoto = useCallback((taskId: string) => {
-    setTaskProgress((prev) => ({
-      ...prev,
-      [taskId]: {
+  const handleSkipPhoto = useCallback(
+    (taskId: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setTaskProgress(taskId, {
         state: "waiting",
         hasPhoto: false,
         waitStartedAt: Date.now(),
-      },
-    }));
-  }, []);
+      });
+    },
+    [setTaskProgress],
+  );
 
   // Step 3: Time lock expires → show claim button (don't award yet)
   const handleTimerComplete = useCallback(
     (task: PresetTask) => {
       const progress = taskProgress[task.id];
-      if (!progress) return;
+      // Only transition out of "waiting" — guards against a duplicate reward
+      // roll if the timer fires again across a remount.
+      if (!progress || progress.state !== "waiting") return;
 
       if (progress.hasPhoto) {
         // Calculate photo reward
@@ -202,36 +184,30 @@ export default function TasksScreen() {
         }
 
         // Transition to reward_ready with reward info
-        setTaskProgress((prev) => ({
-          ...prev,
-          [task.id]: {
-            ...prev[task.id],
-            state: "reward_ready",
-            rewardInfo: {
-              basePoints: task.pointValue,
-              pointsMultiplier: reward.pointsMultiplier,
-              finalPoints,
-              freeItemName,
-            },
+        setTaskProgress(task.id, {
+          ...progress,
+          state: "reward_ready",
+          rewardInfo: {
+            basePoints: task.pointValue,
+            pointsMultiplier: reward.pointsMultiplier,
+            finalPoints,
+            freeItemName,
           },
-        }));
+        });
       } else {
         // No photo — base points only
-        setTaskProgress((prev) => ({
-          ...prev,
-          [task.id]: {
-            ...prev[task.id],
-            state: "reward_ready",
-            rewardInfo: {
-              basePoints: task.pointValue,
-              pointsMultiplier: 1,
-              finalPoints: task.pointValue,
-            },
+        setTaskProgress(task.id, {
+          ...progress,
+          state: "reward_ready",
+          rewardInfo: {
+            basePoints: task.pointValue,
+            pointsMultiplier: 1,
+            finalPoints: task.pointValue,
           },
-        }));
+        });
       }
     },
-    [taskProgress, buyItem],
+    [taskProgress, buyItem, setTaskProgress],
   );
 
   // Step 4: User claims reward → award points and mark as claimed
@@ -241,6 +217,9 @@ export default function TasksScreen() {
       if (!progress || !progress.rewardInfo) return;
 
       const { finalPoints } = progress.rewardInfo;
+
+      // Strong success haptic feedback for reward claim
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       // Award points and track
       earnPoints(finalPoints);
@@ -253,10 +232,7 @@ export default function TasksScreen() {
       care();
 
       // Mark as claimed
-      setTaskProgress((prev) => ({
-        ...prev,
-        [task.id]: { ...prev[task.id], state: "claimed" },
-      }));
+      setTaskProgress(task.id, { ...progress, state: "claimed" });
 
       // Show celebration
       showCelebration(`\u2728 +${finalPoints} pts claimed!`);
@@ -270,6 +246,7 @@ export default function TasksScreen() {
       checkStreakMilestones,
       care,
       showCelebration,
+      setTaskProgress,
     ],
   );
 
@@ -434,6 +411,7 @@ export default function TasksScreen() {
                   )}
                   <TaskTimer
                     totalSeconds={minTime}
+                    startedAt={progress.waitStartedAt ?? Date.now()}
                     onComplete={() => handleTimerComplete(task)}
                     active={true}
                   />
