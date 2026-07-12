@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { setupNotifications } from "@/utils/notification-setup";
+import { initNotifications } from "@/utils/daily-nudge";
 
 export const unstable_settings = {
   anchor: "onboarding",
@@ -19,8 +19,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    // Set up notifications on app start
-    setupNotifications();
+    // Handler + Android channel only — permission is requested later, at
+    // the first reward claim, never on first launch.
+    void initNotifications();
   }, []);
 
   return (

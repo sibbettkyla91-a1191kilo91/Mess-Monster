@@ -24,7 +24,6 @@ export interface PetState {
   happiness: number; // 0–100
   lastCaredAt: number; // unix ms — last care action
   lastSessionAt: number; // unix ms — when applyDecay last ran
-  lastDecayReminderAt: number; // unix ms — last time decay reminder was shown (throttle to 1 per hour)
   evolutionStage: EvolutionStage;
   totalPointsEarned: number; // lifetime cleaning points, never decremented
   adultVariant: AdultVariant; // determined at adult evolution, stored permanently

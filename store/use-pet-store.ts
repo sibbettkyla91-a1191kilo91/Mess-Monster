@@ -1,64 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { rescheduleDailyNudges } from "@/utils/daily-nudge";
+import { localDayString } from "@/utils/local-day";
 import { AdultVariant, EvolutionStage, PetState, TaskCategory } from "./types";
 import { usePlayerStore } from "./use-player-store";
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
-
-/**
- * Lazy-load notifications to avoid import-time crash in Expo Go.
- * Skip entirely in Expo Go — push notifications removed in SDK 53+.
- * Dynamic import prevents auto-registration side effect from running.
- */
-async function scheduleDecayReminderAsync(
-  healthLow: boolean,
-  happinessLow: boolean,
-  monsterName: string,
-) {
-  // Skip in Expo Go — notifications not supported and import triggers crash
-  if (Constants.appOwnership === "expo") {
-    if (__DEV__)
-      console.log(
-        "[Decay Reminder] Running in Expo Go; skipping notification (SDK 53+)",
-      );
-    return;
-  }
-
-  try {
-    const Notifications = await import("expo-notifications");
-
-    // Generate personalized message based on which stat is low
-    let title = "Your pet needs you! 🧹";
-    let body: string;
-
-    if (healthLow && happinessLow) {
-      body = `${monsterName} is struggling. Time to clean up and show some care!`;
-    } else if (healthLow) {
-      body = `${monsterName}'s health is declining. A quick cleaning task will help!`;
-    } else {
-      body = `${monsterName} is sad. Complete a cleaning task to brighten their day!`;
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: "default",
-        // Android-specific: route to decay-reminders channel if available
-        android: {
-          channelId: "decay-reminders",
-          color: "#52b788", // Nilly's accent green
-          priority: "max",
-        },
-      },
-      trigger: null, // Show immediately
-    });
-  } catch (e) {
-    if (__DEV__) console.warn("Notification error:", e);
-  }
-}
 
 export type PetMood = "thriving" | "happy" | "neutral" | "sad" | "sick";
 
@@ -157,7 +105,6 @@ export const usePetStore = create<PetStore>()(
       happiness: 100,
       lastCaredAt: Date.now(),
       lastSessionAt: Date.now(),
-      lastDecayReminderAt: 0,
       evolutionStage: "egg" as EvolutionStage,
       totalPointsEarned: 0,
       adultVariant: "base" as AdultVariant,
@@ -168,12 +115,17 @@ export const usePetStore = create<PetStore>()(
       pendingPremiumGate: null,
       premiumGateShownFor: null,
 
-      care: () =>
+      care: () => {
         set((s) => ({
           health: clamp(s.health + HEALTH_CARE_BOOST),
           happiness: clamp(s.happiness + HAPPINESS_CARE_BOOST),
           lastCaredAt: Date.now(),
-        })),
+        }));
+        // The monster was just cared for — push the nudge window to
+        // tomorrow. No-ops without notification permission.
+        const { monsterName } = usePlayerStore.getState();
+        void rescheduleDailyNudges(monsterName, true);
+      },
 
       addHappiness: (amount: number) =>
         set((s) => ({
@@ -294,39 +246,15 @@ export const usePetStore = create<PetStore>()(
 
       applyDecay: () => {
         const now = Date.now();
-        const { lastSessionAt, health, happiness, lastDecayReminderAt } = get();
+        const { lastSessionAt, health, happiness } = get();
         const elapsedHours = (now - lastSessionAt) / 3_600_000;
         if (elapsedHours < MIN_DECAY_HOURS) return;
 
-        const newHealth = clamp(health - HEALTH_DECAY_RATE * elapsedHours);
-        const newHappiness = clamp(
-          happiness - HAPPINESS_DECAY_RATE * elapsedHours,
-        );
-
         set({
-          health: newHealth,
-          happiness: newHappiness,
+          health: clamp(health - HEALTH_DECAY_RATE * elapsedHours),
+          happiness: clamp(happiness - HAPPINESS_DECAY_RATE * elapsedHours),
           lastSessionAt: now,
         });
-
-        // Trigger notification the moment a stat crosses below 30 (edge-triggered,
-        // not level-triggered). Per-stat: fires if health just crossed OR happiness
-        // just crossed, regardless of the other stat's state. Throttled to once/hour.
-        const timeSinceLastReminder = now - lastDecayReminderAt;
-        const oneHourMs = 60 * 60 * 1000;
-        const shouldThrottle = timeSinceLastReminder < oneHourMs;
-        const healthCrossed = newHealth < 30 && health >= 30;
-        const happinessCrossed = newHappiness < 30 && happiness >= 30;
-
-        if ((healthCrossed || happinessCrossed) && !shouldThrottle) {
-          const { monsterName } = usePlayerStore.getState();
-          scheduleDecayReminderAsync(
-            newHealth < 30,
-            newHappiness < 30,
-            monsterName,
-          );
-          set({ lastDecayReminderAt: now });
-        }
       },
     }),
     {
@@ -349,7 +277,6 @@ export const usePetStore = create<PetStore>()(
         return {
           adultVariant: "base",
           categoryCompletions: {},
-          lastDecayReminderAt: 0,
           pendingEvolution: null,
           pendingPremiumGate: null,
           premiumGateShownFor: null,
@@ -363,13 +290,22 @@ export const usePetStore = create<PetStore>()(
       // This unblocks the initial render and defers heavy computation to after the UI is ready.
       onRehydrateStorage: () => (state) => {
         if (state) {
+          const afterHydrate = () => {
+            state.applyDecay();
+            // Re-plan the nudge window from fresh persisted state (days may
+            // have passed since the last session). No-ops without permission.
+            const { monsterName } = usePlayerStore.getState();
+            const caredToday =
+              localDayString(new Date(state.lastCaredAt)) === localDayString();
+            void rescheduleDailyNudges(monsterName, caredToday);
+          };
           // Use setImmediate to schedule decay on the next event loop iteration.
           // This allows React to complete the initial render before we do heavy calculations.
           if (typeof setImmediate !== "undefined") {
-            setImmediate(() => state.applyDecay());
+            setImmediate(afterHydrate);
           } else {
             // Fallback for environments without setImmediate (e.g., some React Native setups)
-            setTimeout(() => state.applyDecay(), 0);
+            setTimeout(afterHydrate, 0);
           }
         }
       },

@@ -42,6 +42,8 @@ function todayISO() {
 interface PlayerStore extends PlayerProfile {
   lastTapReactionDate: string; // ISO date of last tap reaction
   tapReactionCount: number; // taps used today (resets daily)
+  notifPermissionAsked: boolean; // asked once ever, at the first reward claim
+  markNotifPermissionAsked: () => void;
   availablePoints: () => number; // derived: totalPoints - spentPoints
   earnPoints: (amount: number) => void;
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
@@ -67,6 +69,7 @@ export const usePlayerStore = create<PlayerStore>()(
       hasCompletedOnboarding: false,
       lastTapReactionDate: "",
       tapReactionCount: 0,
+      notifPermissionAsked: false,
 
       // Always derived from totalPoints/spentPoints — never stored, so it
       // can't desync. In components, select the primitive directly:
@@ -126,6 +129,8 @@ export const usePlayerStore = create<PlayerStore>()(
         }));
         return true;
       },
+
+      markNotifPermissionAsked: () => set({ notifPermissionAsked: true }),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),

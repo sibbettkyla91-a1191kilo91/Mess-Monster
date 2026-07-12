@@ -2,13 +2,13 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from "react-native";
 
 import { PhotoRewardModal } from "@/components/photo-reward-modal";
@@ -16,13 +16,17 @@ import { TaskTimer } from "@/components/task-timer";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
-    DEFAULT_MIN_TIME,
-    FREE_ITEM_MAX_PRICE,
-    RewardOutcome,
-    TASK_MIN_TIMES,
-    rollReward,
+  DEFAULT_MIN_TIME,
+  FREE_ITEM_MAX_PRICE,
+  RewardOutcome,
+  TASK_MIN_TIMES,
+  rollReward,
 } from "@/constants/task-timers";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
+import {
+  requestNudgePermission,
+  rescheduleDailyNudges,
+} from "@/utils/daily-nudge";
 import { PresetTask } from "@/store/preset-tasks";
 import { STORE_ITEMS } from "@/store/store-items";
 import { TaskCategory } from "@/store/types";
@@ -48,6 +52,11 @@ export default function TasksScreen() {
   const refreshDailyRoll = useTasksStore((s) => s.refreshDailyRoll);
   const earnPoints = usePlayerStore((s) => s.earnPoints);
   const recordActivity = usePlayerStore((s) => s.recordActivity);
+  const monsterName = usePlayerStore((s) => s.monsterName);
+  const notifPermissionAsked = usePlayerStore((s) => s.notifPermissionAsked);
+  const markNotifPermissionAsked = usePlayerStore(
+    (s) => s.markNotifPermissionAsked,
+  );
   const care = usePetStore((s) => s.care);
   const trackEarned = usePetStore((s) => s.trackEarned);
   const checkStreakMilestones = usePetStore((s) => s.checkStreakMilestones);
@@ -236,6 +245,15 @@ export default function TasksScreen() {
 
       // Show celebration
       showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+
+      // First reward claim is the moment we ask about gentle reminders \u2014
+      // the loop just paid off, so the request has context. Asked once ever.
+      if (!notifPermissionAsked) {
+        markNotifPermissionAsked();
+        void requestNudgePermission().then((granted) => {
+          if (granted) void rescheduleDailyNudges(monsterName, true);
+        });
+      }
     },
     [
       taskProgress,
@@ -247,6 +265,9 @@ export default function TasksScreen() {
       care,
       showCelebration,
       setTaskProgress,
+      notifPermissionAsked,
+      markNotifPermissionAsked,
+      monsterName,
     ],
   );
 
