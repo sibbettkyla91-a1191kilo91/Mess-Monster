@@ -317,7 +317,7 @@ export default function TasksScreen() {
               style={[
                 styles.taskCard,
                 isDark ? styles.taskCardDark : styles.taskCardLight,
-                progress.state === "completed" && styles.taskCardCompleted,
+                progress.state === "claimed" && styles.taskCardCompleted,
               ]}
             >
               {/* Task header row */}
@@ -325,13 +325,13 @@ export default function TasksScreen() {
                 <View
                   style={[
                     styles.checkbox,
-                    progress.state === "completed" && {
+                    progress.state === "claimed" && {
                       backgroundColor: accent,
                       borderColor: accent,
                     },
                   ]}
                 >
-                  {progress.state === "completed" && (
+                  {progress.state === "claimed" && (
                     <Text style={styles.checkmark}>{"\u2713"}</Text>
                   )}
                 </View>
@@ -339,7 +339,7 @@ export default function TasksScreen() {
                   <ThemedText
                     style={[
                       styles.taskLabel,
-                      progress.state === "completed" && styles.taskLabelDone,
+                      progress.state === "claimed" && styles.taskLabelDone,
                     ]}
                   >
                     {task.label}
@@ -352,7 +352,7 @@ export default function TasksScreen() {
                 <Text
                   style={[
                     styles.pointsText,
-                    progress.state === "completed"
+                    progress.state === "claimed"
                       ? { color: accent }
                       : styles.pointsPending,
                   ]}
