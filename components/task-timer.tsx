@@ -42,8 +42,7 @@ export function TaskTimer({
 
     // Wall-clock based: recompute from startedAt on every tick, so time spent
     // backgrounded (where JS timers are suspended) still counts toward the wait.
-    const tick = () =>
-      setRemaining(remainingSeconds(startedAt, totalSeconds));
+    const tick = () => setRemaining(remainingSeconds(startedAt, totalSeconds));
     tick();
     const interval = setInterval(tick, 1000);
     // Recompute the moment the app returns to the foreground instead of
