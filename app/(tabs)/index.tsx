@@ -93,7 +93,8 @@ const MOOD_CONFIG = {
     },
     sick: {
       label: "Sad",
-      message: "Nilly is really struggling. Even a small task will help her feel better.",
+      message:
+        "Nilly is really struggling. Even a small task will help her feel better.",
     },
   },
   luna: {
@@ -116,7 +117,8 @@ const MOOD_CONFIG = {
     },
     sick: {
       label: "Sad",
-      message: "Luna's magic dims. A little cleaning is all it takes to bring her back.",
+      message:
+        "Luna's magic dims. A little cleaning is all it takes to bring her back.",
     },
   },
 } as const;
@@ -983,12 +985,13 @@ export default function HomeScreen() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const tasks = useTasksStore((s) => s.tasks);
+  const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
 
   const [panelHeight, setPanelHeight] = useState(0);
 
   // Tap-to-react state
   const [tapHearts, setTapHearts] = useState<
-    Array<{ id: string; x: number; y: number }>
+    { id: string; x: number; y: number }[]
   >([]);
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
@@ -1334,7 +1337,7 @@ export default function HomeScreen() {
         {doneToday > 0 && (
           <View style={styles.pillScrim}>
             <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
-              ✓ {doneToday}/6 done
+              ✓ {doneToday}/{dailyRollSize} done
             </ThemedText>
           </View>
         )}

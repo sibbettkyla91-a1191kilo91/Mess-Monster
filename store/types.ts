@@ -44,4 +44,5 @@ export interface PlayerProfile {
   isPremium: boolean; // temporary flag until real IAP is wired
   selectedMonster: "nilly" | "luna" | null;
   monsterName: string; // player-chosen pet name (set during onboarding)
+  hasCompletedOnboarding: boolean; // gates the onboarding flow redirect
 }
