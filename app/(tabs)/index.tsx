@@ -785,13 +785,20 @@ const evolutionStyles = StyleSheet.create({
 
 // ─── PremiumGateModal ───────────────────────────────────────────────────────
 
+const FOUNDING_MEMBER_PERKS = [
+  { emoji: "🧬", text: "Adult form — plus a secret final form to discover" },
+  { emoji: "📝", text: "Custom task lists that fit your home" },
+  { emoji: "🎵", text: "Mess Monster Picks — cleaning soundtracks we love" },
+];
+
 function PremiumGateModal({
   stage,
   theme,
   onDismiss,
   onUpgrade,
 }: {
-  stage: EvolutionStage;
+  /** Stage that triggered the gate, or null when opened from the info pill */
+  stage: EvolutionStage | null;
   theme: (typeof THEMES)[keyof typeof THEMES];
   onDismiss: () => void;
   onUpgrade: () => void;
@@ -816,14 +823,16 @@ function PremiumGateModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const stageName = stage.charAt(0).toUpperCase() + stage.slice(1);
+  const stageName = stage
+    ? stage.charAt(0).toUpperCase() + stage.slice(1)
+    : null;
 
   return (
     <Pressable
       style={[StyleSheet.absoluteFillObject, evolutionStyles.overlay]}
       onPress={onDismiss}
       accessibilityRole="button"
-      accessibilityLabel="Premium upgrade modal — tap outside to dismiss"
+      accessibilityLabel="Founding Member info — tap outside to dismiss"
     >
       <Animated.View
         style={[
@@ -839,16 +848,29 @@ function PremiumGateModal({
         // Prevent tap-through to the backdrop dismiss
         onStartShouldSetResponder={() => true}
       >
-        <Text style={[evolutionStyles.emoji]}>🔒</Text>
+        <Text style={[evolutionStyles.emoji]}>⭐</Text>
         <ThemedText style={[evolutionStyles.title, { color: theme.accent }]}>
-          Premium Feature
+          Founding Member
         </ThemedText>
         <ThemedText style={[evolutionStyles.stageName, { color: theme.text }]}>
-          {stageName} form and beyond require Premium.
+          {stageName
+            ? `Your monster is ready for its ${stageName} form — that one comes with Founding Member.`
+            : "A little extra for you and your monster, whenever you feel like it."}
         </ThemedText>
-        <ThemedText style={[premiumStyles.body, { color: theme.text }]}>
-          Your monster is ready to evolve! Unlock Adult and a mysterious locked
-          form by upgrading to Premium (~$4.99/month).
+        <View style={premiumStyles.perkList}>
+          {FOUNDING_MEMBER_PERKS.map((perk) => (
+            <View key={perk.text} style={premiumStyles.perkRow}>
+              <Text style={premiumStyles.perkEmoji}>{perk.emoji}</Text>
+              <ThemedText
+                style={[premiumStyles.perkText, { color: theme.text }]}
+              >
+                {perk.text}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+        <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
+          $24.99/year · Founding Member rate
         </ThemedText>
         <Pressable
           style={[
@@ -857,12 +879,12 @@ function PremiumGateModal({
           ]}
           onPress={onUpgrade}
           accessibilityRole="button"
-          accessibilityLabel="Upgrade to Premium"
+          accessibilityLabel="Become a Founding Member"
         >
           <ThemedText
             style={[premiumStyles.upgradeButtonText, { color: theme.pillText }]}
           >
-            Upgrade to Premium
+            Become a Founding Member
           </ThemedText>
         </Pressable>
         <Pressable onPress={onDismiss} style={premiumStyles.dismissButton}>
@@ -872,17 +894,43 @@ function PremiumGateModal({
             Maybe later
           </ThemedText>
         </Pressable>
+        <ThemedText style={[premiumStyles.reassurance, { color: theme.text }]}>
+          The free app is yours forever — no pressure, ever.
+        </ThemedText>
       </Animated.View>
     </Pressable>
   );
 }
 
 const premiumStyles = StyleSheet.create({
-  body: {
+  perkList: {
+    gap: 10,
+    alignSelf: "stretch",
+    marginTop: 4,
+  },
+  perkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  perkEmoji: {
+    fontSize: 18,
+  },
+  perkText: {
+    flex: 1,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 19,
+    opacity: 0.85,
+  },
+  priceLine: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+  reassurance: {
+    fontSize: 12,
+    opacity: 0.5,
     textAlign: "center",
-    opacity: 0.75,
   },
   upgradeButton: {
     borderRadius: 14,
@@ -1360,12 +1408,12 @@ export default function HomeScreen() {
                 setShowUpgradeModal(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Learn about Premium"
+              accessibilityLabel="Learn about Founding Member"
             >
               <ThemedText
                 style={[styles.unlockButtonText, { color: theme.accent }]}
               >
-                ✨ Unlock more
+                ⭐ Founding Member
               </ThemedText>
             </Pressable>
           )}
@@ -1444,10 +1492,10 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* ── Premium gate modal (auto-popup or manual "Unlock more") ── */}
+      {/* ── Founding Member modal (evolution gate or manual info pill) ── */}
       {(pendingPremiumGate !== null || showUpgradeModal) && (
         <PremiumGateModal
-          stage={pendingPremiumGate ?? "adult"}
+          stage={pendingPremiumGate}
           theme={theme}
           onDismiss={() => {
             clearPremiumGate();
