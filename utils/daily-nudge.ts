@@ -43,13 +43,43 @@ const NUDGE_MESSAGES: {
 ];
 
 /**
- * Lazy-load expo-notifications so importing this module never triggers
- * native side effects (and web, where the API is unavailable, is skipped).
+ * Load only the expo-notifications submodules we need, never the package
+ * barrel. Importing "expo-notifications" evaluates getExpoPushTokenAsync →
+ * DevicePushTokenAutoRegistration.fx, which calls addPushTokenListener at
+ * module scope — remote-push machinery that throws in Expo Go on Android
+ * (removed in SDK 53). Local scheduled notifications need no push token,
+ * so these side-effect-free deep imports are the entire surface we use.
  */
 async function getNotifications() {
   try {
     if (Platform.OS === "web") return null;
-    return await import("expo-notifications");
+    const [
+      { setNotificationHandler },
+      { setNotificationChannelAsync },
+      { AndroidImportance },
+      { getPermissionsAsync, requestPermissionsAsync },
+      { cancelScheduledNotificationAsync },
+      { scheduleNotificationAsync },
+      { SchedulableTriggerInputTypes },
+    ] = await Promise.all([
+      import("expo-notifications/build/NotificationsHandler"),
+      import("expo-notifications/build/setNotificationChannelAsync"),
+      import("expo-notifications/build/NotificationChannelManager.types"),
+      import("expo-notifications/build/NotificationPermissions"),
+      import("expo-notifications/build/cancelScheduledNotificationAsync"),
+      import("expo-notifications/build/scheduleNotificationAsync"),
+      import("expo-notifications/build/Notifications.types"),
+    ]);
+    return {
+      setNotificationHandler,
+      setNotificationChannelAsync,
+      AndroidImportance,
+      getPermissionsAsync,
+      requestPermissionsAsync,
+      cancelScheduledNotificationAsync,
+      scheduleNotificationAsync,
+      SchedulableTriggerInputTypes,
+    };
   } catch {
     // Unavailable (web, tests) — every caller treats null as a no-op.
     return null;
