@@ -10,9 +10,8 @@ import { usePlayerStore } from "@/store/use-player-store";
 const MIN_STORE_ITEM_COST = 20;
 
 export default function TabLayout() {
-  // PERFORMANCE: Select the computed availablePointsValue instead of calling the function.
-  // This prevents unnecessary re-renders when other store values change.
-  const availablePoints = usePlayerStore((s) => s.availablePointsValue);
+  // Derived primitive selector — re-renders only when the balance changes.
+  const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
   const { tabTint } = useMonsterTheme();
 
   // PERFORMANCE: Memoize the badge value to prevent tab options recalculation on every render

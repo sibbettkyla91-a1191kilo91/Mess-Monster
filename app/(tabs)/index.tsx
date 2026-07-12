@@ -970,7 +970,7 @@ export default function HomeScreen() {
   const clearPremiumGate = usePetStore((s) => s.clearPremiumGate);
   const recheckEvolution = usePetStore((s) => s.recheckEvolution);
 
-  const availablePoints = usePlayerStore((s) => s.availablePointsValue);
+  const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
   const streak = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);

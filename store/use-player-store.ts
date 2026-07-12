@@ -12,16 +12,17 @@ import { PlayerProfile } from "./types";
 
 // Exported for tests.
 export function migratePlayerState(persistedState: any, version: number): any {
-  const totalPoints = persistedState?.totalPoints ?? 100;
-  const spentPoints = persistedState?.spentPoints ?? 0;
   const migrated = {
     activeDaysCount: 0,
     isPremium: false,
     lastTapReactionDate: "",
     tapReactionCount: 0,
-    availablePointsValue: totalPoints - spentPoints,
     ...persistedState,
   };
+  // v3 -> v4: availablePointsValue was a persisted cache of
+  // totalPoints - spentPoints that could desync from its inputs.
+  // It is now always derived on read; strip the stale copy.
+  delete migrated.availablePointsValue;
   // v2 -> v3: lastActiveDay used to be derived from toISOString() (UTC),
   // which for users west of UTC can be one day AHEAD of their local day.
   // Left as-is, that value fails both the "today" and "yesterday" checks
@@ -39,10 +40,9 @@ function todayISO() {
 }
 
 interface PlayerStore extends PlayerProfile {
-  availablePointsValue: number; // Computed field: totalPoints - spentPoints
   lastTapReactionDate: string; // ISO date of last tap reaction
   tapReactionCount: number; // taps used today (resets daily)
-  availablePoints: () => number; // Selector function for backward compatibility
+  availablePoints: () => number; // derived: totalPoints - spentPoints
   earnPoints: (amount: number) => void;
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
   recordActivity: () => void; // call after a task is logged; updates streak + activeDaysCount
@@ -67,29 +67,18 @@ export const usePlayerStore = create<PlayerStore>()(
       hasCompletedOnboarding: false,
       lastTapReactionDate: "",
       tapReactionCount: 0,
-      availablePointsValue: 100, // Initial value: 100 - 0
 
-      // PERFORMANCE: Computed property updated whenever points change.
-      // This provides a single source of truth that can be selected safely.
-      // Use the selector: usePlayerStore((s) => s.availablePointsValue)
-      // instead of calling availablePoints() to avoid function re-creation.
+      // Always derived from totalPoints/spentPoints — never stored, so it
+      // can't desync. In components, select the primitive directly:
+      // usePlayerStore((s) => s.totalPoints - s.spentPoints)
       availablePoints: () => get().totalPoints - get().spentPoints,
 
       earnPoints: (amount) =>
-        set((s) => {
-          const newTotal = s.totalPoints + amount;
-          return {
-            totalPoints: newTotal,
-            availablePointsValue: newTotal - s.spentPoints,
-          };
-        }),
+        set((s) => ({ totalPoints: s.totalPoints + amount })),
 
       spendPoints: (amount) => {
-        if (get().availablePointsValue < amount) return false;
-        set((s) => ({
-          spentPoints: s.spentPoints + amount,
-          availablePointsValue: s.availablePointsValue - amount,
-        }));
+        if (get().availablePoints() < amount) return false;
+        set((s) => ({ spentPoints: s.spentPoints + amount }));
         return true;
       },
 
@@ -142,7 +131,7 @@ export const usePlayerStore = create<PlayerStore>()(
     }),
     {
       name: "mm-player",
-      version: 3,
+      version: 4,
       migrate: migratePlayerState,
       storage: createJSONStorage(() => AsyncStorage),
     },

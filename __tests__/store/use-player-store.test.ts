@@ -222,10 +222,13 @@ describe("migratePlayerState", () => {
     expect(out.lastActiveDay).toBe(localTomorrowString());
   });
 
-  it("still applies the v2 shape defaults", () => {
-    const out = migratePlayerState({ totalPoints: 150, spentPoints: 30 }, 1);
+  it("still applies the v2 shape defaults and strips the removed cache field", () => {
+    const out = migratePlayerState(
+      { totalPoints: 150, spentPoints: 30, availablePointsValue: 120 },
+      1,
+    );
 
-    expect(out.availablePointsValue).toBe(120);
+    expect(out.availablePointsValue).toBeUndefined();
     expect(out.activeDaysCount).toBe(0);
     expect(out.isPremium).toBe(false);
     expect(out.lastTapReactionDate).toBe("");
