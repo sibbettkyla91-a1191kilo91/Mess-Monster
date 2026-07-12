@@ -201,6 +201,7 @@ export default function TasksScreen() {
             pointsMultiplier: reward.pointsMultiplier,
             finalPoints,
             freeItemName,
+            outcome: reward,
           },
         });
       } else {
@@ -243,8 +244,14 @@ export default function TasksScreen() {
       // Mark as claimed
       setTaskProgress(task.id, { ...progress, state: "claimed" });
 
-      // Show celebration
-      showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+      // Photo-verified tasks get the full celebration modal; others get the
+      // lightweight pill.
+      const { outcome, basePoints, freeItemName } = progress.rewardInfo;
+      if (progress.hasPhoto && outcome) {
+        setRewardModal({ reward: outcome, basePoints, freeItemName });
+      } else {
+        showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+      }
 
       // First reward claim is the moment we ask about gentle reminders \u2014
       // the loop just paid off, so the request has context. Asked once ever.

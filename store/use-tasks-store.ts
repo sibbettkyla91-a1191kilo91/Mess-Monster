@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { RewardOutcome } from "@/constants/task-timers";
 import { localDayString } from "@/utils/local-day";
 
 import { getDailyRoll, PresetTask } from "./preset-tasks";
@@ -31,6 +32,8 @@ export interface TaskProgress {
     pointsMultiplier: number;
     finalPoints: number;
     freeItemName?: string;
+    /** Rolled outcome for photo tasks — drives the celebration modal at claim */
+    outcome?: RewardOutcome;
   };
 }
 
