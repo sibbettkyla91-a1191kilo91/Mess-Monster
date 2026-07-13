@@ -2,7 +2,43 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { StoreItem } from "./store-items";
+import { STORE_ITEMS, StoreItem } from "./store-items";
+
+// Exported for tests.
+export function migrateStoreState(persistedState: any, version: number): any {
+  const migrated = {
+    ...persistedState,
+    // v0 → v1: decor placement added. Items owned before this feature
+    // simply become placeable (unplaced); nothing is lost.
+    placed: persistedState?.placed ?? {},
+  };
+  // v1 → v2: toys changed from consumables (auto-used at purchase, so their
+  // owned entry sat at quantity 0) to permanent collectibles like decor.
+  // Restore one unit to every toy bought under the old behavior so players
+  // keep what they paid for. Two parts, both needed:
+  //  - refresh the persisted item snapshot from the catalog, because old
+  //    snapshots have repeatable: true frozen in and the Collection screen
+  //    filters on the snapshot, not the catalog;
+  //  - bump quantity-0 toy entries to 1. Food stays untouched — quantity 0
+  //    there means correctly consumed.
+  if (version < 2 && migrated.owned) {
+    const owned: Record<string, OwnedEntry> = {};
+    for (const [id, entry] of Object.entries<any>(migrated.owned)) {
+      const catalogItem = STORE_ITEMS.find((i) => i.id === id);
+      if (catalogItem?.category === "toys") {
+        owned[id] = {
+          ...entry,
+          item: catalogItem,
+          quantity: entry.quantity === 0 ? 1 : entry.quantity,
+        };
+      } else {
+        owned[id] = entry;
+      }
+    }
+    migrated.owned = owned;
+  }
+  return migrated;
+}
 
 export interface OwnedEntry {
   item: StoreItem;
@@ -15,7 +51,7 @@ export interface OwnedEntry {
 interface StoreStore {
   owned: Record<string, OwnedEntry>;
 
-  /** Item ids currently placed in the habitat room (decor items only). */
+  /** Item ids currently placed in the habitat room (decor and toys). */
   placed: Record<string, true>;
 
   /** Add an item to the owned collection. Returns true on success. */
@@ -99,13 +135,8 @@ export const useStoreStore = create<StoreStore>()(
     {
       name: "mm-store-owned",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
-      // v0 → v1: decor placement added. Items owned before this feature
-      // simply become placeable (unplaced); nothing is lost.
-      migrate: (persistedState: any): any => ({
-        ...persistedState,
-        placed: persistedState?.placed ?? {},
-      }),
+      version: 2,
+      migrate: migrateStoreState,
     },
   ),
 );

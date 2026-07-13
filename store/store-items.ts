@@ -92,7 +92,7 @@ export const STORE_ITEMS: StoreItem[] = [
     repeatable: true,
   },
 
-  // ─── Toys (repeatable, moderate mood boost) ─────────────────────────
+  // ─── Toys (one-time purchase, permanent collection, placeable) ──────
   {
     id: "toy-ball",
     name: "Bouncy Ball",
@@ -101,7 +101,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "Simple fun — bounce it around!",
     price: 20,
     moodBoost: 3,
-    repeatable: true,
+    repeatable: false,
   },
   {
     id: "toy-yarn",
@@ -111,7 +111,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "Soft and fun to bat around.",
     price: 25,
     moodBoost: 4,
-    repeatable: true,
+    repeatable: false,
   },
   {
     id: "toy-kite",
@@ -121,7 +121,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "Let it fly high on a breezy day!",
     price: 35,
     moodBoost: 5,
-    repeatable: true,
+    repeatable: false,
   },
   {
     id: "toy-puzzle",
@@ -131,7 +131,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "Keeps your monster thinking.",
     price: 40,
     moodBoost: 5,
-    repeatable: true,
+    repeatable: false,
   },
   {
     id: "toy-teddy",
@@ -141,7 +141,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "A cuddly companion for nap time.",
     price: 60,
     moodBoost: 7,
-    repeatable: true,
+    repeatable: false,
   },
   {
     id: "toy-bubbles",
@@ -151,7 +151,7 @@ export const STORE_ITEMS: StoreItem[] = [
     description: "Pop! Pop! Pop! Pure joy.",
     price: 30,
     moodBoost: 4,
-    repeatable: true,
+    repeatable: false,
   },
 
   // ─── Accessories (one-time purchase, permanent collection) ──────────

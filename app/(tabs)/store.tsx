@@ -97,7 +97,9 @@ export default function StoreScreen() {
       // the item stays granted \u2014 the failure mode always favors the player.
       spendPoints(item.price);
 
-      // For food and toys, auto-use immediately (they boost mood)
+      // For food (the only repeatable category), auto-use immediately —
+      // it boosts mood. Toys, accessories, and decor are permanent
+      // collectibles and take the branch below.
       if (item.repeatable) {
         consumeItem(item.id);
         // Apply mood boost by calling care (resets lastCaredAt)

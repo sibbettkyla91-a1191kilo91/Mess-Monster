@@ -31,7 +31,8 @@ export default function CollectionScreen() {
     text: accentText,
   } = useMonsterTheme();
 
-  // Filter to only non-repeatable items (accessories and decor that user keeps)
+  // Filter to only non-repeatable items (toys, accessories, and decor that
+  // the user keeps; food is consumable and never collected)
   const collectionItems = ownedItems.filter((entry) => !entry.item.repeatable);
 
   const hasItems = collectionItems.length > 0;
@@ -50,7 +51,8 @@ export default function CollectionScreen() {
         >
           {collectionItems.map((entry) => {
             const { item } = entry;
-            const isDecor = item.category === "decor";
+            const isPlaceable =
+              item.category === "decor" || item.category === "toys";
             const isPlaced = !!placed[item.id];
             return (
               <View
@@ -67,7 +69,7 @@ export default function CollectionScreen() {
                 </ThemedText>
 
                 <View style={styles.itemFooter}>
-                  {isDecor && (
+                  {isPlaceable && (
                     <Pressable
                       style={({ pressed }) => [
                         styles.placeButton,
@@ -120,7 +122,7 @@ export default function CollectionScreen() {
           <ThemedText style={styles.emptyEmoji}>🎁</ThemedText>
           <ThemedText style={styles.emptyTitle}>Collection Empty</ThemedText>
           <ThemedText style={styles.emptyMessage}>
-            Visit the Points Store to collect accessories and decor!
+            Visit the Points Store to collect toys, accessories, and decor!
           </ThemedText>
         </View>
       )}
