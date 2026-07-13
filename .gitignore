@@ -44,3 +44,6 @@ app-example
 
 # local docs
 *.pdf
+
+# local Claude Code settings
+.claude/settings.local.json
