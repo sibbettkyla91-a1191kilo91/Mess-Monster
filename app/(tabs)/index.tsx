@@ -136,9 +136,9 @@ const STAGE_SPRITES = {
     adult_livingroom: require("../../assets/images/luna_adult_livingroom.png"),
     adult_bedroom: require("../../assets/images/luna_adult_bedroom.png"),
     adult_bathroom: require("../../assets/images/luna_adult_bathroom.png"),
-    sad_egg: require("../../assets/images/sad_luna_egg.jpg"),
-    sad_baby: require("../../assets/images/sad_luna_baby.jpg"),
-    sad_teen: require("../../assets/images/sad_luna_teen.jpg"),
+    sad_egg: require("../../assets/images/sad_luna_egg.png"),
+    sad_baby: require("../../assets/images/sad_luna_baby.png"),
+    sad_teen: require("../../assets/images/sad_luna_teen.png"),
   },
   nilly: {
     egg: require("../../assets/images/nilly_egg.png"),
