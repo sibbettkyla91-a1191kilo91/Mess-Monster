@@ -17,6 +17,7 @@ export function migratePlayerState(persistedState: any, version: number): any {
     isPremium: false,
     lastTapReactionDate: "",
     tapReactionCount: 0,
+    statPanelCollapsed: false,
     ...persistedState,
   };
   // v3 -> v4: availablePointsValue was a persisted cache of
@@ -43,7 +44,9 @@ interface PlayerStore extends PlayerProfile {
   lastTapReactionDate: string; // ISO date of last tap reaction
   tapReactionCount: number; // taps used today (resets daily)
   notifPermissionAsked: boolean; // asked once ever, at the first reward claim
+  statPanelCollapsed: boolean; // Home stat panel shrunk to its peek handle
   markNotifPermissionAsked: () => void;
+  toggleStatPanel: () => void;
   availablePoints: () => number; // derived: totalPoints - spentPoints
   earnPoints: (amount: number) => void;
   spendPoints: (amount: number) => boolean; // returns false if insufficient points
@@ -70,6 +73,9 @@ export const usePlayerStore = create<PlayerStore>()(
       lastTapReactionDate: "",
       tapReactionCount: 0,
       notifPermissionAsked: false,
+      // New key on existing installs is filled by the hydration merge (same
+      // version) or the migrate defaults (older versions) — no version bump.
+      statPanelCollapsed: false,
 
       // Always derived from totalPoints/spentPoints — never stored, so it
       // can't desync. In components, select the primitive directly:
@@ -131,6 +137,9 @@ export const usePlayerStore = create<PlayerStore>()(
       },
 
       markNotifPermissionAsked: () => set({ notifPermissionAsked: true }),
+
+      toggleStatPanel: () =>
+        set((s) => ({ statPanelCollapsed: !s.statPanelCollapsed })),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
     }),

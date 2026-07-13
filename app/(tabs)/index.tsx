@@ -40,6 +40,11 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HABITAT_WIDTH = SCREEN_WIDTH;
 const IMAGE_SIZE = Math.round(HABITAT_WIDTH * 0.55);
 
+// Visible sliver of the bottom panel when collapsed: the panel's top padding
+// (16) plus the toggle handle row (20), with a hair of the gap below so the
+// rounded corners still read as a sheet edge.
+const PANEL_PEEK_HEIGHT = 40;
+
 // ─── Theme ───────────────────────────────────────────────────────────
 
 const THEMES = {
@@ -979,6 +984,8 @@ export default function HomeScreen() {
   const monsterName = usePlayerStore((s) => s.monsterName);
   const setPremium = usePlayerStore((s) => s.setPremium);
   const isPremium = usePlayerStore((s) => s.isPremium);
+  const statPanelCollapsed = usePlayerStore((s) => s.statPanelCollapsed);
+  const toggleStatPanel = usePlayerStore((s) => s.toggleStatPanel);
   const router = useRouter();
 
   // Pet taps and the upgrade action write to the player and pet stores; a
@@ -997,6 +1004,29 @@ export default function HomeScreen() {
   const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
 
   const [panelHeight, setPanelHeight] = useState(0);
+
+  // Stat panel collapse: 0 = expanded, 1 = collapsed to the peek handle.
+  // The panel is an absolute overlay on the room, so sliding it down truly
+  // reveals habitat pixels (the toy/decor floor slots sit under it) rather
+  // than shrinking a box that still reserves the space.
+  const collapseAnim = useRef(
+    new Animated.Value(statPanelCollapsed ? 1 : 0),
+  ).current;
+  useEffect(() => {
+    Animated.timing(collapseAnim, {
+      toValue: statPanelCollapsed ? 1 : 0,
+      duration: 320,
+      useNativeDriver: true,
+    }).start();
+  }, [statPanelCollapsed, collapseAnim]);
+  const panelTranslateY = collapseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(0, panelHeight - PANEL_PEEK_HEIGHT)],
+  });
+  const grabBarOpacity = collapseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
 
   // Tap-to-react state
   const [tapHearts, setTapHearts] = useState<
@@ -1026,6 +1056,14 @@ export default function HomeScreen() {
   const moodCfg = MOOD_CONFIG[monster][displayMood];
 
   const displayName = monsterName || (monster === "nilly" ? "Nilly" : "Luna");
+
+  // ── Stat panel toggle ───────────────────────────────────────────────────────
+  const handleStatPanelToggle = () => {
+    // Persisted write — same pre-hydration clobber guard as pet taps.
+    if (!hydrated) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    toggleStatPanel();
+  };
 
   // ── Tap-to-react handler ────────────────────────────────────────────────────
   const handlePetTap = () => {
@@ -1410,86 +1448,139 @@ export default function HomeScreen() {
       ))}
 
       {/* ── Bottom panel ── */}
-      <View
-        style={[styles.bottomPanel, { backgroundColor: theme.panelBg }]}
+      {/* Collapsing slides the panel down until only the handle row peeks
+          above the screen edge. A transform keeps the measured layout height
+          intact, so the monster's anchor above the panel doesn't move and
+          the revealed floor stays clear for placed decor and toys. */}
+      <Animated.View
+        style={[
+          styles.bottomPanel,
+          { backgroundColor: theme.panelBg },
+          panelHeight > 0 && { transform: [{ translateY: panelTranslateY }] },
+        ]}
         onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
       >
-        <View style={styles.nameRow}>
-          <ThemedText style={[styles.monsterName, { color: theme.text }]}>
-            {displayName}
-          </ThemedText>
-          <View
-            style={[styles.stagePill, { backgroundColor: theme.accent + "33" }]}
+        <Pressable
+          style={styles.panelHandle}
+          onPress={handleStatPanelToggle}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={
+            statPanelCollapsed ? "Show monster stats" : "Hide monster stats"
+          }
+          accessibilityState={{ expanded: !statPanelCollapsed }}
+        >
+          {/* Cross-fade: bottom-sheet grab bar when expanded, compact stat
+              peek when collapsed. Both layers stay mounted; opacity follows
+              the collapse animation. */}
+          <Animated.View
+            style={[styles.handleLayer, { opacity: grabBarOpacity }]}
+            pointerEvents="none"
           >
-            <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
-              {STAGE_LABELS[evolutionStage]}
+            <View
+              style={[styles.grabBar, { backgroundColor: theme.accent + "66" }]}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[styles.handleLayer, { opacity: collapseAnim }]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.peekText, { color: theme.text }]}>
+              ❤️ {Math.round(health)}
+              {"   "}✨ {Math.round(happiness)}
+              {"   "}
+              <Text style={{ color: theme.accent }}>▴</Text>
+            </Text>
+          </Animated.View>
+        </Pressable>
+
+        <View
+          style={styles.panelBody}
+          accessibilityElementsHidden={statPanelCollapsed}
+          importantForAccessibility={
+            statPanelCollapsed ? "no-hide-descendants" : "auto"
+          }
+        >
+          <View style={styles.nameRow}>
+            <ThemedText style={[styles.monsterName, { color: theme.text }]}>
+              {displayName}
+            </ThemedText>
+            <View
+              style={[
+                styles.stagePill,
+                { backgroundColor: theme.accent + "33" },
+              ]}
+            >
+              <ThemedText style={[styles.stageLabel, { color: theme.accent }]}>
+                {STAGE_LABELS[evolutionStage]}
+              </ThemedText>
+            </View>
+            {!isPremium && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.unlockButton,
+                  { borderColor: theme.accent, opacity: pressed ? 0.7 : 1 },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowUpgradeModal(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Learn about Founding Member"
+              >
+                <ThemedText
+                  style={[styles.unlockButtonText, { color: theme.accent }]}
+                >
+                  ⭐ Founding Member
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.statBars}>
+            <StatBar
+              icon="❤️"
+              label="Health"
+              value={health}
+              color={theme.accent}
+              trackColor={theme.barTrack}
+            />
+            <StatBar
+              icon="✨"
+              label="Happiness"
+              value={happiness}
+              color={theme.particleColor}
+              trackColor={theme.barTrack}
+            />
+          </View>
+
+          <View style={styles.moodSection}>
+            <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
+              {moodCfg.label}
+            </ThemedText>
+            <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
+              {moodCfg.message}
             </ThemedText>
           </View>
-          {!isPremium && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.unlockButton,
-                { borderColor: theme.accent, opacity: pressed ? 0.7 : 1 },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowUpgradeModal(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Learn about Founding Member"
-            >
-              <ThemedText
-                style={[styles.unlockButtonText, { color: theme.accent }]}
-              >
-                ⭐ Founding Member
-              </ThemedText>
-            </Pressable>
-          )}
-        </View>
 
-        <View style={styles.statBars}>
-          <StatBar
-            icon="❤️"
-            label="Health"
-            value={health}
-            color={theme.accent}
-            trackColor={theme.barTrack}
-          />
-          <StatBar
-            icon="✨"
-            label="Happiness"
-            value={happiness}
-            color={theme.particleColor}
-            trackColor={theme.barTrack}
-          />
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaButton,
+              { backgroundColor: theme.accent, opacity: pressed ? 0.82 : 1 },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.navigate("/(tabs)/explore");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Go clean something"
+          >
+            <ThemedText style={[styles.ctaText, { color: theme.pillText }]}>
+              Clean Something →
+            </ThemedText>
+          </Pressable>
         </View>
-
-        <View style={styles.moodSection}>
-          <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
-            {moodCfg.label}
-          </ThemedText>
-          <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
-            {moodCfg.message}
-          </ThemedText>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.ctaButton,
-            { backgroundColor: theme.accent, opacity: pressed ? 0.82 : 1 },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.navigate("/(tabs)/explore");
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Go clean something"
-        >
-          <ThemedText style={[styles.ctaText, { color: theme.pillText }]}>
-            Clean Something →
-          </ThemedText>
-        </Pressable>
-      </View>
+      </Animated.View>
 
       {/* ── Streak milestone banner ── */}
       {pendingMilestoneBanner !== null && (
@@ -1592,6 +1683,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 16,
     paddingBottom: 28,
+    gap: 12,
+  },
+  panelHandle: {
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  handleLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  grabBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+  },
+  peekText: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  panelBody: {
     gap: 12,
   },
   nameRow: {
