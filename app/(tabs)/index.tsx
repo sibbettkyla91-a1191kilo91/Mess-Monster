@@ -1003,6 +1003,10 @@ export default function HomeScreen() {
     { id: string; x: number; y: number }[]
   >([]);
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
+  // Monotonic id so two taps in the same millisecond can't collide, and
+  // pending heart-removal timers so unmount doesn't leak them.
+  const heartSeqRef = useRef(0);
+  const heartTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
   const addHappiness = usePetStore((s) => s.addHappiness);
 
@@ -1026,8 +1030,11 @@ export default function HomeScreen() {
   // ── Tap-to-react handler ────────────────────────────────────────────────────
   const handlePetTap = () => {
     if (!hydrated) return;
-    const canTap = recordTapReaction();
-    if (!canTap) return; // Tap limit reached, do nothing
+    // The daily allowance caps only the happiness grant (anti-farming) —
+    // never the reaction. The monster always acknowledges affection with
+    // the bounce, haptic, and heart: a capped tap silently doing nothing
+    // reads as "broken", worst of all on a sad monster being comforted.
+    const withinDailyAllowance = recordTapReaction();
 
     // Trigger haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1047,10 +1054,11 @@ export default function HomeScreen() {
     ]).start();
 
     // Boost happiness (no points — tapping is affection, not cleaning)
-    addHappiness(3);
+    if (withinDailyAllowance) addHappiness(3);
 
     // Create heart animation at center of pet
-    const heartId = `heart-${Date.now()}`;
+    heartSeqRef.current += 1;
+    const heartId = `heart-${heartSeqRef.current}`;
     setTapHearts((prev) => [
       ...prev,
       {
@@ -1061,18 +1069,23 @@ export default function HomeScreen() {
     ]);
 
     // Remove heart after animation completes
-    setTimeout(() => {
+    const heartTimer = setTimeout(() => {
+      heartTimersRef.current.delete(heartTimer);
       setTapHearts((prev) => prev.filter((h) => h.id !== heartId));
     }, 1200);
+    heartTimersRef.current.add(heartTimer);
   };
 
   // ── Bob ────────────────────────────────────────────────────────────────────
   const bobAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const heartTimers = heartTimersRef.current;
     return () => {
       // PERFORMANCE: Reset animation values on cleanup to prevent leaks
       tapScaleAnim.setValue(1);
+      heartTimers.forEach(clearTimeout);
+      heartTimers.clear();
     };
   }, [tapScaleAnim]);
 
@@ -1364,6 +1377,8 @@ export default function HomeScreen() {
           styles.monsterImageWrapper,
           panelHeight > 0 && { bottom: panelHeight + 16 },
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Pet ${displayName}`}
       >
         <Animated.View
           style={[
