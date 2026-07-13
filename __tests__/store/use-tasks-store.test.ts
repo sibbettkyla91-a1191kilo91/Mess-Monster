@@ -24,6 +24,7 @@ beforeEach(() => {
     dailyRoll: getDailyRoll(localDayString()),
     dailyRollDate: localDayString(),
     taskProgress: {},
+    pendingRewards: [],
   });
 });
 
@@ -174,5 +175,122 @@ describe("dailyRoll store state", () => {
     useTasksStore.getState().refreshDailyRoll();
     expect(useTasksStore.getState().dailyRollDate).toBe(today);
     expect(useTasksStore.getState().dailyRoll).toHaveLength(6);
+  });
+});
+
+// ─── pending rewards: carry across day rollover ───────────────────────────────
+// Zero-shame rule: a reward earned but not collected before the day rolls over
+// must survive indefinitely, not vanish with the daily reset.
+
+describe("pending rewards across day rollover", () => {
+  /** Seed a stale roll date with one task sitting in reward_ready. */
+  const seedRewardReady = (rollDate: string) => {
+    const roll = getDailyRoll(rollDate);
+    const task = roll[0];
+    useTasksStore.setState({
+      dailyRollDate: rollDate,
+      dailyRoll: roll,
+      taskProgress: {
+        [task.id]: {
+          state: "reward_ready",
+          hasPhoto: false,
+          rewardInfo: {
+            basePoints: task.pointValue,
+            pointsMultiplier: 1,
+            finalPoints: task.pointValue,
+          },
+        },
+      },
+    });
+    return task;
+  };
+
+  it("an uncollected reward survives the rollover and stays claimable", () => {
+    const task = seedRewardReady("2020-01-01");
+
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    // Per-day state reset as usual…
+    expect(s.dailyRollDate).toBe(localDayString());
+    expect(s.taskProgress).toEqual({});
+    // …but the earned reward carried forward intact.
+    expect(s.pendingRewards).toHaveLength(1);
+    expect(s.pendingRewards[0]).toMatchObject({
+      taskId: task.id,
+      label: task.label,
+      category: task.category,
+      earnedDate: "2020-01-01",
+      rewardInfo: { finalPoints: task.pointValue },
+    });
+
+    // And it can still be claimed (removed from the queue).
+    useTasksStore.getState().claimPendingReward(s.pendingRewards[0].id);
+    expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
+  });
+
+  it("only reward_ready entries carry — claimed/idle/waiting are not queued", () => {
+    const roll = getDailyRoll("2020-01-01");
+    useTasksStore.setState({
+      dailyRollDate: "2020-01-01",
+      dailyRoll: roll,
+      taskProgress: {
+        [roll[0].id]: { state: "claimed", hasPhoto: false },
+        [roll[1].id]: { state: "idle", hasPhoto: false },
+        [roll[2].id]: {
+          state: "waiting",
+          hasPhoto: false,
+          waitStartedAt: Date.now(),
+        },
+      },
+    });
+
+    useTasksStore.getState().refreshDailyRoll();
+
+    expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
+    expect(useTasksStore.getState().taskProgress).toEqual({});
+  });
+
+  it("rewards stack across multiple missed days instead of overwriting", () => {
+    seedRewardReady("2020-01-01");
+    useTasksStore.getState().refreshDailyRoll();
+
+    // Second missed day: another reward left unclaimed, another rollover.
+    seedRewardReady("2020-01-02");
+    useTasksStore.getState().refreshDailyRoll();
+
+    const { pendingRewards } = useTasksStore.getState();
+    expect(pendingRewards).toHaveLength(2);
+    expect(pendingRewards.map((r) => r.earnedDate)).toEqual([
+      "2020-01-01",
+      "2020-01-02",
+    ]);
+    // Queue entries stay unique even if the same task id repeats across days.
+    expect(new Set(pendingRewards.map((r) => r.id)).size).toBe(2);
+  });
+
+  it("a same-day refresh does not touch the pending queue", () => {
+    const task = seedRewardReady("2020-01-01");
+    useTasksStore.getState().refreshDailyRoll();
+    expect(useTasksStore.getState().pendingRewards).toHaveLength(1);
+
+    // Roll date is now today; refreshing again must be a full no-op.
+    useTasksStore.getState().refreshDailyRoll();
+    expect(useTasksStore.getState().pendingRewards).toHaveLength(1);
+    expect(useTasksStore.getState().pendingRewards[0].taskId).toBe(task.id);
+  });
+
+  it("claimPendingReward removes only the matching reward", () => {
+    seedRewardReady("2020-01-01");
+    useTasksStore.getState().refreshDailyRoll();
+    seedRewardReady("2020-01-02");
+    useTasksStore.getState().refreshDailyRoll();
+
+    const [first, second] = useTasksStore.getState().pendingRewards;
+    useTasksStore.getState().claimPendingReward(first.id);
+
+    const remaining = useTasksStore.getState().pendingRewards;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe(second.id);
   });
 });

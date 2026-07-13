@@ -4,8 +4,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { RewardOutcome } from "@/constants/task-timers";
 import { localDayString } from "@/utils/local-day";
 
-import { getDailyRoll, PresetTask } from "./preset-tasks";
-import { CleaningTask } from "./types";
+import { getDailyRoll, PRESET_TASKS, PresetTask } from "./preset-tasks";
+import { CleaningTask, TaskCategory } from "./types";
 
 function todayStr(): string {
   return localDayString();
@@ -37,10 +37,32 @@ export interface TaskProgress {
   };
 }
 
+/**
+ * A reward that was earned (timer completed, reward rolled) but not yet
+ * collected when the day rolled over. Zero-shame rule: earned rewards never
+ * expire — they queue here until the player claims them, however long that
+ * takes. Kept separate from taskProgress so "did I do today's chore" and
+ * "did I collect a reward" stay independent pieces of state.
+ */
+export interface PendingReward {
+  /** Unique per earn: `${earnedDate}:${taskId}` */
+  id: string;
+  taskId: string;
+  label: string;
+  category: TaskCategory;
+  pointValue: number;
+  /** Roll date (YYYY-MM-DD, local) the reward was earned on */
+  earnedDate: string;
+  hasPhoto: boolean;
+  rewardInfo: NonNullable<TaskProgress["rewardInfo"]>;
+}
+
 interface TasksState {
   tasks: CleaningTask[];
   dailyRoll: PresetTask[];
   dailyRollDate: string;
+  /** Uncollected rewards carried across day rollovers; never expire. */
+  pendingRewards: PendingReward[];
   /**
    * Per-task progress for today's roll. Persisted so an app restart mid-wait
    * resumes the time lock (wall-clock based) instead of resetting to idle,
@@ -53,6 +75,8 @@ interface TasksState {
   clearHistory: () => void;
   refreshDailyRoll: () => void;
   setTaskProgress: (taskId: string, progress: TaskProgress) => void;
+  /** Remove a carried-over reward once collected. Points are awarded by the caller. */
+  claimPendingReward: (id: string) => void;
 }
 
 export const useTasksStore = create<TasksState>()(
@@ -62,6 +86,7 @@ export const useTasksStore = create<TasksState>()(
       dailyRoll: getDailyRoll(todayStr()),
       dailyRollDate: todayStr(),
       taskProgress: {},
+      pendingRewards: [],
 
       addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
       removeTask: (id) =>
@@ -70,29 +95,62 @@ export const useTasksStore = create<TasksState>()(
 
       refreshDailyRoll: () => {
         const today = todayStr();
-        if (get().dailyRollDate !== today) {
-          set({
-            dailyRoll: getDailyRoll(today),
-            dailyRollDate: today,
-            taskProgress: {},
+        const s = get();
+        if (s.dailyRollDate === today) return;
+
+        // Zero-shame rule: a reward that was earned but not tapped before the
+        // day rolled over must not vanish. Harvest reward_ready entries into
+        // the persistent queue before the per-day progress map resets.
+        const carried: PendingReward[] = [];
+        for (const [taskId, progress] of Object.entries(s.taskProgress)) {
+          if (progress.state !== "reward_ready" || !progress.rewardInfo)
+            continue;
+          const task =
+            s.dailyRoll.find((t) => t.id === taskId) ??
+            PRESET_TASKS.find((t) => t.id === taskId);
+          if (!task) continue;
+          carried.push({
+            id: `${s.dailyRollDate}:${taskId}`,
+            taskId,
+            label: task.label,
+            category: task.category,
+            pointValue: task.pointValue,
+            earnedDate: s.dailyRollDate,
+            hasPhoto: progress.hasPhoto,
+            rewardInfo: progress.rewardInfo,
           });
         }
+
+        set({
+          dailyRoll: getDailyRoll(today),
+          dailyRollDate: today,
+          taskProgress: {},
+          pendingRewards: [...s.pendingRewards, ...carried],
+        });
       },
 
       setTaskProgress: (taskId, progress) =>
         set((s) => ({
           taskProgress: { ...s.taskProgress, [taskId]: progress },
         })),
+
+      claimPendingReward: (id) =>
+        set((s) => ({
+          pendingRewards: s.pendingRewards.filter((r) => r.id !== id),
+        })),
     }),
     {
       name: "mm-tasks",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
       // v0 → v1: per-task progress is now persisted; older state just starts
       // with an empty progress map.
+      // v1 → v2: uncollected rewards carry across rollovers; older state
+      // starts with an empty queue.
       migrate: (persistedState: any): any => ({
         ...persistedState,
         taskProgress: persistedState?.taskProgress ?? {},
+        pendingRewards: persistedState?.pendingRewards ?? [],
       }),
       // After AsyncStorage rehydration, refresh the roll if the device date has
       // moved past the stored roll date (e.g. app left open overnight).

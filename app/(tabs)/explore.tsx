@@ -34,7 +34,11 @@ import { usePetStore } from "@/store/use-pet-store";
 import { usePhotoStore } from "@/store/use-photo-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
-import { TaskProgress, useTasksStore } from "@/store/use-tasks-store";
+import {
+  PendingReward,
+  TaskProgress,
+  useTasksStore,
+} from "@/store/use-tasks-store";
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
   kitchen: "\ud83c\udf73",
@@ -73,6 +77,8 @@ export default function TasksScreen() {
   // Persisted in the tasks store so a restart mid-wait resumes the time lock
   const taskProgress = useTasksStore((s) => s.taskProgress);
   const setTaskProgress = useTasksStore((s) => s.setTaskProgress);
+  const pendingRewards = useTasksStore((s) => s.pendingRewards);
+  const claimPendingReward = useTasksStore((s) => s.claimPendingReward);
 
   const [celebration, setCelebration] = useState<string | null>(null);
   const [rewardModal, setRewardModal] = useState<{
@@ -278,6 +284,55 @@ export default function TasksScreen() {
     ],
   );
 
+  // Claiming a reward carried over from an earlier day. Awards points and
+  // logs the task, but deliberately does NOT call recordActivity or
+  // checkStreakMilestones: streaks answer "did I clean today" and stay a
+  // per-day system, while reward collection is independent and never expires.
+  const handleClaimCarriedReward = useCallback(
+    (reward: PendingReward) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const { finalPoints } = reward.rewardInfo;
+      earnPoints(finalPoints);
+      trackEarned(finalPoints, reward.category);
+      addTask({
+        id: reward.taskId,
+        label: reward.label,
+        category: reward.category,
+        pointValue: reward.pointValue,
+        completedAt: Date.now(),
+      });
+      care();
+
+      claimPendingReward(reward.id);
+
+      const { outcome, basePoints, freeItemName } = reward.rewardInfo;
+      if (reward.hasPhoto && outcome) {
+        setRewardModal({ reward: outcome, basePoints, freeItemName });
+      } else {
+        showCelebration(`✨ +${finalPoints} pts claimed!`);
+      }
+
+      if (!notifPermissionAsked) {
+        markNotifPermissionAsked();
+        void requestNudgePermission().then((granted) => {
+          if (granted) void rescheduleDailyNudges(monsterName, true);
+        });
+      }
+    },
+    [
+      earnPoints,
+      trackEarned,
+      addTask,
+      care,
+      claimPendingReward,
+      showCelebration,
+      notifPermissionAsked,
+      markNotifPermissionAsked,
+      monsterName,
+    ],
+  );
+
   const completedCount = Object.values(taskProgress).filter(
     (p) => p.state === "claimed",
   ).length;
@@ -314,6 +369,62 @@ export default function TasksScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
+        {/* Rewards earned on earlier days that were never collected. They
+            never expire — zero shame, no lost progress. */}
+        {pendingRewards.length > 0 && (
+          <View style={styles.carriedSection}>
+            <ThemedText style={styles.carriedTitle}>
+              {"🎁"} Rewards waiting for you
+            </ThemedText>
+            <ThemedText style={styles.carriedSubtitle}>
+              Earned earlier — yours whenever you&apos;re ready.
+            </ThemedText>
+            {pendingRewards.map((reward) => (
+              <View
+                key={reward.id}
+                style={[
+                  styles.taskCard,
+                  isDark ? styles.taskCardDark : styles.taskCardLight,
+                ]}
+              >
+                <View style={styles.taskRow}>
+                  <View style={styles.taskInfo}>
+                    <ThemedText style={styles.taskLabel}>
+                      {reward.label}
+                    </ThemedText>
+                    <ThemedText style={styles.categoryLabel}>
+                      {CATEGORY_EMOJI[reward.category]}{" "}
+                      {reward.category.replace("_", " ")}
+                    </ThemedText>
+                  </View>
+                  <Text style={[styles.pointsText, { color: accent }]}>
+                    +{reward.rewardInfo.finalPoints}
+                  </Text>
+                </View>
+                {reward.rewardInfo.freeItemName && (
+                  <Text
+                    style={[
+                      styles.freeItemText,
+                      { color: isDark ? "#aaa" : "#666" },
+                    ]}
+                  >
+                    + {reward.rewardInfo.freeItemName}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  style={[styles.claimButton, { backgroundColor: accent }]}
+                  onPress={() => handleClaimCarriedReward(reward)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.claimButtonText}>
+                    {"🌟"} Claim Reward
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
         {dailyRoll.map((task) => {
           const progress = getProgress(task.id);
           const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
@@ -552,6 +663,9 @@ const styles = StyleSheet.create({
   },
   celebrationText: { fontWeight: "600", fontSize: 12 },
   list: { gap: 12, paddingBottom: 40 },
+  carriedSection: { gap: 12 },
+  carriedTitle: { fontSize: 16, fontWeight: "700" },
+  carriedSubtitle: { fontSize: 12, opacity: 0.5, marginTop: -8 },
   taskCard: {
     borderRadius: 16,
     borderWidth: 1,
