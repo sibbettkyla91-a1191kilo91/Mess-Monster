@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { getDecorSlot } from "@/store/decor-slots";
 import { AdultVariant, EvolutionStage } from "@/store/types";
 import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
@@ -980,6 +981,14 @@ export default function HomeScreen() {
   const isPremium = usePlayerStore((s) => s.isPremium);
   const router = useRouter();
 
+  // Pet taps and the upgrade action write to the player and pet stores; a
+  // write landing before AsyncStorage rehydration completes gets clobbered
+  // by the hydration merge. The habitat itself is display-only, so no
+  // loading state — mutating handlers just no-op until stores are ready.
+  const playerHydrated = useHasHydrated(usePlayerStore);
+  const petHydrated = useHasHydrated(usePetStore);
+  const hydrated = playerHydrated && petHydrated;
+
   // Manual entry point for the upgrade modal — the auto-popup only shows
   // once per stage, so non-premium users need a way to reopen it anytime.
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -1016,6 +1025,7 @@ export default function HomeScreen() {
 
   // ── Tap-to-react handler ────────────────────────────────────────────────────
   const handlePetTap = () => {
+    if (!hydrated) return;
     const canTap = recordTapReaction();
     if (!canTap) return; // Tap limit reached, do nothing
 
@@ -1505,6 +1515,7 @@ export default function HomeScreen() {
             setShowUpgradeModal(false);
           }}
           onUpgrade={() => {
+            if (!hydrated) return;
             // Placeholder: set premium true; real IAP wired in a future update
             setPremium(true);
             clearPremiumGate();

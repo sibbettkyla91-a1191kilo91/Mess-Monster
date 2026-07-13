@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
@@ -29,6 +31,13 @@ export default function StoreScreen() {
   const isOwned = useStoreStore((s) => s.isOwned);
   const consumeItem = useStoreStore((s) => s.useItem);
   const owned = useStoreStore((s) => s.owned);
+  // handleBuy writes to all three persisted stores; a purchase made before
+  // AsyncStorage rehydration completes gets clobbered when the hydration
+  // merge lands, so the shop stays closed until every store is hydrated.
+  const storeHydrated = useHasHydrated(useStoreStore);
+  const playerHydrated = useHasHydrated(usePlayerStore);
+  const petHydrated = useHasHydrated(usePetStore);
+  const hydrated = storeHydrated && playerHydrated && petHydrated;
   const scheme = useColorScheme();
   const isDark = scheme === "dark";
   const {
@@ -50,6 +59,10 @@ export default function StoreScreen() {
 
   const handleBuy = useCallback(
     (item: StoreItem) => {
+      // Backstop for the render gate below: never write to a store that
+      // hasn't finished rehydrating, or the write gets clobbered.
+      if (!hydrated) return;
+
       // Check if non-repeatable and already owned
       if (!item.repeatable && isOwned(item.id)) {
         showFeedback("\u2705 Already owned!");
@@ -71,18 +84,18 @@ export default function StoreScreen() {
         return;
       }
 
-      // Process purchase
-      const spent = spendPoints(item.price);
-      if (!spent) {
-        showFeedback("\ud83d\ude05 Not enough points!");
-        return;
-      }
-
+      // Grant the item before charging: if the app is killed between the
+      // two writes, the player keeps the item rather than losing points
+      // with nothing to show for it.
       const bought = buyItem(item);
       if (!bought) {
         showFeedback("\u274c Something went wrong");
         return;
       }
+
+      // Affordability was checked above; if points shifted underneath us
+      // the item stays granted \u2014 the failure mode always favors the player.
+      spendPoints(item.price);
 
       // For food and toys, auto-use immediately (they boost mood)
       if (item.repeatable) {
@@ -95,6 +108,7 @@ export default function StoreScreen() {
       }
     },
     [
+      hydrated,
       availablePoints,
       spendPoints,
       buyItem,
@@ -170,88 +184,98 @@ export default function StoreScreen() {
         ))}
       </View>
 
-      {/* Items grid */}
-      <ScrollView
-        contentContainerStyle={styles.itemsGrid}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredItems.map((item) => {
-          const ownedForever = !item.repeatable && isOwned(item.id);
-          const giftCount = item.repeatable
-            ? (owned[item.id]?.quantity ?? 0)
-            : 0;
-          const canAfford = availablePoints >= item.price;
+      {/* Items grid — held behind a brief loading moment on cold start so a
+          fast tap can't land before persisted purchases finish loading. */}
+      {!hydrated ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={accent} />
+          <ThemedText style={styles.loadingText}>Opening the shop…</ThemedText>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.itemsGrid}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredItems.map((item) => {
+            const ownedForever = !item.repeatable && isOwned(item.id);
+            const giftCount = item.repeatable
+              ? (owned[item.id]?.quantity ?? 0)
+              : 0;
+            const canAfford = availablePoints >= item.price;
 
-          return (
-            <View
-              key={item.id}
-              style={[
-                styles.itemCard,
-                isDark ? styles.itemCardDark : styles.itemCardLight,
-                ownedForever && styles.itemCardOwned,
-              ]}
-            >
-              <Text style={styles.itemEmoji}>{item.emoji}</Text>
-              <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-              <ThemedText style={styles.itemDesc}>
-                {item.description}
-              </ThemedText>
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.itemCard,
+                  isDark ? styles.itemCardDark : styles.itemCardLight,
+                  ownedForever && styles.itemCardOwned,
+                ]}
+              >
+                <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+                <ThemedText style={styles.itemDesc}>
+                  {item.description}
+                </ThemedText>
 
-              <View style={styles.itemFooter}>
-                {giftCount > 0 && (
-                  <View
-                    style={[
-                      styles.giftBadge,
-                      { backgroundColor: isDark ? accentDark : accentLight },
-                    ]}
-                  >
-                    <Text style={[styles.giftText, { color: accentText }]}>
-                      {"🎁"} {giftCount} gift
-                      {giftCount > 1 ? "s" : ""} ready
-                    </Text>
-                  </View>
-                )}
-                {ownedForever ? (
-                  <View
-                    style={[
-                      styles.ownedBadge,
-                      { backgroundColor: isDark ? accentDark : accentLight },
-                    ]}
-                  >
-                    <Text style={[styles.ownedText, { color: accentText }]}>
-                      {"\u2713"} Owned
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.buyButton,
-                      { backgroundColor: accent },
-                      !canAfford && giftCount === 0 && styles.buyButtonDisabled,
-                    ]}
-                    onPress={() => handleBuy(item)}
-                    activeOpacity={0.7}
-                    disabled={!canAfford && giftCount === 0}
-                  >
-                    <Text
+                <View style={styles.itemFooter}>
+                  {giftCount > 0 && (
+                    <View
                       style={[
-                        styles.buyButtonText,
-                        !canAfford &&
-                          giftCount === 0 &&
-                          styles.buyButtonTextDisabled,
+                        styles.giftBadge,
+                        { backgroundColor: isDark ? accentDark : accentLight },
                       ]}
                     >
-                      {giftCount > 0
-                        ? "\ud83c\udf81 Use a gift \u00b7 free"
-                        : `${item.repeatable ? "\ud83c\udf74 Use" : "\ud83d\uded2 Buy"} \u00b7 ${item.price} pts`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                      <Text style={[styles.giftText, { color: accentText }]}>
+                        {"🎁"} {giftCount} gift
+                        {giftCount > 1 ? "s" : ""} ready
+                      </Text>
+                    </View>
+                  )}
+                  {ownedForever ? (
+                    <View
+                      style={[
+                        styles.ownedBadge,
+                        { backgroundColor: isDark ? accentDark : accentLight },
+                      ]}
+                    >
+                      <Text style={[styles.ownedText, { color: accentText }]}>
+                        {"\u2713"} Owned
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.buyButton,
+                        { backgroundColor: accent },
+                        !canAfford &&
+                          giftCount === 0 &&
+                          styles.buyButtonDisabled,
+                      ]}
+                      onPress={() => handleBuy(item)}
+                      activeOpacity={0.7}
+                      disabled={!canAfford && giftCount === 0}
+                    >
+                      <Text
+                        style={[
+                          styles.buyButtonText,
+                          !canAfford &&
+                            giftCount === 0 &&
+                            styles.buyButtonTextDisabled,
+                        ]}
+                      >
+                        {giftCount > 0
+                          ? "\ud83c\udf81 Use a gift \u00b7 free"
+                          : `${item.repeatable ? "\ud83c\udf74 Use" : "\ud83d\uded2 Buy"} \u00b7 ${item.price} pts`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+            );
+          })}
+        </ScrollView>
+      )}
     </ThemedView>
   );
 }
@@ -320,6 +344,17 @@ const styles = StyleSheet.create({
   itemsGrid: {
     gap: 12,
     paddingBottom: 40,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingBottom: 80,
+  },
+  loadingText: {
+    fontSize: 14,
+    opacity: 0.6,
   },
   itemCard: {
     borderRadius: 16,

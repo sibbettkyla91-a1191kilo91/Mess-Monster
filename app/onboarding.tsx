@@ -1,6 +1,6 @@
 import { Redirect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { randomMonsterName } from "@/store/name-randomizer";
 import { usePlayerStore } from "@/store/use-player-store";
 
@@ -234,16 +235,12 @@ export default function OnboardingScreen() {
   const hasCompletedOnboarding = usePlayerStore(
     (s) => s.hasCompletedOnboarding,
   );
-  const [hydrated, setHydrated] = useState(() =>
-    usePlayerStore.persist.hasHydrated(),
-  );
+  // Renders nothing until the player store rehydrates: choosing a monster
+  // before the merge landed would be clobbered, and the completed-onboarding
+  // redirect can't be decided from pre-hydration defaults.
+  const hydrated = useHasHydrated(usePlayerStore);
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
-
-  useEffect(() => {
-    if (hydrated) return;
-    return usePlayerStore.persist.onFinishHydration(() => setHydrated(true));
-  }, [hydrated]);
 
   if (!hydrated) return null;
   if (hasCompletedOnboarding) return <Redirect href="/(tabs)" />;

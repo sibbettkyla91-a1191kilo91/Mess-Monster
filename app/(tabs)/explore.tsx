@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import {
   TASK_MIN_TIMES,
   rollReward,
 } from "@/constants/task-timers";
+import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import {
   requestNudgePermission,
@@ -66,6 +68,20 @@ export default function TasksScreen() {
   const checkStreakMilestones = usePetStore((s) => s.checkStreakMilestones);
   const addPhoto = usePhotoStore((s) => s.addPhoto);
   const buyItem = useStoreStore((s) => s.buyItem);
+  // The task flow writes to all five persisted stores; a write landing before
+  // AsyncStorage rehydration completes gets clobbered when the hydration
+  // merge arrives, so the task list stays closed until every store is ready.
+  const tasksHydrated = useHasHydrated(useTasksStore);
+  const playerHydrated = useHasHydrated(usePlayerStore);
+  const petHydrated = useHasHydrated(usePetStore);
+  const photoHydrated = useHasHydrated(usePhotoStore);
+  const storeHydrated = useHasHydrated(useStoreStore);
+  const hydrated =
+    tasksHydrated &&
+    playerHydrated &&
+    petHydrated &&
+    photoHydrated &&
+    storeHydrated;
   const scheme = useColorScheme();
   const {
     accent,
@@ -90,10 +106,12 @@ export default function TasksScreen() {
 
   const isDark = scheme === "dark";
 
-  // Refresh the roll when the screen mounts in case the date ticked over
+  // Refresh the roll when the screen mounts in case the date ticked over.
+  // Waits for hydration: pre-hydration the store still holds defaults, and
+  // the tasks store already refreshes itself in onRehydrateStorage.
   useEffect(() => {
-    refreshDailyRoll();
-  }, [refreshDailyRoll]);
+    if (hydrated) refreshDailyRoll();
+  }, [hydrated, refreshDailyRoll]);
 
   const getProgress = (taskId: string): TaskProgress => {
     return taskProgress[taskId] ?? { state: "idle", hasPhoto: false };
@@ -108,15 +126,19 @@ export default function TasksScreen() {
   // Step 1: User taps a task → moves to pending_photo state
   const handleTapTask = useCallback(
     (taskId: string) => {
+      // Backstop for the render gate: writes made before rehydration
+      // completes get clobbered by the hydration merge.
+      if (!hydrated) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setTaskProgress(taskId, { state: "pending_photo", hasPhoto: false });
     },
-    [setTaskProgress],
+    [hydrated, setTaskProgress],
   );
 
   // Step 2a: User takes a photo → then starts time lock
   const handleTakePhoto = useCallback(
     async (task: PresetTask) => {
+      if (!hydrated) return;
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
@@ -151,12 +173,13 @@ export default function TasksScreen() {
         waitStartedAt: Date.now(),
       });
     },
-    [addPhoto, setTaskProgress],
+    [hydrated, addPhoto, setTaskProgress],
   );
 
   // Step 2b: User skips photo → starts time lock anyway
   const handleSkipPhoto = useCallback(
     (taskId: string) => {
+      if (!hydrated) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setTaskProgress(taskId, {
         state: "waiting",
@@ -164,12 +187,13 @@ export default function TasksScreen() {
         waitStartedAt: Date.now(),
       });
     },
-    [setTaskProgress],
+    [hydrated, setTaskProgress],
   );
 
   // Step 3: Time lock expires → show claim button (don't award yet)
   const handleTimerComplete = useCallback(
     (task: PresetTask) => {
+      if (!hydrated) return;
       const progress = taskProgress[task.id];
       // Only transition out of "waiting" — guards against a duplicate reward
       // roll if the timer fires again across a remount.
@@ -223,12 +247,13 @@ export default function TasksScreen() {
         });
       }
     },
-    [taskProgress, buyItem, setTaskProgress],
+    [hydrated, taskProgress, buyItem, setTaskProgress],
   );
 
   // Step 4: User claims reward → award points and mark as claimed
   const handleClaimReward = useCallback(
     (task: PresetTask) => {
+      if (!hydrated) return;
       const progress = taskProgress[task.id];
       if (!progress || !progress.rewardInfo) return;
 
@@ -269,6 +294,7 @@ export default function TasksScreen() {
       }
     },
     [
+      hydrated,
       taskProgress,
       earnPoints,
       trackEarned,
@@ -290,6 +316,7 @@ export default function TasksScreen() {
   // per-day system, while reward collection is independent and never expires.
   const handleClaimCarriedReward = useCallback(
     (reward: PendingReward) => {
+      if (!hydrated) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const { finalPoints } = reward.rewardInfo;
@@ -321,6 +348,7 @@ export default function TasksScreen() {
       }
     },
     [
+      hydrated,
       earnPoints,
       trackEarned,
       addTask,
@@ -365,277 +393,293 @@ export default function TasksScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Rewards earned on earlier days that were never collected. They
+      {/* Task list — held behind a brief loading moment on cold start so a
+          fast tap can't land before persisted progress finishes loading. */}
+      {!hydrated ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={accent} />
+          <ThemedText style={styles.loadingText}>
+            Getting your tasks ready…
+          </ThemedText>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Rewards earned on earlier days that were never collected. They
             never expire — zero shame, no lost progress. */}
-        {pendingRewards.length > 0 && (
-          <View style={styles.carriedSection}>
-            <ThemedText style={styles.carriedTitle}>
-              {"🎁"} Rewards waiting for you
-            </ThemedText>
-            <ThemedText style={styles.carriedSubtitle}>
-              Earned earlier — yours whenever you&apos;re ready.
-            </ThemedText>
-            {pendingRewards.map((reward) => (
-              <View
-                key={reward.id}
-                style={[
-                  styles.taskCard,
-                  isDark ? styles.taskCardDark : styles.taskCardLight,
-                ]}
-              >
-                <View style={styles.taskRow}>
-                  <View style={styles.taskInfo}>
-                    <ThemedText style={styles.taskLabel}>
-                      {reward.label}
-                    </ThemedText>
-                    <ThemedText style={styles.categoryLabel}>
-                      {CATEGORY_EMOJI[reward.category]}{" "}
-                      {reward.category.replace("_", " ")}
-                    </ThemedText>
-                  </View>
-                  <Text style={[styles.pointsText, { color: accent }]}>
-                    +{reward.rewardInfo.finalPoints}
-                  </Text>
-                </View>
-                {reward.rewardInfo.freeItemName && (
-                  <Text
-                    style={[
-                      styles.freeItemText,
-                      { color: isDark ? "#aaa" : "#666" },
-                    ]}
-                  >
-                    + {reward.rewardInfo.freeItemName}
-                  </Text>
-                )}
-                <TouchableOpacity
-                  style={[styles.claimButton, { backgroundColor: accent }]}
-                  onPress={() => handleClaimCarriedReward(reward)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.claimButtonText}>
-                    {"🌟"} Claim Reward
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {dailyRoll.map((task) => {
-          const progress = getProgress(task.id);
-          const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
-
-          return (
-            <View
-              key={task.id}
-              style={[
-                styles.taskCard,
-                isDark ? styles.taskCardDark : styles.taskCardLight,
-                progress.state === "claimed" && styles.taskCardCompleted,
-              ]}
-            >
-              {/* Task header row */}
-              <View style={styles.taskRow}>
+          {pendingRewards.length > 0 && (
+            <View style={styles.carriedSection}>
+              <ThemedText style={styles.carriedTitle}>
+                {"🎁"} Rewards waiting for you
+              </ThemedText>
+              <ThemedText style={styles.carriedSubtitle}>
+                Earned earlier — yours whenever you&apos;re ready.
+              </ThemedText>
+              {pendingRewards.map((reward) => (
                 <View
+                  key={reward.id}
                   style={[
-                    styles.checkbox,
-                    progress.state === "claimed" && {
-                      backgroundColor: accent,
-                      borderColor: accent,
-                    },
+                    styles.taskCard,
+                    isDark ? styles.taskCardDark : styles.taskCardLight,
                   ]}
                 >
-                  {progress.state === "claimed" && (
-                    <Text style={styles.checkmark}>{"\u2713"}</Text>
-                  )}
-                </View>
-                <View style={styles.taskInfo}>
-                  <ThemedText
-                    style={[
-                      styles.taskLabel,
-                      progress.state === "claimed" && styles.taskLabelDone,
-                    ]}
-                  >
-                    {task.label}
-                  </ThemedText>
-                  <ThemedText style={styles.categoryLabel}>
-                    {CATEGORY_EMOJI[task.category]}{" "}
-                    {task.category.replace("_", " ")}
-                  </ThemedText>
-                </View>
-                <Text
-                  style={[
-                    styles.pointsText,
-                    progress.state === "claimed"
-                      ? { color: accent }
-                      : styles.pointsPending,
-                  ]}
-                >
-                  +{task.pointValue}
-                </Text>
-              </View>
-
-              {/* State: idle — show "Mark Done" button */}
-              {progress.state === "idle" && (
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: accent }]}
-                  onPress={() => handleTapTask(task.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {"\u2705"} Mark Done
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* State: pending_photo — show photo + skip options */}
-              {progress.state === "pending_photo" && (
-                <View style={styles.photoSection}>
-                  <Text
-                    style={[
-                      styles.photoPrompt,
-                      { color: isDark ? "#ccc" : "#555" },
-                    ]}
-                  >
-                    Take a photo for bonus rewards!
-                  </Text>
-                  <View style={styles.photoActions}>
-                    <TouchableOpacity
-                      style={[styles.photoButton, { backgroundColor: accent }]}
-                      onPress={() => handleTakePhoto(task)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.photoButtonText}>
-                        {"\ud83d\udcf8"} Snap Photo
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.skipButton}
-                      onPress={() => handleSkipPhoto(task.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.skipButtonText,
-                          { color: isDark ? "#888" : "#999" },
-                        ]}
-                      >
-                        Skip
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* State: waiting — show timer countdown */}
-              {progress.state === "waiting" && (
-                <View style={styles.waitingSection}>
-                  {progress.hasPhoto && (
-                    <View
-                      style={[
-                        styles.photoBadge,
-                        { backgroundColor: isDark ? accentDark : accentLight },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.photoBadgeText, { color: accentText }]}
-                      >
-                        {"\ud83d\udcf7"} Photo saved
-                      </Text>
+                  <View style={styles.taskRow}>
+                    <View style={styles.taskInfo}>
+                      <ThemedText style={styles.taskLabel}>
+                        {reward.label}
+                      </ThemedText>
+                      <ThemedText style={styles.categoryLabel}>
+                        {CATEGORY_EMOJI[reward.category]}{" "}
+                        {reward.category.replace("_", " ")}
+                      </ThemedText>
                     </View>
-                  )}
-                  <TaskTimer
-                    totalSeconds={minTime}
-                    startedAt={progress.waitStartedAt ?? Date.now()}
-                    onComplete={() => handleTimerComplete(task)}
-                    active={true}
-                  />
-                  <Text
-                    style={[
-                      styles.waitHint,
-                      { color: isDark ? "#888" : "#999" },
-                    ]}
-                  >
-                    Reward ready when timer expires...
-                  </Text>
-                </View>
-              )}
-
-              {/* State: reward_ready — show claim button with point breakdown */}
-              {progress.state === "reward_ready" && progress.rewardInfo && (
-                <View style={styles.rewardSection}>
-                  <View
-                    style={[
-                      styles.rewardBreakdown,
-                      { backgroundColor: isDark ? "#2a2a3e" : "#f5f5f5" },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.rewardLabel,
-                        { color: isDark ? "#ccc" : "#555" },
-                      ]}
-                    >
-                      Base: {progress.rewardInfo.basePoints} pts
-                    </Text>
-                    {progress.rewardInfo.pointsMultiplier > 1 && (
-                      <Text
-                        style={[
-                          styles.rewardLabel,
-                          { color: accent, fontWeight: "700" },
-                        ]}
-                      >
-                        × {progress.rewardInfo.pointsMultiplier.toFixed(1)}{" "}
-                        bonus
-                      </Text>
-                    )}
-                    <Text style={[styles.rewardTotal, { color: accent }]}>
-                      = {progress.rewardInfo.finalPoints} pts
+                    <Text style={[styles.pointsText, { color: accent }]}>
+                      +{reward.rewardInfo.finalPoints}
                     </Text>
                   </View>
-                  {progress.rewardInfo.freeItemName && (
+                  {reward.rewardInfo.freeItemName && (
                     <Text
                       style={[
                         styles.freeItemText,
                         { color: isDark ? "#aaa" : "#666" },
                       ]}
                     >
-                      + {progress.rewardInfo.freeItemName}
+                      + {reward.rewardInfo.freeItemName}
                     </Text>
                   )}
                   <TouchableOpacity
                     style={[styles.claimButton, { backgroundColor: accent }]}
-                    onPress={() => handleClaimReward(task)}
+                    onPress={() => handleClaimCarriedReward(reward)}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.claimButtonText}>
-                      {"\ud83c\udf1f"} Claim Reward
+                      {"🌟"} Claim Reward
                     </Text>
                   </TouchableOpacity>
                 </View>
-              )}
+              ))}
+            </View>
+          )}
 
-              {/* State: claimed — show verified badge */}
-              {progress.state === "claimed" && (
-                <View
-                  style={[
-                    styles.completedBadge,
-                    { backgroundColor: isDark ? accentDark : accentLight },
-                  ]}
-                >
-                  <Text style={[styles.completedText, { color: accentText }]}>
-                    {"\u2705"} Claimed
+          {dailyRoll.map((task) => {
+            const progress = getProgress(task.id);
+            const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
+
+            return (
+              <View
+                key={task.id}
+                style={[
+                  styles.taskCard,
+                  isDark ? styles.taskCardDark : styles.taskCardLight,
+                  progress.state === "claimed" && styles.taskCardCompleted,
+                ]}
+              >
+                {/* Task header row */}
+                <View style={styles.taskRow}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      progress.state === "claimed" && {
+                        backgroundColor: accent,
+                        borderColor: accent,
+                      },
+                    ]}
+                  >
+                    {progress.state === "claimed" && (
+                      <Text style={styles.checkmark}>{"\u2713"}</Text>
+                    )}
+                  </View>
+                  <View style={styles.taskInfo}>
+                    <ThemedText
+                      style={[
+                        styles.taskLabel,
+                        progress.state === "claimed" && styles.taskLabelDone,
+                      ]}
+                    >
+                      {task.label}
+                    </ThemedText>
+                    <ThemedText style={styles.categoryLabel}>
+                      {CATEGORY_EMOJI[task.category]}{" "}
+                      {task.category.replace("_", " ")}
+                    </ThemedText>
+                  </View>
+                  <Text
+                    style={[
+                      styles.pointsText,
+                      progress.state === "claimed"
+                        ? { color: accent }
+                        : styles.pointsPending,
+                    ]}
+                  >
+                    +{task.pointValue}
                   </Text>
                 </View>
-              )}
-            </View>
-          );
-        })}
-      </ScrollView>
+
+                {/* State: idle — show "Mark Done" button */}
+                {progress.state === "idle" && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: accent }]}
+                    onPress={() => handleTapTask(task.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {"\u2705"} Mark Done
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* State: pending_photo — show photo + skip options */}
+                {progress.state === "pending_photo" && (
+                  <View style={styles.photoSection}>
+                    <Text
+                      style={[
+                        styles.photoPrompt,
+                        { color: isDark ? "#ccc" : "#555" },
+                      ]}
+                    >
+                      Take a photo for bonus rewards!
+                    </Text>
+                    <View style={styles.photoActions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.photoButton,
+                          { backgroundColor: accent },
+                        ]}
+                        onPress={() => handleTakePhoto(task)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.photoButtonText}>
+                          {"\ud83d\udcf8"} Snap Photo
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.skipButton}
+                        onPress={() => handleSkipPhoto(task.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.skipButtonText,
+                            { color: isDark ? "#888" : "#999" },
+                          ]}
+                        >
+                          Skip
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* State: waiting — show timer countdown */}
+                {progress.state === "waiting" && (
+                  <View style={styles.waitingSection}>
+                    {progress.hasPhoto && (
+                      <View
+                        style={[
+                          styles.photoBadge,
+                          {
+                            backgroundColor: isDark ? accentDark : accentLight,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.photoBadgeText, { color: accentText }]}
+                        >
+                          {"\ud83d\udcf7"} Photo saved
+                        </Text>
+                      </View>
+                    )}
+                    <TaskTimer
+                      totalSeconds={minTime}
+                      startedAt={progress.waitStartedAt ?? Date.now()}
+                      onComplete={() => handleTimerComplete(task)}
+                      active={true}
+                    />
+                    <Text
+                      style={[
+                        styles.waitHint,
+                        { color: isDark ? "#888" : "#999" },
+                      ]}
+                    >
+                      Reward ready when timer expires...
+                    </Text>
+                  </View>
+                )}
+
+                {/* State: reward_ready — show claim button with point breakdown */}
+                {progress.state === "reward_ready" && progress.rewardInfo && (
+                  <View style={styles.rewardSection}>
+                    <View
+                      style={[
+                        styles.rewardBreakdown,
+                        { backgroundColor: isDark ? "#2a2a3e" : "#f5f5f5" },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.rewardLabel,
+                          { color: isDark ? "#ccc" : "#555" },
+                        ]}
+                      >
+                        Base: {progress.rewardInfo.basePoints} pts
+                      </Text>
+                      {progress.rewardInfo.pointsMultiplier > 1 && (
+                        <Text
+                          style={[
+                            styles.rewardLabel,
+                            { color: accent, fontWeight: "700" },
+                          ]}
+                        >
+                          × {progress.rewardInfo.pointsMultiplier.toFixed(1)}{" "}
+                          bonus
+                        </Text>
+                      )}
+                      <Text style={[styles.rewardTotal, { color: accent }]}>
+                        = {progress.rewardInfo.finalPoints} pts
+                      </Text>
+                    </View>
+                    {progress.rewardInfo.freeItemName && (
+                      <Text
+                        style={[
+                          styles.freeItemText,
+                          { color: isDark ? "#aaa" : "#666" },
+                        ]}
+                      >
+                        + {progress.rewardInfo.freeItemName}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.claimButton, { backgroundColor: accent }]}
+                      onPress={() => handleClaimReward(task)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.claimButtonText}>
+                        {"\ud83c\udf1f"} Claim Reward
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* State: claimed — show verified badge */}
+                {progress.state === "claimed" && (
+                  <View
+                    style={[
+                      styles.completedBadge,
+                      { backgroundColor: isDark ? accentDark : accentLight },
+                    ]}
+                  >
+                    <Text style={[styles.completedText, { color: accentText }]}>
+                      {"\u2705"} Claimed
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {/* Reward modal overlay */}
       {rewardModal && (
@@ -663,6 +707,17 @@ const styles = StyleSheet.create({
   },
   celebrationText: { fontWeight: "600", fontSize: 12 },
   list: { gap: 12, paddingBottom: 40 },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingBottom: 80,
+  },
+  loadingText: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
   carriedSection: { gap: 12 },
   carriedTitle: { fontSize: 16, fontWeight: "700" },
   carriedSubtitle: { fontSize: 12, opacity: 0.5, marginTop: -8 },
