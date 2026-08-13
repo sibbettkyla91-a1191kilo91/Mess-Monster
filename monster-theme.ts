@@ -17,6 +17,25 @@ export interface MonsterPalette {
   tabTint: string;
   /** Which monster this palette belongs to */
   monster: "nilly" | "luna";
+
+  /** Full-screen page background (Tasks / later shared chrome) */
+  page: string;
+  /** Default task / list card */
+  surface: string;
+  /** Elevated card (reward-ready, carried rewards) */
+  surfaceRaised: string;
+  /** Primary body / task name */
+  ink: string;
+  /** Secondary labels, hints, progress */
+  inkMuted: string;
+  /** Hairline edge (not a generic gray stroke) */
+  line: string;
+  /** Text on solid accent buttons */
+  accentInk: string;
+  /** Soft accent wash (badges, celebration, breakdown) */
+  accentSoft: string;
+  /** Text on accentSoft surfaces */
+  onSoft: string;
 }
 
 export const NILLY_PALETTE: MonsterPalette = {
@@ -26,6 +45,16 @@ export const NILLY_PALETTE: MonsterPalette = {
   text: "#1a5c3a",
   tabTint: "#52b788",
   monster: "nilly",
+
+  page: "#eef8f2",
+  surface: "#f7fdf9",
+  surfaceRaised: "#ffffff",
+  ink: "#1e3a2f",
+  inkMuted: "#5a7266",
+  line: "rgba(30,58,47,0.08)",
+  accentInk: "#ffffff",
+  accentSoft: "#b8f5c8",
+  onSoft: "#1a5c3a",
 };
 
 export const LUNA_PALETTE: MonsterPalette = {
@@ -35,6 +64,16 @@ export const LUNA_PALETTE: MonsterPalette = {
   text: "#f0e0e0",
   tabTint: "#cc2222",
   monster: "luna",
+
+  page: "#14121c",
+  surface: "#1c1826",
+  surfaceRaised: "#261c2e",
+  ink: "#f0e6d3",
+  inkMuted: "#9a8fa0",
+  line: "rgba(240,230,211,0.10)",
+  accentInk: "#f0e6d3",
+  accentSoft: "#3a1220",
+  onSoft: "#f0e0e0",
 };
 
 /** Fallback palette used before monster selection (defaults to Nilly) */

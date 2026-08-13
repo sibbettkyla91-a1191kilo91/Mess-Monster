@@ -2,20 +2,19 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
-  useColorScheme,
 } from "react-native";
 
 import { PhotoRewardModal } from "@/components/photo-reward-modal";
 import { TaskTimer } from "@/components/task-timer";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import {
   DEFAULT_MIN_TIME,
   FREE_ITEM_MAX_PRICE,
@@ -43,14 +42,20 @@ import {
 } from "@/store/use-tasks-store";
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
-  kitchen: "\ud83c\udf73",
-  bathroom: "\ud83d\udebf",
-  bedroom: "\ud83d\udecf",
-  living_room: "\ud83d\udecb",
-  laundry: "\ud83d\udc55",
-  trash: "\ud83d\uddd1",
-  other: "\ud83d\udce6",
+  kitchen: "🍳",
+  bathroom: "🛁",
+  bedroom: "🛏",
+  living_room: "🛋",
+  laundry: "👕",
+  trash: "🗑",
+  other: "📦",
 };
+
+const fontRounded = Platform.select({
+  ios: "ui-rounded",
+  android: "sans-serif-medium",
+  default: "system-ui",
+});
 
 export default function TasksScreen() {
   const addTask = useTasksStore((s) => s.addTask);
@@ -82,12 +87,18 @@ export default function TasksScreen() {
     petHydrated &&
     photoHydrated &&
     storeHydrated;
-  const scheme = useColorScheme();
   const {
     accent,
-    accentLight,
-    accentDark,
-    text: accentText,
+    accentInk,
+    accentSoft,
+    onSoft,
+    page,
+    surface,
+    surfaceRaised,
+    ink,
+    inkMuted,
+    line,
+    monster,
   } = useMonsterTheme();
 
   // Persisted in the tasks store so a restart mid-wait resumes the time lock
@@ -103,8 +114,22 @@ export default function TasksScreen() {
     freeItemName?: string;
   } | null>(null);
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
-  const isDark = scheme === "dark";
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (mounted) setReduceMotion(value);
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduceMotion,
+    );
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
 
   // Refresh the roll when the screen mounts in case the date ticked over.
   // Waits for hydration: pre-hydration the store still holds defaults, and
@@ -281,10 +306,10 @@ export default function TasksScreen() {
       if (progress.hasPhoto && outcome) {
         setRewardModal({ reward: outcome, basePoints, freeItemName });
       } else {
-        showCelebration(`\u2728 +${finalPoints} pts claimed!`);
+        showCelebration(`✨ +${finalPoints} pts claimed!`);
       }
 
-      // First reward claim is the moment we ask about gentle reminders \u2014
+      // First reward claim is the moment we ask about gentle reminders —
       // the loop just paid off, so the request has context. Asked once ever.
       if (!notifPermissionAsked) {
         markNotifPermissionAsked();
@@ -365,27 +390,52 @@ export default function TasksScreen() {
     (p) => p.state === "claimed",
   ).length;
 
+  const isLuna = monster === "luna";
+  const photoPrompt = isLuna
+    ? "Seal it with a photo?"
+    : "Photo for a better treat?";
+
+  const cardLift = isLuna
+    ? null
+    : {
+        shadowColor: ink,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+      };
+
+  const claimLift = {
+    shadowColor: accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 6,
+  };
+
+  const pressScale = (pressed: boolean) =>
+    reduceMotion ? 1 : pressed ? 0.98 : 1;
+
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: page }]}>
       <View style={styles.header}>
-        <ThemedText type="title">{"Today\u2019s Tasks"}</ThemedText>
+        <Text
+          style={[
+            styles.title,
+            { color: ink, fontFamily: fontRounded },
+          ]}
+        >
+          Today’s Tasks
+        </Text>
         <View style={styles.subrow}>
-          <ThemedText style={styles.count}>
+          <Text style={[styles.count, { color: inkMuted }]}>
             {completedCount}/{dailyRoll.length} done
-          </ThemedText>
+          </Text>
           {celebration && (
             <View
-              style={[
-                styles.celebrationPill,
-                { backgroundColor: isDark ? accentDark : accentLight },
-              ]}
+              style={[styles.celebrationPill, { backgroundColor: accentSoft }]}
             >
-              <Text
-                style={[
-                  styles.celebrationText,
-                  { color: isDark ? accentLight : accentText },
-                ]}
-              >
+              <Text style={[styles.celebrationText, { color: onSoft }]}>
                 {celebration}
               </Text>
             </View>
@@ -398,9 +448,9 @@ export default function TasksScreen() {
       {!hydrated ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
-          <ThemedText style={styles.loadingText}>
+          <Text style={[styles.loadingText, { color: inkMuted }]}>
             Getting your tasks ready…
-          </ThemedText>
+          </Text>
         </View>
       ) : (
         <ScrollView
@@ -411,53 +461,79 @@ export default function TasksScreen() {
             never expire — zero shame, no lost progress. */}
           {pendingRewards.length > 0 && (
             <View style={styles.carriedSection}>
-              <ThemedText style={styles.carriedTitle}>
-                {"🎁"} Rewards waiting for you
-              </ThemedText>
-              <ThemedText style={styles.carriedSubtitle}>
-                Earned earlier — yours whenever you&apos;re ready.
-              </ThemedText>
+              <Text style={[styles.carriedTitle, { color: ink }]}>
+                Rewards waiting for you
+              </Text>
+              <Text style={[styles.carriedSubtitle, { color: inkMuted }]}>
+                Earned earlier — yours whenever you're ready.
+              </Text>
               {pendingRewards.map((reward) => (
                 <View
                   key={reward.id}
                   style={[
                     styles.taskCard,
-                    isDark ? styles.taskCardDark : styles.taskCardLight,
+                    {
+                      backgroundColor: surfaceRaised,
+                      borderColor: line,
+                    },
+                    cardLift,
                   ]}
                 >
+                  <View
+                    style={[styles.carriedBar, { backgroundColor: accent }]}
+                  />
                   <View style={styles.taskRow}>
                     <View style={styles.taskInfo}>
-                      <ThemedText style={styles.taskLabel}>
+                      <Text
+                        style={[
+                          styles.taskLabel,
+                          { color: ink, fontFamily: fontRounded },
+                        ]}
+                      >
                         {reward.label}
-                      </ThemedText>
-                      <ThemedText style={styles.categoryLabel}>
+                      </Text>
+                      <Text style={[styles.categoryLabel, { color: inkMuted }]}>
                         {CATEGORY_EMOJI[reward.category]}{" "}
                         {reward.category.replace("_", " ")}
-                      </ThemedText>
+                      </Text>
                     </View>
-                    <Text style={[styles.pointsText, { color: accent }]}>
+                    <Text
+                      style={[
+                        styles.pointsText,
+                        { color: accent, fontFamily: fontRounded },
+                      ]}
+                    >
                       +{reward.rewardInfo.finalPoints}
                     </Text>
                   </View>
                   {reward.rewardInfo.freeItemName && (
-                    <Text
-                      style={[
-                        styles.freeItemText,
-                        { color: isDark ? "#aaa" : "#666" },
-                      ]}
-                    >
+                    <Text style={[styles.freeItemText, { color: inkMuted }]}>
                       + {reward.rewardInfo.freeItemName}
                     </Text>
                   )}
-                  <TouchableOpacity
-                    style={[styles.claimButton, { backgroundColor: accent }]}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.claimButton,
+                      { backgroundColor: accent },
+                      claimLift,
+                      {
+                        opacity: pressed ? 0.88 : 1,
+                        transform: [{ scale: pressScale(pressed) }],
+                      },
+                    ]}
                     onPress={() => handleClaimCarriedReward(reward)}
-                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Claim reward"
                   >
-                    <Text style={styles.claimButtonText}>
-                      {"🌟"} Claim Reward
+                    <Text
+                      style={[
+                        styles.claimButtonText,
+                        { color: accentInk, fontFamily: fontRounded },
+                      ]}
+                    >
+                      Claim reward
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               ))}
             </View>
@@ -466,14 +542,20 @@ export default function TasksScreen() {
           {dailyRoll.map((task) => {
             const progress = getProgress(task.id);
             const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
+            const isReady = progress.state === "reward_ready";
+            const isClaimed = progress.state === "claimed";
 
             return (
               <View
                 key={task.id}
                 style={[
                   styles.taskCard,
-                  isDark ? styles.taskCardDark : styles.taskCardLight,
-                  progress.state === "claimed" && styles.taskCardCompleted,
+                  {
+                    backgroundColor: isReady ? surfaceRaised : surface,
+                    borderColor: line,
+                    opacity: isClaimed ? 0.72 : 1,
+                  },
+                  cardLift,
                 ]}
               >
                 {/* Task header row */}
@@ -481,93 +563,116 @@ export default function TasksScreen() {
                   <View
                     style={[
                       styles.checkbox,
-                      progress.state === "claimed" && {
+                      { borderColor: line },
+                      isClaimed && {
                         backgroundColor: accent,
                         borderColor: accent,
                       },
                     ]}
                   >
-                    {progress.state === "claimed" && (
-                      <Text style={styles.checkmark}>{"\u2713"}</Text>
+                    {isClaimed && (
+                      <Text style={[styles.checkmark, { color: accentInk }]}>
+                        {"✓"}
+                      </Text>
                     )}
                   </View>
                   <View style={styles.taskInfo}>
-                    <ThemedText
+                    <Text
                       style={[
                         styles.taskLabel,
-                        progress.state === "claimed" && styles.taskLabelDone,
+                        {
+                          color: isClaimed ? inkMuted : ink,
+                          fontWeight: isClaimed ? "500" : "600",
+                          fontFamily: fontRounded,
+                        },
                       ]}
                     >
                       {task.label}
-                    </ThemedText>
-                    <ThemedText style={styles.categoryLabel}>
+                    </Text>
+                    <Text style={[styles.categoryLabel, { color: inkMuted }]}>
                       {CATEGORY_EMOJI[task.category]}{" "}
                       {task.category.replace("_", " ")}
-                    </ThemedText>
+                    </Text>
                   </View>
                   <Text
                     style={[
                       styles.pointsText,
-                      progress.state === "claimed"
-                        ? { color: accent }
-                        : styles.pointsPending,
+                      {
+                        color: accent,
+                        opacity: isClaimed ? 1 : 0.7,
+                        fontFamily: fontRounded,
+                      },
                     ]}
                   >
                     +{task.pointValue}
                   </Text>
                 </View>
 
-                {/* State: idle — show "Mark Done" button */}
+                {/* State: idle — show "Mark done" button */}
                 {progress.state === "idle" && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: accent }]}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      { backgroundColor: accent },
+                      {
+                        opacity: pressed ? 0.88 : 1,
+                        transform: [{ scale: pressScale(pressed) }],
+                      },
+                    ]}
                     onPress={() => handleTapTask(task.id)}
-                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mark done"
                   >
-                    <Text style={styles.actionButtonText}>
-                      {"\u2705"} Mark Done
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        { color: accentInk, fontFamily: fontRounded },
+                      ]}
+                    >
+                      Mark done
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
 
                 {/* State: pending_photo — show photo + skip options */}
                 {progress.state === "pending_photo" && (
                   <View style={styles.photoSection}>
-                    <Text
-                      style={[
-                        styles.photoPrompt,
-                        { color: isDark ? "#ccc" : "#555" },
-                      ]}
-                    >
-                      Take a photo for bonus rewards!
+                    <Text style={[styles.photoPrompt, { color: ink }]}>
+                      {photoPrompt}
                     </Text>
                     <View style={styles.photoActions}>
-                      <TouchableOpacity
-                        style={[
+                      <Pressable
+                        style={({ pressed }) => [
                           styles.photoButton,
                           { backgroundColor: accent },
+                          {
+                            opacity: pressed ? 0.88 : 1,
+                            transform: [{ scale: pressScale(pressed) }],
+                          },
                         ]}
                         onPress={() => handleTakePhoto(task)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.photoButtonText}>
-                          {"\ud83d\udcf8"} Snap Photo
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.skipButton}
-                        onPress={() => handleSkipPhoto(task.id)}
-                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel="Snap photo"
                       >
                         <Text
                           style={[
-                            styles.skipButtonText,
-                            { color: isDark ? "#888" : "#999" },
+                            styles.photoButtonText,
+                            { color: accentInk, fontFamily: fontRounded },
                           ]}
                         >
+                          Snap photo
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.skipButton}
+                        onPress={() => handleSkipPhoto(task.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Skip photo"
+                      >
+                        <Text style={[styles.skipButtonText, { color: inkMuted }]}>
                           Skip
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     </View>
                   </View>
                 )}
@@ -579,15 +684,11 @@ export default function TasksScreen() {
                       <View
                         style={[
                           styles.photoBadge,
-                          {
-                            backgroundColor: isDark ? accentDark : accentLight,
-                          },
+                          { backgroundColor: accentSoft },
                         ]}
                       >
-                        <Text
-                          style={[styles.photoBadgeText, { color: accentText }]}
-                        >
-                          {"\ud83d\udcf7"} Photo saved
+                        <Text style={[styles.photoBadgeText, { color: onSoft }]}>
+                          Photo saved
                         </Text>
                       </View>
                     )}
@@ -597,81 +698,80 @@ export default function TasksScreen() {
                       onComplete={() => handleTimerComplete(task)}
                       active={true}
                     />
-                    <Text
-                      style={[
-                        styles.waitHint,
-                        { color: isDark ? "#888" : "#999" },
-                      ]}
-                    >
+                    <Text style={[styles.waitHint, { color: inkMuted }]}>
                       Reward ready when timer expires...
                     </Text>
                   </View>
                 )}
 
                 {/* State: reward_ready — show claim button with point breakdown */}
-                {progress.state === "reward_ready" && progress.rewardInfo && (
+                {isReady && progress.rewardInfo && (
                   <View style={styles.rewardSection}>
                     <View
                       style={[
                         styles.rewardBreakdown,
-                        { backgroundColor: isDark ? "#2a2a3e" : "#f5f5f5" },
+                        { backgroundColor: accentSoft },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.rewardLabel,
-                          { color: isDark ? "#ccc" : "#555" },
-                        ]}
-                      >
+                      <Text style={[styles.rewardLabel, { color: inkMuted }]}>
                         Base: {progress.rewardInfo.basePoints} pts
                       </Text>
                       {progress.rewardInfo.pointsMultiplier > 1 && (
-                        <Text
-                          style={[
-                            styles.rewardLabel,
-                            { color: accent, fontWeight: "700" },
-                          ]}
-                        >
+                        <Text style={[styles.rewardLabel, { color: inkMuted }]}>
                           × {progress.rewardInfo.pointsMultiplier.toFixed(1)}{" "}
                           bonus
                         </Text>
                       )}
-                      <Text style={[styles.rewardTotal, { color: accent }]}>
+                      <Text
+                        style={[
+                          styles.rewardTotal,
+                          { color: accent, fontFamily: fontRounded },
+                        ]}
+                      >
                         = {progress.rewardInfo.finalPoints} pts
                       </Text>
                     </View>
                     {progress.rewardInfo.freeItemName && (
-                      <Text
-                        style={[
-                          styles.freeItemText,
-                          { color: isDark ? "#aaa" : "#666" },
-                        ]}
-                      >
+                      <Text style={[styles.freeItemText, { color: inkMuted }]}>
                         + {progress.rewardInfo.freeItemName}
                       </Text>
                     )}
-                    <TouchableOpacity
-                      style={[styles.claimButton, { backgroundColor: accent }]}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.claimButton,
+                        { backgroundColor: accent },
+                        claimLift,
+                        {
+                          opacity: pressed ? 0.88 : 1,
+                          transform: [{ scale: pressScale(pressed) }],
+                        },
+                      ]}
                       onPress={() => handleClaimReward(task)}
-                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Claim reward"
                     >
-                      <Text style={styles.claimButtonText}>
-                        {"\ud83c\udf1f"} Claim Reward
+                      <Text
+                        style={[
+                          styles.claimButtonText,
+                          { color: accentInk, fontFamily: fontRounded },
+                        ]}
+                      >
+                        Claim reward
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </View>
                 )}
 
                 {/* State: claimed — show verified badge */}
-                {progress.state === "claimed" && (
+                {isClaimed && (
                   <View
                     style={[
                       styles.completedBadge,
-                      { backgroundColor: isDark ? accentDark : accentLight },
+                      { backgroundColor: accentSoft },
                     ]}
                   >
-                    <Text style={[styles.completedText, { color: accentText }]}>
-                      {"\u2705"} Claimed
+                    <Text style={[styles.completedText, { color: onSoft }]}>
+                      Claimed
                     </Text>
                   </View>
                 )}
@@ -690,22 +790,31 @@ export default function TasksScreen() {
           onDismiss={() => setRewardModal(null)}
         />
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
+  container: { flex: 1, paddingTop: 54, paddingHorizontal: 20 },
   header: { marginBottom: 20, gap: 8 },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
   subrow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  count: { opacity: 0.5, fontSize: 14 },
+  count: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
   celebrationPill: {
-    borderRadius: 20,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 4,
     flexShrink: 1,
   },
-  celebrationText: { fontWeight: "600", fontSize: 12 },
+  celebrationText: { fontWeight: "700", fontSize: 13 },
   list: { gap: 12, paddingBottom: 40 },
   loadingWrap: {
     flex: 1,
@@ -716,20 +825,26 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    opacity: 0.6,
+    fontWeight: "500",
   },
   carriedSection: { gap: 12 },
-  carriedTitle: { fontSize: 16, fontWeight: "700" },
-  carriedSubtitle: { fontSize: 12, opacity: 0.5, marginTop: -8 },
+  carriedTitle: { fontSize: 13, fontWeight: "700" },
+  carriedSubtitle: { fontSize: 12, fontWeight: "500", marginTop: -8 },
   taskCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
+    padding: 16,
+    gap: 12,
   },
-  taskCardLight: { backgroundColor: "#f8f9fa", borderColor: "#e2e5e8" },
-  taskCardDark: { backgroundColor: "#1e2124", borderColor: "#2e3236" },
-  taskCardCompleted: { opacity: 0.7 },
+  carriedBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+  },
   taskRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -738,28 +853,35 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#aaa",
+    borderRadius: 7,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },
-  checkmark: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  checkmark: { fontSize: 13, fontWeight: "700" },
   taskInfo: { flex: 1, gap: 3 },
-  taskLabel: { fontSize: 16, fontWeight: "500" },
-  taskLabelDone: { opacity: 0.45 },
-  categoryLabel: { fontSize: 12, opacity: 0.5, textTransform: "capitalize" },
-  pointsText: { fontWeight: "700", fontSize: 15 },
-  pointsPending: { color: "#0a7ea4" },
+  taskLabel: { fontSize: 16, fontWeight: "600" },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  pointsText: {
+    fontWeight: "700",
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
+  },
   actionButton: {
-    paddingVertical: 10,
-    borderRadius: 10,
+    height: 48,
+    borderRadius: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
   actionButtonText: {
-    color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
   photoSection: {
     gap: 8,
@@ -776,22 +898,25 @@ const styles = StyleSheet.create({
   },
   photoButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+    height: 48,
+    borderRadius: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
   photoButtonText: {
-    color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
   skipButton: {
+    minHeight: 44,
     paddingVertical: 12,
     paddingHorizontal: 16,
+    justifyContent: "center",
   },
   skipButtonText: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   waitingSection: {
     gap: 6,
@@ -800,7 +925,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   photoBadgeText: {
     fontSize: 12,
@@ -808,14 +933,15 @@ const styles = StyleSheet.create({
   },
   waitHint: {
     fontSize: 12,
-    textAlign: "center",
+    fontWeight: "500",
     fontStyle: "italic",
+    textAlign: "center",
   },
   completedBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   completedText: {
     fontSize: 12,
@@ -834,23 +960,26 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   rewardTotal: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
     marginTop: 4,
+    fontVariant: ["tabular-nums"],
   },
   freeItemText: {
     fontSize: 12,
-    textAlign: "center",
+    fontWeight: "500",
     fontStyle: "italic",
+    textAlign: "center",
   },
   claimButton: {
-    paddingVertical: 14,
-    borderRadius: 10,
+    height: 52,
+    borderRadius: 16,
     alignItems: "center",
+    justifyContent: "center",
   },
   claimButtonText: {
-    color: "#fff",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 16,
+    letterSpacing: 0.3,
   },
 });

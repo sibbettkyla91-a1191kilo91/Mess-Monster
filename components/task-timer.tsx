@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, StyleSheet, Text, View } from "react-native";
 
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 
@@ -19,6 +19,12 @@ function remainingSeconds(startedAt: number, totalSeconds: number): number {
   return Math.max(0, totalSeconds - elapsed);
 }
 
+const fontRounded = Platform.select({
+  ios: "ui-rounded",
+  android: "sans-serif-medium",
+  default: "system-ui",
+});
+
 export function TaskTimer({
   totalSeconds,
   startedAt,
@@ -33,7 +39,7 @@ export function TaskTimer({
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
   const firedRef = useRef(false);
-  const { accent } = useMonsterTheme();
+  const { accent, ink, inkMuted, line } = useMonsterTheme();
 
   useEffect(() => {
     if (!active) return;
@@ -74,7 +80,7 @@ export function TaskTimer({
 
   return (
     <View style={styles.container}>
-      <View style={styles.barBackground}>
+      <View style={[styles.barBackground, { backgroundColor: line }]}>
         <View
           style={[
             styles.barFill,
@@ -82,11 +88,23 @@ export function TaskTimer({
           ]}
         />
       </View>
-      <Text style={[styles.timeText, { color: accent }]}>
-        {remaining > 0
-          ? `${minutes}:${seconds.toString().padStart(2, "0")} remaining`
-          : "Timer complete!"}
-      </Text>
+      {remaining > 0 ? (
+        <Text style={styles.timeRow}>
+          <Text
+            style={[
+              styles.timeNumeral,
+              { color: ink, fontFamily: fontRounded },
+            ]}
+          >
+            {minutes}:{seconds.toString().padStart(2, "0")}
+          </Text>
+          <Text style={[styles.timeHint, { color: inkMuted }]}> remaining</Text>
+        </Text>
+      ) : (
+        <Text style={[styles.timeHint, { color: inkMuted }]}>
+          Timer complete!
+        </Text>
+      )}
     </View>
   );
 }
@@ -99,16 +117,25 @@ const styles = StyleSheet.create({
   barBackground: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#e0e0e0",
     overflow: "hidden",
   },
   barFill: {
     height: "100%",
     borderRadius: 3,
   },
-  timeText: {
+  timeRow: {
+    textAlign: "center",
+  },
+  timeNumeral: {
+    fontSize: 28,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.3,
+  },
+  timeHint: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "500",
+    fontStyle: "italic",
     textAlign: "center",
   },
 });
