@@ -1,16 +1,15 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
-  useColorScheme,
 } from "react-native";
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { usePetStore } from "@/store/use-pet-store";
@@ -22,6 +21,12 @@ import {
   StoreCategory,
   StoreItem,
 } from "@/store/store-items";
+
+const fontRounded = Platform.select({
+  ios: "ui-rounded",
+  android: "sans-serif-medium",
+  default: "system-ui",
+});
 
 export default function StoreScreen() {
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
@@ -38,18 +43,39 @@ export default function StoreScreen() {
   const playerHydrated = useHasHydrated(usePlayerStore);
   const petHydrated = useHasHydrated(usePetStore);
   const hydrated = storeHydrated && playerHydrated && petHydrated;
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
   const {
     accent,
-    accentLight,
-    accentDark,
-    text: accentText,
+    accentInk,
+    accentSoft,
+    onSoft,
+    page,
+    surface,
+    surfaceRaised,
+    ink,
+    inkMuted,
+    line,
+    monster,
   } = useMonsterTheme();
 
   const [activeCategory, setActiveCategory] = useState<StoreCategory>("food");
   const [feedback, setFeedback] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (mounted) setReduceMotion(value);
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduceMotion,
+    );
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
 
   const showFeedback = useCallback((message: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -126,64 +152,80 @@ export default function StoreScreen() {
     (i) => i.category === activeCategory,
   );
 
+  const isLuna = monster === "luna";
+  const cardLift = isLuna
+    ? null
+    : {
+        shadowColor: ink,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+      };
+
+  const pressScale = (pressed: boolean) =>
+    reduceMotion ? 1 : pressed ? 0.98 : 1;
+
   return (
-    <ThemedView style={styles.container}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: page }]}>
       <View style={styles.header}>
-        <ThemedText type="title">Points Store</ThemedText>
-        <View style={styles.pointsBadge}>
-          <Text style={styles.pointsBadgeText}>
-            {"\u2b50"} {availablePoints} pts
+        <Text
+          style={[styles.title, { color: ink, fontFamily: fontRounded }]}
+        >
+          Points Store
+        </Text>
+        <View style={[styles.pointsBadge, { backgroundColor: accentSoft }]}>
+          <Text
+            style={[
+              styles.pointsBadgeText,
+              { color: onSoft, fontFamily: fontRounded },
+            ]}
+          >
+            {availablePoints} pts
           </Text>
         </View>
       </View>
 
-      {/* Feedback pill */}
       {feedback && (
-        <View
-          style={[
-            styles.feedbackPill,
-            { backgroundColor: isDark ? accentDark : accentLight },
-          ]}
-        >
-          <Text
-            style={[
-              styles.feedbackText,
-              { color: isDark ? accentLight : accentText },
-            ]}
-          >
+        <View style={[styles.feedbackPill, { backgroundColor: accentSoft }]}>
+          <Text style={[styles.feedbackText, { color: onSoft }]}>
             {feedback}
           </Text>
         </View>
       )}
 
-      {/* Category tabs */}
       <View style={styles.categoryRow}>
-        {STORE_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.key}
-            style={[
-              styles.categoryTab,
-              isDark && styles.categoryTabDark,
-              activeCategory === cat.key && {
-                backgroundColor: isDark ? accentDark : accentLight,
-              },
-            ]}
-            onPress={() => setActiveCategory(cat.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-            <Text
-              style={[
-                styles.categoryLabel,
-                isDark && styles.categoryLabelDark,
-                activeCategory === cat.key && { color: accentText },
+        {STORE_CATEGORIES.map((cat) => {
+          const active = activeCategory === cat.key;
+          return (
+            <Pressable
+              key={cat.key}
+              style={({ pressed }) => [
+                styles.categoryTab,
+                {
+                  backgroundColor: active ? accentSoft : surface,
+                  borderColor: active ? accentSoft : line,
+                  opacity: pressed ? 0.88 : 1,
+                  transform: [{ scale: pressScale(pressed) }],
+                },
               ]}
+              onPress={() => setActiveCategory(cat.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={cat.label}
             >
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+              <Text
+                style={[
+                  styles.categoryLabel,
+                  { color: active ? onSoft : inkMuted },
+                ]}
+              >
+                {cat.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Items grid — held behind a brief loading moment on cold start so a
@@ -191,7 +233,9 @@ export default function StoreScreen() {
       {!hydrated ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
-          <ThemedText style={styles.loadingText}>Opening the shop…</ThemedText>
+          <Text style={[styles.loadingText, { color: inkMuted }]}>
+            Opening the shop…
+          </Text>
         </View>
       ) : (
         <ScrollView
@@ -204,33 +248,47 @@ export default function StoreScreen() {
               ? (owned[item.id]?.quantity ?? 0)
               : 0;
             const canAfford = availablePoints >= item.price;
+            const canPress = canAfford || giftCount > 0;
 
             return (
               <View
                 key={item.id}
                 style={[
                   styles.itemCard,
-                  isDark ? styles.itemCardDark : styles.itemCardLight,
-                  ownedForever && styles.itemCardOwned,
+                  {
+                    backgroundColor: ownedForever ? surface : surfaceRaised,
+                    borderColor: line,
+                    opacity: ownedForever ? 0.72 : 1,
+                  },
+                  cardLift,
                 ]}
               >
                 <Text style={styles.itemEmoji}>{item.emoji}</Text>
-                <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                <ThemedText style={styles.itemDesc}>
+                <Text
+                  style={[
+                    styles.itemName,
+                    {
+                      color: ownedForever ? inkMuted : ink,
+                      fontFamily: fontRounded,
+                    },
+                  ]}
+                >
+                  {item.name}
+                </Text>
+                <Text style={[styles.itemDesc, { color: inkMuted }]}>
                   {item.description}
-                </ThemedText>
+                </Text>
 
                 <View style={styles.itemFooter}>
                   {giftCount > 0 && (
                     <View
                       style={[
                         styles.giftBadge,
-                        { backgroundColor: isDark ? accentDark : accentLight },
+                        { backgroundColor: accentSoft },
                       ]}
                     >
-                      <Text style={[styles.giftText, { color: accentText }]}>
-                        {"🎁"} {giftCount} gift
-                        {giftCount > 1 ? "s" : ""} ready
+                      <Text style={[styles.giftText, { color: onSoft }]}>
+                        {giftCount} gift{giftCount > 1 ? "s" : ""} ready
                       </Text>
                     </View>
                   )}
@@ -238,39 +296,49 @@ export default function StoreScreen() {
                     <View
                       style={[
                         styles.ownedBadge,
-                        { backgroundColor: isDark ? accentDark : accentLight },
+                        { backgroundColor: accentSoft },
                       ]}
                     >
-                      <Text style={[styles.ownedText, { color: accentText }]}>
-                        {"\u2713"} Owned
+                      <Text style={[styles.ownedText, { color: onSoft }]}>
+                        Owned
                       </Text>
                     </View>
                   ) : (
-                    <TouchableOpacity
-                      style={[
+                    <Pressable
+                      style={({ pressed }) => [
                         styles.buyButton,
-                        { backgroundColor: accent },
-                        !canAfford &&
-                          giftCount === 0 &&
-                          styles.buyButtonDisabled,
+                        {
+                          backgroundColor: canPress ? accent : line,
+                          opacity: pressed && canPress ? 0.88 : 1,
+                          transform: [
+                            { scale: canPress ? pressScale(pressed) : 1 },
+                          ],
+                        },
                       ]}
                       onPress={() => handleBuy(item)}
-                      activeOpacity={0.7}
-                      disabled={!canAfford && giftCount === 0}
+                      disabled={!canPress}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: !canPress }}
+                      accessibilityLabel={
+                        giftCount > 0
+                          ? "Use a gift, free"
+                          : `${item.repeatable ? "Use" : "Buy"} ${item.price} points`
+                      }
                     >
                       <Text
                         style={[
                           styles.buyButtonText,
-                          !canAfford &&
-                            giftCount === 0 &&
-                            styles.buyButtonTextDisabled,
+                          {
+                            color: canPress ? accentInk : inkMuted,
+                            fontFamily: fontRounded,
+                          },
                         ]}
                       >
                         {giftCount > 0
-                          ? "\ud83c\udf81 Use a gift \u00b7 free"
-                          : `${item.repeatable ? "\ud83c\udf74 Use" : "\ud83d\uded2 Buy"} \u00b7 ${item.price} pts`}
+                          ? "Use a gift · free"
+                          : `${item.repeatable ? "Use" : "Buy"} · ${item.price} pts`}
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   )}
                 </View>
               </View>
@@ -278,43 +346,49 @@ export default function StoreScreen() {
           })}
         </ScrollView>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 16,
+    paddingTop: 54,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    flexShrink: 1,
   },
   pointsBadge: {
-    backgroundColor: "#fef3c7",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 999,
   },
   pointsBadgeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    color: "#92400e",
+    fontVariant: ["tabular-nums"],
   },
   feedbackPill: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     alignSelf: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   feedbackText: {
-    fontWeight: "600",
-    fontSize: 14,
+    fontWeight: "700",
+    fontSize: 13,
   },
   categoryRow: {
     flexDirection: "row",
@@ -325,12 +399,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#f0f0f0",
+    borderRadius: 14,
+    borderWidth: 1,
     gap: 2,
-  },
-  categoryTabDark: {
-    backgroundColor: "#1e2124",
   },
   categoryEmoji: {
     fontSize: 18,
@@ -338,10 +409,7 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#666",
-  },
-  categoryLabelDark: {
-    color: "#aaa",
+    letterSpacing: 0.4,
   },
   itemsGrid: {
     gap: 12,
@@ -356,37 +424,26 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    opacity: 0.6,
+    fontWeight: "500",
   },
   itemCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-  },
-  itemCardLight: {
-    backgroundColor: "#fafafa",
-    borderColor: "#e8e8e8",
-  },
-  itemCardDark: {
-    backgroundColor: "#1e2124",
-    borderColor: "#2e3236",
-  },
-  itemCardOwned: {
-    opacity: 0.7,
+    gap: 4,
   },
   itemEmoji: {
     fontSize: 36,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   itemName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 2,
   },
   itemDesc: {
     fontSize: 13,
-    opacity: 0.6,
-    marginBottom: 12,
+    fontWeight: "500",
+    marginBottom: 10,
   },
   itemFooter: {
     flexDirection: "row",
@@ -397,7 +454,7 @@ const styles = StyleSheet.create({
   giftBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 12,
     marginRight: "auto",
   },
   giftText: {
@@ -405,28 +462,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   buyButton: {
+    height: 48,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  buyButtonDisabled: {
-    backgroundColor: "#ccc",
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 132,
   },
   buyButtonText: {
-    color: "#fff",
     fontWeight: "700",
-    fontSize: 13,
-  },
-  buyButtonTextDisabled: {
-    color: "#888",
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
   ownedBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
   },
   ownedText: {
-    fontWeight: "700",
-    fontSize: 13,
+    fontWeight: "600",
+    fontSize: 12,
   },
 });
