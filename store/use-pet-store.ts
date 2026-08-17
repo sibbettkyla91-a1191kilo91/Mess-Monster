@@ -45,6 +45,20 @@ function clamp(v: number): number {
   return Math.min(100, Math.max(0, v));
 }
 
+/** True only for a real, positive unix-ms timestamp that is not in the future. */
+function isValidTimestamp(value: unknown, now: number): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= now
+  );
+}
+
+function safeTimestamp(value: unknown, now: number): number {
+  return isValidTimestamp(value, now) ? value : now;
+}
+
 export function deriveMood(health: number, happiness: number): PetMood {
   const avg = (health + happiness) / 2;
   if (avg >= 75) return "thriving";
@@ -247,8 +261,19 @@ export const usePetStore = create<PetStore>()(
       applyDecay: () => {
         const now = Date.now();
         const { lastSessionAt, health, happiness } = get();
-        const elapsedHours = (now - lastSessionAt) / 3_600_000;
-        if (elapsedHours < MIN_DECAY_HOURS) return;
+        // Invalid / zero / missing / future timestamps must not be used for
+        // elapsed-time math. Epoch produces decades of decay; a future stamp
+        // produces negative elapsed time and would skip decay forever.
+        const safeLastSessionAt = safeTimestamp(lastSessionAt, now);
+        const elapsedHours = (now - safeLastSessionAt) / 3_600_000;
+        if (elapsedHours < MIN_DECAY_HOURS) {
+          // Persist a repair so a stuck 0/null/future timestamp doesn't keep
+          // short-circuiting decay on every subsequent session.
+          if (safeLastSessionAt !== lastSessionAt) {
+            set({ lastSessionAt: now });
+          }
+          return;
+        }
 
         set({
           health: clamp(health - HEALTH_DECAY_RATE * elapsedHours),
@@ -259,7 +284,7 @@ export const usePetStore = create<PetStore>()(
     }),
     {
       name: "mm-pet",
-      version: 1,
+      version: 2,
       migrate: (persistedState: any): any => {
         // Migrate from old integer stage (0=hatchling, 1=growing, 2=mature, 3=evolved)
         const STAGE_MAP: Record<number, EvolutionStage> = {
@@ -274,6 +299,7 @@ export const usePetStore = create<PetStore>()(
             ? (STAGE_MAP[oldStage] ?? "egg")
             : (oldStage ?? "egg");
 
+        const now = Date.now();
         return {
           adultVariant: "base",
           categoryCompletions: {},
@@ -282,7 +308,9 @@ export const usePetStore = create<PetStore>()(
           premiumGateShownFor: null,
           ...persistedState,
           evolutionStage: migratedStage,
-          lastSessionAt: Date.now(),
+          // Repair only — never overwrite a legitimate existing timestamp.
+          lastSessionAt: safeTimestamp(persistedState?.lastSessionAt, now),
+          lastCaredAt: safeTimestamp(persistedState?.lastCaredAt, now),
         };
       },
       storage: createJSONStorage(() => AsyncStorage),
@@ -291,12 +319,17 @@ export const usePetStore = create<PetStore>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           const afterHydrate = () => {
+            const now = Date.now();
+            const lastCaredAt = safeTimestamp(state.lastCaredAt, now);
+            if (lastCaredAt !== state.lastCaredAt) {
+              usePetStore.setState({ lastCaredAt });
+            }
             state.applyDecay();
             // Re-plan the nudge window from fresh persisted state (days may
             // have passed since the last session). No-ops without permission.
             const { monsterName } = usePlayerStore.getState();
             const caredToday =
-              localDayString(new Date(state.lastCaredAt)) === localDayString();
+              localDayString(new Date(lastCaredAt)) === localDayString();
             void rescheduleDailyNudges(monsterName, caredToday);
           };
           // Use setImmediate to schedule decay on the next event loop iteration.
