@@ -212,4 +212,34 @@ describe("applyDecay()", () => {
     expect(happiness).toBeGreaterThanOrEqual(0);
     expect(happiness).toBeLessThanOrEqual(100);
   });
+
+  it("repairs a future lastSessionAt instead of skipping decay forever", () => {
+    const before = Date.now();
+    usePetStore.setState({
+      health: 80,
+      happiness: 75,
+      lastSessionAt: Date.now() + 7 * 24 * 3_600_000,
+    });
+    usePetStore.getState().applyDecay();
+    const { health, happiness, lastSessionAt } = usePetStore.getState();
+    expect(health).toBe(80);
+    expect(happiness).toBe(75);
+    expect(lastSessionAt).toBeGreaterThanOrEqual(before);
+    expect(lastSessionAt).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("applies normal decay on the next session after a future stamp is repaired", () => {
+    usePetStore.setState({
+      health: 100,
+      happiness: 100,
+      lastSessionAt: Date.now() + 3_600_000,
+    });
+    usePetStore.getState().applyDecay();
+    expect(usePetStore.getState().health).toBe(100);
+
+    usePetStore.setState({ lastSessionAt: hoursAgo(2) });
+    usePetStore.getState().applyDecay();
+    expect(usePetStore.getState().health).toBeCloseTo(97, 0);
+    expect(usePetStore.getState().happiness).toBeCloseTo(96, 0);
+  });
 });

@@ -45,13 +45,18 @@ function clamp(v: number): number {
   return Math.min(100, Math.max(0, v));
 }
 
-/** True only for a real, positive unix-ms timestamp. Rejects 0 / null / NaN / non-numbers. */
-function isValidTimestamp(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
+/** True only for a real, positive unix-ms timestamp that is not in the future. */
+function isValidTimestamp(value: unknown, now: number): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= now
+  );
 }
 
-function safeTimestamp(value: unknown, fallback: number): number {
-  return isValidTimestamp(value) ? value : fallback;
+function safeTimestamp(value: unknown, now: number): number {
+  return isValidTimestamp(value, now) ? value : now;
 }
 
 export function deriveMood(health: number, happiness: number): PetMood {
@@ -256,12 +261,13 @@ export const usePetStore = create<PetStore>()(
       applyDecay: () => {
         const now = Date.now();
         const { lastSessionAt, health, happiness } = get();
-        // Invalid / zero / missing timestamps must not be treated as 1970 —
-        // that produces decades of elapsed time and instantly floors the pet.
+        // Invalid / zero / missing / future timestamps must not be used for
+        // elapsed-time math. Epoch produces decades of decay; a future stamp
+        // produces negative elapsed time and would skip decay forever.
         const safeLastSessionAt = safeTimestamp(lastSessionAt, now);
         const elapsedHours = (now - safeLastSessionAt) / 3_600_000;
         if (elapsedHours < MIN_DECAY_HOURS) {
-          // Persist a repair so a stuck 0/null timestamp doesn't keep
+          // Persist a repair so a stuck 0/null/future timestamp doesn't keep
           // short-circuiting decay on every subsequent session.
           if (safeLastSessionAt !== lastSessionAt) {
             set({ lastSessionAt: now });

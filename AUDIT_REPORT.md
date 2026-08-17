@@ -2,6 +2,8 @@
 
 **Date:** 2026-06-26 | **Auditor:** Claude Code (claude-sonnet-4-6) | **Branch:** main
 
+**Follow-up (2026-08-17):** Pet decay clamp + timestamp initialization findings below are resolved on `fix/p0-pet-decay-timestamp-init` (PR #5). Other audit items are unchanged.
+
 ---
 
 ## 1. FEATURE STATUS
@@ -13,7 +15,7 @@
 | Task logging                                                  | `app/(tabs)/explore.tsx`                                                                                                                  | Full    |
 | Points store                                                  | `app/(tabs)/store.tsx`                                                                                                                    | Full    |
 | Zustand + AsyncStorage data layer                             | `store/use-player-store.ts`, `store/use-pet-store.ts`, `store/use-tasks-store.ts`, `store/use-store-store.ts`, `store/use-photo-store.ts` | Full    |
-| Stat decay + offline catch-up                                 | `store/use-pet-store.ts` (`applyDecay`, rehydration hook)                                                                                 | Partial |
+| Stat decay + offline catch-up                                 | `store/use-pet-store.ts` (`applyDecay`, rehydration hook)                                                                                 | Full    |
 | Daily chore roll (date-seeded, category-balanced)             | `store/preset-tasks.ts` (`getDailyRoll`), `store/use-tasks-store.ts` (`refreshDailyRoll`)                                                 | Full    |
 | Health/happiness bars                                         | `app/(tabs)/index.tsx` (stat bar section)                                                                                                 | Full    |
 | Mood overlays                                                 | `app/(tabs)/index.tsx` (`MOOD_CONFIG`, `deriveMood`)                                                                                      | Full    |
@@ -31,11 +33,11 @@
 
 ## 2. CRITICAL & LOGIC BUGS
 
-**[High] `store/use-pet-store.ts` (`applyDecay`) — Decay can produce negative stat values**
-No floor clamp is applied after subtracting hours × rate. If `lastCaredAt` is very old (e.g., 100+ hours), `health` and `happiness` will go deeply negative, not stop at 0. This causes `deriveMood` to receive values below its `< 15` threshold correctly, but downstream display and care calculations assume 0–100 range. Any future arithmetic on raw stat values (e.g., percentage display) will render negative numbers or NaN if divided.
+**[Resolved 2026-08-17] `store/use-pet-store.ts` (`applyDecay`) — Decay can produce negative stat values**
+Fixed. `applyDecay` (and care / addHappiness) already pass results through the existing `clamp()` helper (`Math.min(100, Math.max(0, v))`). Long absences floor at 0; values never go above 100. Covered by `clamps stats to 0 — never goes negative` in `__tests__/store/use-pet-store.test.ts`.
 
-**[High] `store/use-pet-store.ts` (`applyDecay`) — Offline catch-up ignores elapsed time since last _session_, not last care**
-`applyDecay` uses `lastCaredAt` as the decay origin. If the user cares for the pet and then opens the app 48 hours later without caring, decay is correctly calculated. However, if `lastCaredAt` is `null` or `0` (new saves before first care action), `Date.now() - 0` yields a ~57-year elapsed time, causing instant maximum decay or negative stats on first launch. The initial `lastCaredAt` is not set to `Date.now()` at store initialization; it is set to `0` via the `PetState` default shape inferred from the type.
+**[Resolved 2026-08-17] `store/use-pet-store.ts` (`applyDecay`) — Invalid timestamps produce decades of elapsed time or skip decay**
+Fixed. Initial state sets both `lastCaredAt` and `lastSessionAt` to `Date.now()`. Decay uses `lastSessionAt` (not `lastCaredAt`). A timestamp is used only when it is a finite number `> 0` and `<= now`; `0` / `null` / missing / non-numeric / future values are treated as now (no invented elapsed time) and persisted so later sessions decay normally. Migration (persist v2) and the rehydration / daily-nudge path repair only invalid stamps and preserve valid ones.
 
 **[High] `store/use-pet-store.ts` — Ascended evolution threshold defined but never triggered**
 `checkEvolution` contains no branch for `stage === 'adult'` → `ascended`. The ascended stage exists in `EvolutionStage` type (`store/types.ts`) and in the pet store's migration, but there is no points/days threshold, no trigger call, and no sprite or UI for it. Users who reach adult will never progress further, silently.
@@ -108,7 +110,7 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 | -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Core loop            | 4      | Task → reward → care → evolution loop is coherent and well-implemented; blocked only by missing ascended stage and decor rendering.                                               |
 | UI / screens         | 4      | Home screen is polished with particle system, animations, mood overlays, and themed variants; explore and store screens are functional but lack animation polish.                 |
-| Data persistence     | 3      | Five Zustand stores with AsyncStorage are well-structured, but cross-store rehydration ordering is unsafe and the negative-stat decay bug is a data-integrity risk.               |
+| Data persistence     | 3      | Five Zustand stores with AsyncStorage are well-structured, but cross-store rehydration ordering is unsafe. The negative-stat / invalid-timestamp decay bugs are resolved (clamp + timestamp sanitization, 2026-08-17). |
 | Evolution system     | 3      | Egg→Baby→Teen→Adult thresholds and adult variant logic are solid; ascended stage is entirely unimplemented and the premium-gate desync bug can permanently block adult evolution. |
 | Premium gating       | 1      | Gate UI exists but `setPremium(true)` bypasses all payment — shipping this is a revenue loss and potential store policy violation.                                                |
 | Production readiness | 1      | No EAS config, no real IAP, no crash reporting, no privacy policy, missing Play Store assets, and a dev-only tab that crashes on launch. Not shippable in current state.          |
@@ -119,7 +121,7 @@ The `addPhoto` method prepends and the 200-record cap is mentioned in comments, 
 
 ### Blockers — Must-fix before launch
 
-1. **Fix negative stat decay:** Add `Math.max(0, ...)` clamp to both `health` and `happiness` after decay calculation in `store/use-pet-store.ts` (`applyDecay`). Also initialize `lastCaredAt` to `Date.now()` in the default state, not `0`.
+1. ~~**Fix negative stat decay:** Add `Math.max(0, ...)` clamp to both `health` and `happiness` after decay calculation in `store/use-pet-store.ts` (`applyDecay`). Also initialize `lastCaredAt` to `Date.now()` in the default state, not `0`.~~ **Done (2026-08-17):** existing `clamp()` is applied on every decay/care write; both timestamps initialize to `Date.now()`; invalid / future stamps are sanitized in `applyDecay`, migrate, and rehydration.
 2. **Remove or guard the debug-sprites tab:** Either create `app/(tabs)/debug-sprites.tsx` or wrap the tab definition in `app/(tabs)/_layout.tsx` with a `__DEV__ &&` conditional to prevent the route resolution crash in all builds.
 3. **Integrate RevenueCat (or equivalent IAP):** Replace `setPremium(true)` with a real purchase flow, receipt validation, and restore-purchases button. The current gate is trivially bypassable.
 4. **Implement ascended stage:** Add evolution trigger (`stage === 'adult'` branch in `checkEvolution`), a threshold (e.g., 1000 points + 30 days), a silhouette sprite, and the "?" overlay in `app/(tabs)/index.tsx`.
