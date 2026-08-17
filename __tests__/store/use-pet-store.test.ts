@@ -6,6 +6,10 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/utils/daily-nudge", () => ({
+  rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
+}));
+
 const hoursAgo = (h: number) => Date.now() - h * 3_600_000;
 
 beforeEach(() => {
@@ -168,5 +172,44 @@ describe("applyDecay()", () => {
     // happiness: 100 - 2.0 * 60 = 0 (clamped)
     // avg = 5 → sick
     expect(deriveMood(health, happiness)).toBe("sick");
+  });
+
+  it.each([0, null, undefined, NaN, "not-a-time"] as const)(
+    "does not apply decades of decay when lastSessionAt is %p",
+    (badStamp) => {
+      const before = Date.now();
+      usePetStore.setState({
+        health: 80,
+        happiness: 75,
+        lastSessionAt: badStamp as unknown as number,
+      });
+      usePetStore.getState().applyDecay();
+      const { health, happiness, lastSessionAt } = usePetStore.getState();
+      expect(health).toBe(80);
+      expect(happiness).toBe(75);
+      expect(health).toBeGreaterThanOrEqual(0);
+      expect(health).toBeLessThanOrEqual(100);
+      expect(happiness).toBeGreaterThanOrEqual(0);
+      expect(happiness).toBeLessThanOrEqual(100);
+      expect(lastSessionAt).toBeGreaterThanOrEqual(before);
+    },
+  );
+
+  it("preserves a valid lastSessionAt and still applies normal decay", () => {
+    usePetStore.setState({
+      health: 100,
+      happiness: 100,
+      lastSessionAt: hoursAgo(4),
+    });
+    usePetStore.getState().applyDecay();
+    const { health, happiness } = usePetStore.getState();
+    // health:    100 - 1.5 * 4 = 94
+    // happiness: 100 - 2.0 * 4 = 92
+    expect(health).toBeCloseTo(94, 0);
+    expect(happiness).toBeCloseTo(92, 0);
+    expect(health).toBeGreaterThanOrEqual(0);
+    expect(health).toBeLessThanOrEqual(100);
+    expect(happiness).toBeGreaterThanOrEqual(0);
+    expect(happiness).toBeLessThanOrEqual(100);
   });
 });
