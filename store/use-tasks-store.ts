@@ -75,8 +75,10 @@ interface TasksState {
   clearHistory: () => void;
   refreshDailyRoll: () => void;
   setTaskProgress: (taskId: string, progress: TaskProgress) => void;
-  /** Remove a carried-over reward once collected. Points are awarded by the caller. */
-  claimPendingReward: (id: string) => void;
+  /** Atomically reserve a ready reward for collection. Points are awarded by the caller. */
+  claimTaskReward: (taskId: string) => TaskProgress | null;
+  /** Atomically remove and return a carried-over reward. Points are awarded by the caller. */
+  claimPendingReward: (id: string) => PendingReward | null;
 }
 
 export const useTasksStore = create<TasksState>()(
@@ -134,10 +136,28 @@ export const useTasksStore = create<TasksState>()(
           taskProgress: { ...s.taskProgress, [taskId]: progress },
         })),
 
-      claimPendingReward: (id) =>
+      claimTaskReward: (taskId) => {
+        const progress = get().taskProgress[taskId];
+        if (progress?.state !== "reward_ready" || !progress.rewardInfo) {
+          return null;
+        }
+        set((s) => ({
+          taskProgress: {
+            ...s.taskProgress,
+            [taskId]: { ...progress, state: "claimed" },
+          },
+        }));
+        return progress;
+      },
+
+      claimPendingReward: (id) => {
+        const reward = get().pendingRewards.find((r) => r.id === id);
+        if (!reward) return null;
         set((s) => ({
           pendingRewards: s.pendingRewards.filter((r) => r.id !== id),
-        })),
+        }));
+        return reward;
+      },
     }),
     {
       name: "mm-tasks",

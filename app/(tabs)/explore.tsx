@@ -105,6 +105,7 @@ export default function TasksScreen() {
   const taskProgress = useTasksStore((s) => s.taskProgress);
   const setTaskProgress = useTasksStore((s) => s.setTaskProgress);
   const pendingRewards = useTasksStore((s) => s.pendingRewards);
+  const claimTaskReward = useTasksStore((s) => s.claimTaskReward);
   const claimPendingReward = useTasksStore((s) => s.claimPendingReward);
 
   const [celebration, setCelebration] = useState<string | null>(null);
@@ -279,10 +280,10 @@ export default function TasksScreen() {
   const handleClaimReward = useCallback(
     (task: PresetTask) => {
       if (!hydrated) return;
-      const progress = taskProgress[task.id];
-      if (!progress || !progress.rewardInfo) return;
+      const progress = claimTaskReward(task.id);
+      if (!progress) return;
 
-      const { finalPoints } = progress.rewardInfo;
+      const { finalPoints } = progress.rewardInfo!;
 
       // Strong success haptic feedback for reward claim
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -297,12 +298,9 @@ export default function TasksScreen() {
       checkStreakMilestones();
       care();
 
-      // Mark as claimed
-      setTaskProgress(task.id, { ...progress, state: "claimed" });
-
       // Photo-verified tasks get the full celebration modal; others get the
       // lightweight pill.
-      const { outcome, basePoints, freeItemName } = progress.rewardInfo;
+      const { outcome, basePoints, freeItemName } = progress.rewardInfo!;
       if (progress.hasPhoto && outcome) {
         setRewardModal({ reward: outcome, basePoints, freeItemName });
       } else {
@@ -320,7 +318,7 @@ export default function TasksScreen() {
     },
     [
       hydrated,
-      taskProgress,
+      claimTaskReward,
       earnPoints,
       trackEarned,
       addTask,
@@ -328,7 +326,6 @@ export default function TasksScreen() {
       checkStreakMilestones,
       care,
       showCelebration,
-      setTaskProgress,
       notifPermissionAsked,
       markNotifPermissionAsked,
       monsterName,
@@ -342,24 +339,24 @@ export default function TasksScreen() {
   const handleClaimCarriedReward = useCallback(
     (reward: PendingReward) => {
       if (!hydrated) return;
+      const claimedReward = claimPendingReward(reward.id);
+      if (!claimedReward) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      const { finalPoints } = reward.rewardInfo;
+      const { finalPoints } = claimedReward.rewardInfo;
       earnPoints(finalPoints);
-      trackEarned(finalPoints, reward.category);
+      trackEarned(finalPoints, claimedReward.category);
       addTask({
-        id: reward.taskId,
-        label: reward.label,
-        category: reward.category,
-        pointValue: reward.pointValue,
+        id: claimedReward.taskId,
+        label: claimedReward.label,
+        category: claimedReward.category,
+        pointValue: claimedReward.pointValue,
         completedAt: Date.now(),
       });
       care();
 
-      claimPendingReward(reward.id);
-
-      const { outcome, basePoints, freeItemName } = reward.rewardInfo;
-      if (reward.hasPhoto && outcome) {
+      const { outcome, basePoints, freeItemName } = claimedReward.rewardInfo;
+      if (claimedReward.hasPhoto && outcome) {
         setRewardModal({ reward: outcome, basePoints, freeItemName });
       } else {
         showCelebration(`✨ +${finalPoints} pts claimed!`);

@@ -1,6 +1,6 @@
 import { getDailyRoll, PRESET_TASKS } from "@/store/preset-tasks";
 import { CleaningTask } from "@/store/types";
-import { useTasksStore } from "@/store/use-tasks-store";
+import { TaskProgress, useTasksStore } from "@/store/use-tasks-store";
 import { localDayString } from "@/utils/local-day";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -17,6 +17,12 @@ const makeTask = (overrides: Partial<CleaningTask> = {}): CleaningTask => ({
   completedAt: Date.now(),
   ...overrides,
 });
+
+const rewardInfo: NonNullable<TaskProgress["rewardInfo"]> = {
+  basePoints: 20,
+  pointsMultiplier: 1,
+  finalPoints: 20,
+};
 
 beforeEach(() => {
   useTasksStore.setState({
@@ -106,6 +112,77 @@ describe("clearHistory", () => {
     expect(() => useTasksStore.getState().clearHistory()).not.toThrow();
     expect(useTasksStore.getState().tasks).toHaveLength(0);
   });
+});
+
+// ─── single-flight reward claims ──────────────────────────────────────────────
+
+describe("claimTaskReward", () => {
+  const taskId = "wash-dishes";
+
+  const seedProgress = (state: TaskProgress["state"]) => {
+    useTasksStore.setState({
+      taskProgress: {
+        [taskId]: {
+          state,
+          hasPhoto: false,
+          rewardInfo,
+        },
+      },
+    });
+  };
+
+  it("claims a reward_ready task exactly once and transitions it to claimed", () => {
+    seedProgress("reward_ready");
+
+    const claimed = useTasksStore.getState().claimTaskReward(taskId);
+
+    expect(claimed?.rewardInfo).toEqual(rewardInfo);
+    expect(useTasksStore.getState().taskProgress[taskId].state).toBe("claimed");
+  });
+
+  it("does nothing when the task is already claimed", () => {
+    seedProgress("claimed");
+    let grantedPoints = 0;
+
+    const claimed = useTasksStore.getState().claimTaskReward(taskId);
+    if (claimed) grantedPoints += claimed.rewardInfo!.finalPoints;
+
+    expect(claimed).toBeNull();
+    expect(grantedPoints).toBe(0);
+    expect(useTasksStore.getState().taskProgress[taskId].state).toBe("claimed");
+  });
+
+  it("allows only one winner across rapid repeated claim attempts", () => {
+    seedProgress("reward_ready");
+
+    const attempts = [
+      useTasksStore.getState().claimTaskReward(taskId),
+      useTasksStore.getState().claimTaskReward(taskId),
+      useTasksStore.getState().claimTaskReward(taskId),
+    ];
+    const successful = attempts.filter(
+      (attempt): attempt is TaskProgress => attempt !== null,
+    );
+
+    expect(successful).toHaveLength(1);
+    expect(
+      successful.reduce(
+        (sum, progress) => sum + progress.rewardInfo!.finalPoints,
+        0,
+      ),
+    ).toBe(20);
+    expect(useTasksStore.getState().taskProgress[taskId].state).toBe("claimed");
+  });
+
+  it.each(["idle", "pending_photo", "waiting", "claimed"] as const)(
+    "does not claim from %s",
+    (state) => {
+      seedProgress(state);
+
+      expect(useTasksStore.getState().claimTaskReward(taskId)).toBeNull();
+      expect(useTasksStore.getState().taskProgress[taskId].state).toBe(state);
+    },
+  );
 });
 
 // ─── getDailyRoll (pure function) ─────────────────────────────────────────────
@@ -292,5 +369,21 @@ describe("pending rewards across day rollover", () => {
     const remaining = useTasksStore.getState().pendingRewards;
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(second.id);
+  });
+
+  it("allows only one winner across repeated carried-reward claims", () => {
+    seedRewardReady("2020-01-01");
+    useTasksStore.getState().refreshDailyRoll();
+    const [reward] = useTasksStore.getState().pendingRewards;
+
+    const attempts = [
+      useTasksStore.getState().claimPendingReward(reward.id),
+      useTasksStore.getState().claimPendingReward(reward.id),
+      useTasksStore.getState().claimPendingReward(reward.id),
+    ];
+
+    expect(attempts[0]).toEqual(reward);
+    expect(attempts.slice(1)).toEqual([null, null]);
+    expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
   });
 });
