@@ -23,6 +23,7 @@ const MAPPING = {
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "bag.fill": "shopping-bag",
+  sparkles: "auto-awesome",
   // TODO: DEV ONLY — remove 'ladybug' mapping before launch
   ladybug: "bug-report",
 } as IconMapping;
