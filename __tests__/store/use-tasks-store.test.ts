@@ -1,3 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { TASK_MIN_TIMES } from "@/constants/task-timers";
 import { getDailyRoll, PRESET_TASKS } from "@/store/preset-tasks";
 import { CleaningTask } from "@/store/types";
 import { TaskProgress, useTasksStore } from "@/store/use-tasks-store";
@@ -306,8 +309,9 @@ describe("pending rewards across day rollover", () => {
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
   });
 
-  it("only reward_ready entries carry — claimed/idle/waiting are not queued", () => {
+  it("only reward_ready entries queue as rewards — claimed/idle/waiting do not", () => {
     const roll = getDailyRoll("2020-01-01");
+    const waitStartedAt = Date.now();
     useTasksStore.setState({
       dailyRollDate: "2020-01-01",
       dailyRoll: roll,
@@ -317,7 +321,7 @@ describe("pending rewards across day rollover", () => {
         [roll[2].id]: {
           state: "waiting",
           hasPhoto: false,
-          waitStartedAt: Date.now(),
+          waitStartedAt,
         },
       },
     });
@@ -325,7 +329,11 @@ describe("pending rewards across day rollover", () => {
     useTasksStore.getState().refreshDailyRoll();
 
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
-    expect(useTasksStore.getState().taskProgress).toEqual({});
+    // Finished-with days are dropped, but a time lock still counting down is
+    // wall-clock based and survives the rollover (see the waiting suites below).
+    expect(useTasksStore.getState().taskProgress).toEqual({
+      [roll[2].id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+    });
   });
 
   it("rewards stack across multiple missed days instead of overwriting", () => {
@@ -385,5 +393,192 @@ describe("pending rewards across day rollover", () => {
     expect(attempts[0]).toEqual(reward);
     expect(attempts.slice(1)).toEqual([null, null]);
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
+  });
+});
+
+// ─── waiting time lock across a day rollover ──────────────────────────────────
+// A time lock is wall-clock based: it is anchored to waitStartedAt, so the
+// calendar day rolling over mid-wait must neither restart nor discard it.
+
+describe("waiting time lock across a day rollover", () => {
+  const taskId = "wash-dishes";
+  const minTime = TASK_MIN_TIMES[taskId]; // 300 s
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Mirrors TaskTimer's wall-clock remaining calculation. */
+  const remainingSeconds = () => {
+    const { waitStartedAt } = useTasksStore.getState().taskProgress[taskId];
+    return Math.max(
+      0,
+      minTime - Math.floor((Date.now() - waitStartedAt!) / 1000),
+    );
+  };
+
+  /** Mirrors handleSkipPhoto: the lock starts now, on the current roll day. */
+  const startWait = () => {
+    const today = localDayString();
+    useTasksStore.setState({
+      dailyRollDate: today,
+      dailyRoll: getDailyRoll(today),
+      taskProgress: {
+        [taskId]: {
+          state: "waiting",
+          hasPhoto: false,
+          waitStartedAt: Date.now(),
+        },
+      },
+    });
+    return Date.now();
+  };
+
+  /** Mirrors handleTimerComplete for a photo-less task. */
+  const completeTimer = () => {
+    const progress = useTasksStore.getState().taskProgress[taskId];
+    useTasksStore.getState().setTaskProgress(taskId, {
+      ...progress,
+      state: "reward_ready",
+      rewardInfo,
+    });
+  };
+
+  it("stays waiting while the lock is still running on the same day", () => {
+    jest.setSystemTime(new Date("2026-05-27T12:00:00Z"));
+    const startedAt = startWait();
+
+    jest.setSystemTime(new Date("2026-05-27T12:01:00Z")); // 60 s of 300 s
+    useTasksStore.getState().refreshDailyRoll(); // same day — a no-op
+
+    const progress = useTasksStore.getState().taskProgress[taskId];
+    expect(progress.state).toBe("waiting");
+    expect(progress.waitStartedAt).toBe(startedAt);
+    expect(remainingSeconds()).toBe(minTime - 60);
+  });
+
+  it("completes once the full duration has elapsed", () => {
+    jest.setSystemTime(new Date("2026-05-27T12:00:00Z"));
+    startWait();
+
+    jest.setSystemTime(new Date("2026-05-27T12:05:00Z")); // exactly 300 s
+    expect(remainingSeconds()).toBe(0);
+
+    completeTimer();
+    expect(useTasksStore.getState().taskProgress[taskId].state).toBe(
+      "reward_ready",
+    );
+  });
+
+  it("keeps counting from the original timestamp across midnight", () => {
+    jest.setSystemTime(new Date("2026-05-27T23:58:00Z"));
+    const startedAt = startWait();
+    const startDay = localDayString();
+
+    jest.setSystemTime(new Date("2026-05-28T00:01:00Z")); // 180 s of 300 s
+    expect(localDayString()).not.toBe(startDay); // the day really did move
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    expect(s.dailyRollDate).toBe(localDayString());
+    // The wait survives, still anchored to its original start.
+    expect(s.taskProgress[taskId].state).toBe("waiting");
+    expect(s.taskProgress[taskId].waitStartedAt).toBe(startedAt);
+    expect(remainingSeconds()).toBe(minTime - 180);
+    // Its task stays in the roll, so the timer is still on screen to finish.
+    expect(s.dailyRoll.map((t) => t.id)).toContain(taskId);
+    // An unfinished wait is not an earned reward.
+    expect(s.pendingRewards).toHaveLength(0);
+  });
+
+  it("completes after midnight without restarting at the date change", () => {
+    jest.setSystemTime(new Date("2026-05-27T23:58:00Z"));
+    startWait();
+
+    jest.setSystemTime(new Date("2026-05-28T00:01:00Z"));
+    useTasksStore.getState().refreshDailyRoll();
+    expect(remainingSeconds()).toBeGreaterThan(0);
+
+    jest.setSystemTime(new Date("2026-05-28T00:03:00Z")); // 300 s from the start
+    expect(remainingSeconds()).toBe(0);
+
+    completeTimer();
+    expect(useTasksStore.getState().taskProgress[taskId].state).toBe(
+      "reward_ready",
+    );
+  });
+});
+
+// ─── waiting time lock across an app reopen ───────────────────────────────────
+// Real rehydration (which runs refreshDailyRoll): the persisted waitStartedAt,
+// never the moment hydration happens, is the timer's anchor.
+
+describe("waiting time lock across an app reopen", () => {
+  const taskId = "wash-dishes";
+  const minTime = TASK_MIN_TIMES[taskId];
+  const getItemMock = AsyncStorage.getItem as jest.Mock;
+
+  const remainingFrom = (waitStartedAt: number) =>
+    Math.max(0, minTime - Math.floor((Date.now() - waitStartedAt) / 1000));
+
+  /** Reopen the app on a later day with a wait persisted mid-flight. */
+  const reopenWith = async (waitStartedAt: number) => {
+    getItemMock.mockResolvedValueOnce(
+      JSON.stringify({
+        state: {
+          tasks: [],
+          dailyRoll: getDailyRoll("2020-01-01"),
+          dailyRollDate: "2020-01-01",
+          pendingRewards: [],
+          taskProgress: {
+            [taskId]: { state: "waiting", hasPhoto: false, waitStartedAt },
+          },
+        },
+        version: 2,
+      }),
+    );
+    await useTasksStore.persist.rehydrate();
+  };
+
+  it("resumes a still-running wait from its persisted timestamp", async () => {
+    const waitStartedAt = Date.now() - 120_000; // 2 min into a 5 min lock
+
+    await reopenWith(waitStartedAt);
+
+    const s = useTasksStore.getState();
+    expect(s.dailyRollDate).toBe(localDayString()); // the roll did refresh
+    expect(s.taskProgress[taskId].state).toBe("waiting");
+    // Not re-anchored to hydration time.
+    expect(s.taskProgress[taskId].waitStartedAt).toBe(waitStartedAt);
+    expect(remainingFrom(waitStartedAt)).toBeGreaterThan(0);
+    expect(remainingFrom(waitStartedAt)).toBeLessThanOrEqual(minTime - 120);
+    expect(s.dailyRoll.map((t) => t.id)).toContain(taskId);
+  });
+
+  it("recognises a wait that already elapsed while the app was closed", async () => {
+    const waitStartedAt = Date.now() - (minTime + 60) * 1000;
+
+    await reopenWith(waitStartedAt);
+
+    const s = useTasksStore.getState();
+    expect(s.taskProgress[taskId].state).toBe("waiting");
+    expect(s.taskProgress[taskId].waitStartedAt).toBe(waitStartedAt);
+    // Zero remaining on arrival: no second full wait is imposed.
+    expect(remainingFrom(waitStartedAt)).toBe(0);
+    expect(s.dailyRoll.map((t) => t.id)).toContain(taskId);
+  });
+
+  it("does not restart the wait after a long closed period", async () => {
+    const waitStartedAt = Date.now() - 30 * 24 * 3_600_000; // a month ago
+
+    await reopenWith(waitStartedAt);
+
+    const s = useTasksStore.getState();
+    expect(s.taskProgress[taskId].waitStartedAt).toBe(waitStartedAt);
+    expect(remainingFrom(waitStartedAt)).toBe(0);
   });
 });
