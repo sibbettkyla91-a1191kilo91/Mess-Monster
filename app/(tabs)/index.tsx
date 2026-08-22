@@ -990,8 +990,8 @@ export default function HomeScreen() {
 
   // Pet taps and the upgrade action write to the player and pet stores; a
   // write landing before AsyncStorage rehydration completes gets clobbered
-  // by the hydration merge. The habitat itself is display-only, so no
-  // loading state — mutating handlers just no-op until stores are ready.
+  // by the hydration merge, so mutating handlers no-op until stores are
+  // ready. playerHydrated additionally gates the render — see below.
   const playerHydrated = useHasHydrated(usePlayerStore);
   const petHydrated = useHasHydrated(usePetStore);
   const hydrated = playerHydrated && petHydrated;
@@ -1365,6 +1365,15 @@ export default function HomeScreen() {
     adultVariant,
     mood,
   );
+
+  // Until the player store rehydrates, selectedMonster still reads its default,
+  // so a Luna player would get Nilly's room, sprite, and palette for a frame
+  // before it snapped over. Every pixel here keys off the chosen monster, so
+  // hold the whole habitat back rather than paint the wrong pet: an empty
+  // container shows the navigator's own background for that moment.
+  if (!playerHydrated) {
+    return <View style={styles.container} />;
+  }
 
   return (
     <View style={styles.container}>
