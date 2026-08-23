@@ -149,11 +149,13 @@ interface PetStore extends PetState {
     category?: TaskCategory,
   ) => void;
   applyRewardGrantCared: (grantId: string) => void;
+  applyRewardGrantStreakMilestone: (grantId: string, hit: number) => void;
 }
 
 export type PetGrantReceipt = {
   tracked?: true;
   cared?: true;
+  streakMilestone?: number;
 };
 
 function computeTrackEarnedUpdate(
@@ -363,6 +365,34 @@ export const usePetStore = create<PetStore>()(
           const { monsterName } = usePlayerStore.getState();
           void rescheduleDailyNudges(monsterName, true);
         }
+      },
+
+      applyRewardGrantStreakMilestone: (grantId, hit) => {
+        set((s) => {
+          const alreadyRecorded =
+            s.appliedRewardGrants[grantId]?.streakMilestone === hit;
+          const alreadyClaimed = s.claimedStreakMilestones.includes(hit);
+          if (
+            alreadyRecorded &&
+            alreadyClaimed &&
+            s.pendingMilestoneBanner === hit
+          ) {
+            return {};
+          }
+          return {
+            claimedStreakMilestones: alreadyClaimed
+              ? s.claimedStreakMilestones
+              : [...s.claimedStreakMilestones, hit],
+            pendingMilestoneBanner: hit,
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: {
+                ...s.appliedRewardGrants[grantId],
+                streakMilestone: hit,
+              },
+            },
+          };
+        });
       },
 
       applyDecay: () => {

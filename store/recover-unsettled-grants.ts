@@ -15,28 +15,32 @@ function storesHydrated(): boolean {
 
 /**
  * Grant-aware streak bonus. The +50 lives on the player store with a
- * grant-specific receipt; the pet milestone list is updated after. Recovery
- * must not call checkStreakMilestones(), which awards the bonus with no
- * receipt. A stale countsTowardActivity grant whose earnedDate is not today
- * must not mint a new active day or a bonus.
+ * grant-specific receipt; the pet milestone list is updated after, in the
+ * same pet set() as a grant-scoped streakMilestone receipt. Recovery must
+ * not call checkStreakMilestones(), which awards the bonus with no receipt.
+ * A stale countsTowardActivity grant whose earnedDate is not today must not
+ * mint a new bonus — unless this grant already has an in-flight pet
+ * streakMilestone receipt, in which case the +50 must still be completed.
  */
 function applyGrantStreakMilestone(grant: UnsettledRewardGrant): void {
-  const alreadyPaid =
-    !!usePlayerStore.getState().appliedRewardGrants[grant.id]?.streak;
+  const player = usePlayerStore.getState();
+  const pet = usePetStore.getState();
+  const alreadyPaid = !!player.appliedRewardGrants[grant.id]?.streak;
+  const petHit = pet.appliedRewardGrants[grant.id]?.streakMilestone;
+  const liveHit =
+    grant.countsTowardActivity && grant.earnedDate === localDayString()
+      ? pet.unclaimedStreakMilestone()
+      : undefined;
+  const hit = petHit ?? liveHit;
 
   if (!alreadyPaid) {
-    if (!grant.countsTowardActivity) return;
-    if (grant.earnedDate !== localDayString()) return;
-    const hit = usePetStore.getState().unclaimedStreakMilestone();
     if (hit == null) return;
-    usePlayerStore
-      .getState()
-      .applyRewardGrantStreakBonus(grant.id, STREAK_MILESTONE_BONUS);
+    player.applyRewardGrantStreakBonus(grant.id, STREAK_MILESTONE_BONUS);
   }
 
-  const hit = usePetStore.getState().unclaimedStreakMilestone();
-  if (hit != null) {
-    usePetStore.getState().recordStreakMilestone(hit);
+  const toRecord = hit ?? pet.unclaimedStreakMilestone();
+  if (toRecord != null) {
+    usePetStore.getState().applyRewardGrantStreakMilestone(grant.id, toRecord);
   }
 }
 

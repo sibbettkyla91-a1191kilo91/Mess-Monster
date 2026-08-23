@@ -475,10 +475,65 @@ describe("streak bonus receipts", () => {
     });
 
     recoverUnsettledGrants();
+    recoverUnsettledGrants();
 
     expect(usePlayerStore.getState().totalPoints).toBe(170);
     expect(usePetStore.getState().claimedStreakMilestones).toEqual([3]);
     expect(usePetStore.getState().pendingMilestoneBanner).toBe(3);
+    expect(
+      usePetStore.getState().appliedRewardGrants[grantId]?.streakMilestone,
+    ).toBe(3);
+    expect(useTasksStore.getState().unsettledGrants).toHaveLength(0);
+  });
+
+  it("restores the +50 when the pet milestone receipt persisted but the player streak receipt did not", () => {
+    const grant = seedEntitledGrant();
+    const grantId = grant.id;
+
+    // Crash after the pet claimed list + grant receipt persisted, before
+    // the player-side +50 / streak receipt.
+    usePlayerStore.setState({
+      streak: 3,
+      lastActiveDay: "2026-05-27",
+      activeDaysCount: 3,
+      totalPoints: 120,
+      appliedRewardGrants: {
+        [grantId]: { points: true, activity: true },
+      },
+    });
+    usePetStore.setState({
+      claimedStreakMilestones: [3],
+      pendingMilestoneBanner: 3,
+      appliedRewardGrants: {
+        [grantId]: { tracked: true, cared: true, streakMilestone: 3 },
+      },
+      totalPointsEarned: 20,
+      categoryCompletions: { kitchen: 1 },
+    });
+    useTasksStore.setState({
+      appliedRewardGrants: { [grantId]: { history: true } },
+      tasks: [
+        {
+          id: TASK.id,
+          label: TASK.label,
+          category: TASK.category,
+          pointValue: TASK.pointValue,
+          completedAt: grant.claimedAt,
+        },
+      ],
+    });
+
+    recoverUnsettledGrants();
+    recoverUnsettledGrants();
+
+    expect(usePlayerStore.getState().totalPoints).toBe(170);
+    expect(usePlayerStore.getState().appliedRewardGrants[grantId]?.streak).toBe(
+      true,
+    );
+    expect(usePetStore.getState().claimedStreakMilestones).toEqual([3]);
+    expect(
+      usePetStore.getState().appliedRewardGrants[grantId]?.streakMilestone,
+    ).toBe(3);
     expect(useTasksStore.getState().unsettledGrants).toHaveLength(0);
   });
 
