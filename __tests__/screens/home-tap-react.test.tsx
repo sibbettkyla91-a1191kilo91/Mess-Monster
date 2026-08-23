@@ -33,25 +33,9 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Fake timers for the whole file: the screen runs looping/random-delay
-// animation timers (bob, wiggle) that must not escape a test's lifetime.
-jest.useFakeTimers();
-
-/**
- * Yield one real macrotask so React can commit pending concurrent work.
- *
- * React's scheduler captured the real setImmediate before fake timers were
- * installed, so a state update that no zustand write force-flushes (e.g. the
- * tapHearts update on an allowance-capped press, where recordTapReaction
- * bails before set) commits only on a real event-loop turn — which
- * microtask-only awaits and fake-timer advances never yield to.
- */
-async function flushConcurrentWork() {
-  const { setImmediate: realSetImmediate } = jest.requireActual("timers");
-  await act(async () => {
-    await new Promise((resolve) => realSetImmediate(resolve));
-  });
-}
+// Contain Home's looping/random setTimeout animations, but leave the real
+// macrotask queue intact so React 19's scheduler and pet afterHydrate run.
+jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
 
 // health/happiness pairs chosen to land squarely inside each deriveMood band.
 const MOODS = [
@@ -62,11 +46,42 @@ const MOODS = [
   ["sick", 5, 5],
 ] as const;
 
-/** Let store hydration (microtasks) and the deferred decay pass (setImmediate) settle. */
+/**
+ * Persist rehydration is a microtask; pet afterHydrate is a setImmediate.
+ * Two real macrotask turns cover both without fake-timer advances.
+ */
 async function flushHydration() {
-  for (let i = 0; i < 10; i++) await Promise.resolve();
-  jest.advanceTimersByTime(0); // run the deferred (setImmediate) decay pass
-  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+/**
+ * Wait until the tap-heart commit is in the tree.
+ *
+ * RNTL waitFor detects fake timers and calls advanceTimersByTime, which
+ * would run Home's bob/wiggle animations and can fire the 1200ms heart
+ * removal. Poll real setImmediate inside act instead: that is the queue
+ * React 19 actually uses, and fake setTimeout stays frozen. Bound by a
+ * fixed number of macrotask turns so fake Date.now() cannot hang the wait.
+ */
+async function waitForHeartCount(
+  screen: ReturnType<typeof render>,
+  count: number,
+) {
+  const maxTurns = 20;
+  let lastError: unknown;
+  for (let i = 0; i < maxTurns; i++) {
+    try {
+      expect(screen.getAllByText("❤️")).toHaveLength(count);
+      return;
+    } catch (error) {
+      lastError = error;
+      await act(async () => {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      });
+    }
+  }
+  throw lastError;
 }
 
 function forceMood(health: number, happiness: number) {
@@ -116,7 +131,7 @@ describe("tap-to-react across mood states", () => {
       expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
 
       // One new floating heart rendered.
-      expect(screen.getAllByText("❤️")).toHaveLength(heartsBefore + 1);
+      await waitForHeartCount(screen, heartsBefore + 1);
 
       // Affection boost applied, capped at 100.
       expect(usePetStore.getState().happiness).toBe(
@@ -141,7 +156,12 @@ describe("tap-to-react across mood states", () => {
     // Reported sequence: taps spent while the monster was in other moods…
     act(() => forceMood(60, 60)); // happy
     const monster = screen.getByLabelText("Pet Nilly");
-    for (let i = 0; i < 5; i++) fireEvent.press(monster);
+    let hearts = screen.getAllByText("❤️").length;
+    for (let i = 0; i < 5; i++) {
+      fireEvent.press(monster);
+      hearts += 1;
+      await waitForHeartCount(screen, hearts);
+    }
     expect(usePlayerStore.getState().tapReactionCount).toBe(5);
     expect(usePetStore.getState().happiness).toBe(75); // 5 × +3 granted
 
@@ -153,11 +173,10 @@ describe("tap-to-react across mood states", () => {
     const heartsBefore = screen.getAllByText("❤️").length;
 
     fireEvent.press(monster);
-    await flushConcurrentWork();
 
     // The reaction still fires: haptic and a new heart.
     expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText("❤️")).toHaveLength(heartsBefore + 1);
+    await waitForHeartCount(screen, heartsBefore + 1);
 
     // But the grant is capped: no extra happiness, allowance not exceeded.
     expect(usePetStore.getState().happiness).toBe(25);
