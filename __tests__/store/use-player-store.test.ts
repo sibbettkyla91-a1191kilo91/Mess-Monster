@@ -17,6 +17,7 @@ const INITIAL = {
   streak: 0,
   lastActiveDay: "",
   selectedMonster: null as "nilly" | "luna" | null,
+  appliedRewardGrants: {},
 };
 
 beforeEach(() => {
@@ -233,5 +234,11 @@ describe("migratePlayerState", () => {
     expect(out.isPremium).toBe(false);
     expect(out.lastTapReactionDate).toBe("");
     expect(out.tapReactionCount).toBe(0);
+  });
+
+  it("v4 → v5 initializes an empty appliedRewardGrants receipt map", () => {
+    const out = migratePlayerState({ totalPoints: 150, spentPoints: 30 }, 4);
+    expect(out.appliedRewardGrants).toEqual({});
+    expect(out.totalPoints).toBe(150);
   });
 });

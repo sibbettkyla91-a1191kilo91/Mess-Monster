@@ -12,6 +12,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePetStore } from "@/store/use-pet-store";
 import { useTasksStore } from "@/store/use-tasks-store";
+import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
 import { initNotifications } from "@/utils/daily-nudge";
 
 export const unstable_settings = {
@@ -51,6 +52,11 @@ export default function RootLayout() {
     });
     return () => sub.remove();
   }, []);
+
+  // Reserved grants live in the tasks store; their points/pet/history writes
+  // live in other stores. After a crash between those writes, replay any
+  // leftover intent once all three stores have actually rehydrated.
+  useEffect(() => subscribeUnsettledGrantRecovery(), []);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>

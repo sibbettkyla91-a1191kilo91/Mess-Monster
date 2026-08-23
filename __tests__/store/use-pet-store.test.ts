@@ -18,6 +18,7 @@ beforeEach(() => {
     happiness: 100,
     lastCaredAt: Date.now(),
     lastSessionAt: Date.now(),
+    appliedRewardGrants: {},
   });
 });
 

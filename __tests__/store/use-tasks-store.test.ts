@@ -32,6 +32,8 @@ beforeEach(() => {
     dailyRollDate: localDayString(),
     taskProgress: {},
     pendingRewards: [],
+    unsettledGrants: [],
+    appliedRewardGrants: {},
   });
 });
 

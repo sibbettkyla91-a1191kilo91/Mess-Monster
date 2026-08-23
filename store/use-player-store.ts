@@ -18,8 +18,10 @@ export function migratePlayerState(persistedState: any, version: number): any {
     lastTapReactionDate: "",
     tapReactionCount: 0,
     statPanelCollapsed: false,
+    appliedRewardGrants: {},
     ...persistedState,
   };
+  migrated.appliedRewardGrants = persistedState?.appliedRewardGrants ?? {};
   // v3 -> v4: availablePointsValue was a persisted cache of
   // totalPoints - spentPoints that could desync from its inputs.
   // It is now always derived on read; strip the stale copy.
@@ -45,6 +47,7 @@ interface PlayerStore extends PlayerProfile {
   tapReactionCount: number; // taps used today (resets daily)
   notifPermissionAsked: boolean; // asked once ever, at the first reward claim
   statPanelCollapsed: boolean; // Home stat panel shrunk to its peek handle
+  appliedRewardGrants: Record<string, PlayerGrantReceipt>;
   markNotifPermissionAsked: () => void;
   toggleStatPanel: () => void;
   availablePoints: () => number; // derived: totalPoints - spentPoints
@@ -56,7 +59,16 @@ interface PlayerStore extends PlayerProfile {
   setMonsterName: (name: string) => void;
   setPremium: (value: boolean) => void;
   completeOnboarding: () => void;
+  applyRewardGrantPoints: (grantId: string, amount: number) => void;
+  applyRewardGrantActivity: (grantId: string, activityDay: string) => void;
+  applyRewardGrantStreakBonus: (grantId: string, amount: number) => void;
 }
+
+export type PlayerGrantReceipt = {
+  points?: true;
+  activity?: true;
+  streak?: true;
+};
 
 export const usePlayerStore = create<PlayerStore>()(
   persist(
@@ -76,6 +88,7 @@ export const usePlayerStore = create<PlayerStore>()(
       // New key on existing installs is filled by the hydration merge (same
       // version) or the migrate defaults (older versions) — no version bump.
       statPanelCollapsed: false,
+      appliedRewardGrants: {},
 
       // Always derived from totalPoints/spentPoints — never stored, so it
       // can't desync. In components, select the primitive directly:
@@ -142,10 +155,61 @@ export const usePlayerStore = create<PlayerStore>()(
         set((s) => ({ statPanelCollapsed: !s.statPanelCollapsed })),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+
+      applyRewardGrantPoints: (grantId, amount) => {
+        set((s) => {
+          if (s.appliedRewardGrants[grantId]?.points) return {};
+          return {
+            totalPoints: s.totalPoints + amount,
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: { ...s.appliedRewardGrants[grantId], points: true },
+            },
+          };
+        });
+      },
+
+      applyRewardGrantActivity: (grantId, activityDay) => {
+        set((s) => {
+          if (s.appliedRewardGrants[grantId]?.activity) return {};
+          const receipt = {
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: { ...s.appliedRewardGrants[grantId], activity: true },
+            },
+          };
+          // Already counted that day, or the claim's day has passed — stamp
+          // the receipt without minting a new (or the wrong) active day.
+          if (s.lastActiveDay === activityDay || activityDay !== todayISO()) {
+            return receipt;
+          }
+          const yesterday = localYesterdayString();
+          const newStreak = s.lastActiveDay === yesterday ? s.streak + 1 : 1;
+          return {
+            ...receipt,
+            streak: newStreak,
+            lastActiveDay: activityDay,
+            activeDaysCount: s.activeDaysCount + 1,
+          };
+        });
+      },
+
+      applyRewardGrantStreakBonus: (grantId, amount) => {
+        set((s) => {
+          if (s.appliedRewardGrants[grantId]?.streak) return {};
+          return {
+            totalPoints: s.totalPoints + amount,
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: { ...s.appliedRewardGrants[grantId], streak: true },
+            },
+          };
+        });
+      },
     }),
     {
       name: "mm-player",
-      version: 4,
+      version: 5,
       migrate: migratePlayerState,
       storage: createJSONStorage(() => AsyncStorage),
     },

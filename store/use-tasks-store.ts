@@ -57,6 +57,34 @@ export interface PendingReward {
   rewardInfo: NonNullable<TaskProgress["rewardInfo"]>;
 }
 
+/**
+ * Durable intent to finish applying a reserved reward across the independently
+ * persisted player/pet/tasks stores. Written in the same tasks-store set() as
+ * the source claim/removal so a crash after reservation can still complete
+ * the grant. Receipts for each effect live on the store that owns the effect.
+ */
+export interface UnsettledRewardGrant {
+  /** Same uniqueness as PendingReward.id: `${earnedDate}:${taskId}` */
+  id: string;
+  taskId: string;
+  label: string;
+  category: TaskCategory;
+  pointValue: number;
+  earnedDate: string;
+  hasPhoto: boolean;
+  rewardInfo: NonNullable<TaskProgress["rewardInfo"]>;
+  claimedAt: number;
+  /**
+   * True for a claim from today's roll. False for a carried pending reward —
+   * those award points/history/care but must not mint a new active day.
+   */
+  countsTowardActivity: boolean;
+}
+
+export type TasksGrantReceipt = {
+  history?: true;
+};
+
 interface TasksState {
   tasks: CleaningTask[];
   dailyRoll: PresetTask[];
@@ -71,6 +99,10 @@ interface TasksState {
    * counting down — those carry over anchored to their original waitStartedAt.
    */
   taskProgress: Record<string, TaskProgress>;
+  /** Reserved grants whose player/pet/history effects may still be in flight. */
+  unsettledGrants: UnsettledRewardGrant[];
+  /** History-entry receipts, keyed by grant id. */
+  appliedRewardGrants: Record<string, TasksGrantReceipt>;
   addTask: (task: CleaningTask) => void;
   removeTask: (id: string) => void;
   clearHistory: () => void;
@@ -80,6 +112,25 @@ interface TasksState {
   claimTaskReward: (taskId: string) => TaskProgress | null;
   /** Atomically remove and return a carried-over reward. Points are awarded by the caller. */
   claimPendingReward: (id: string) => PendingReward | null;
+  applyRewardGrantHistory: (grant: UnsettledRewardGrant) => void;
+  clearUnsettledGrant: (id: string) => void;
+}
+
+function lookupTask(
+  s: Pick<TasksState, "dailyRoll">,
+  taskId: string,
+): PresetTask | undefined {
+  return s.dailyRoll.find((t) => t.id === taskId) ?? PRESET_TASKS.find((t) => t.id === taskId);
+}
+
+export function migrateTasksState(persistedState: any): any {
+  return {
+    ...persistedState,
+    taskProgress: persistedState?.taskProgress ?? {},
+    pendingRewards: persistedState?.pendingRewards ?? [],
+    unsettledGrants: persistedState?.unsettledGrants ?? [],
+    appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
+  };
 }
 
 export const useTasksStore = create<TasksState>()(
@@ -90,6 +141,8 @@ export const useTasksStore = create<TasksState>()(
       dailyRollDate: todayStr(),
       taskProgress: {},
       pendingRewards: [],
+      unsettledGrants: [],
+      appliedRewardGrants: {},
 
       addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
       removeTask: (id) =>
@@ -156,41 +209,94 @@ export const useTasksStore = create<TasksState>()(
         })),
 
       claimTaskReward: (taskId) => {
-        const progress = get().taskProgress[taskId];
+        const s = get();
+        const progress = s.taskProgress[taskId];
         if (progress?.state !== "reward_ready" || !progress.rewardInfo) {
           return null;
         }
-        set((s) => ({
+        const task = lookupTask(s, taskId);
+        if (!task) return null;
+        const grant: UnsettledRewardGrant = {
+          id: `${s.dailyRollDate}:${taskId}`,
+          taskId,
+          label: task.label,
+          category: task.category,
+          pointValue: task.pointValue,
+          earnedDate: s.dailyRollDate,
+          hasPhoto: progress.hasPhoto,
+          rewardInfo: progress.rewardInfo,
+          claimedAt: Date.now(),
+          countsTowardActivity: true,
+        };
+        set({
           taskProgress: {
             ...s.taskProgress,
             [taskId]: { ...progress, state: "claimed" },
           },
-        }));
+          unsettledGrants: [...s.unsettledGrants, grant],
+        });
         return progress;
       },
 
       claimPendingReward: (id) => {
-        const reward = get().pendingRewards.find((r) => r.id === id);
+        const s = get();
+        const reward = s.pendingRewards.find((r) => r.id === id);
         if (!reward) return null;
-        set((s) => ({
+        const grant: UnsettledRewardGrant = {
+          id: reward.id,
+          taskId: reward.taskId,
+          label: reward.label,
+          category: reward.category,
+          pointValue: reward.pointValue,
+          earnedDate: reward.earnedDate,
+          hasPhoto: reward.hasPhoto,
+          rewardInfo: reward.rewardInfo,
+          claimedAt: Date.now(),
+          countsTowardActivity: false,
+        };
+        set({
           pendingRewards: s.pendingRewards.filter((r) => r.id !== id),
-        }));
+          unsettledGrants: [...s.unsettledGrants, grant],
+        });
         return reward;
       },
+
+      applyRewardGrantHistory: (grant) => {
+        set((s) => {
+          if (s.appliedRewardGrants[grant.id]?.history) return {};
+          const task: CleaningTask = {
+            id: grant.taskId,
+            label: grant.label,
+            category: grant.category,
+            pointValue: grant.pointValue,
+            completedAt: grant.claimedAt,
+          };
+          return {
+            tasks: [task, ...s.tasks],
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grant.id]: { ...s.appliedRewardGrants[grant.id], history: true },
+            },
+          };
+        });
+      },
+
+      clearUnsettledGrant: (id) =>
+        set((s) => ({
+          unsettledGrants: s.unsettledGrants.filter((g) => g.id !== id),
+        })),
     }),
     {
       name: "mm-tasks",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       // v0 → v1: per-task progress is now persisted; older state just starts
       // with an empty progress map.
       // v1 → v2: uncollected rewards carry across rollovers; older state
       // starts with an empty queue.
-      migrate: (persistedState: any): any => ({
-        ...persistedState,
-        taskProgress: persistedState?.taskProgress ?? {},
-        pendingRewards: persistedState?.pendingRewards ?? [],
-      }),
+      // v2 → v3: reserved grants persist as an intent log so a crash between
+      // claim and player/pet writes can still complete the grant.
+      migrate: migrateTasksState,
       // After AsyncStorage rehydration, refresh the roll if the device date has
       // moved past the stored roll date (e.g. app left open overnight).
       onRehydrateStorage: () => (state) => {

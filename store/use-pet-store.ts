@@ -131,15 +131,90 @@ function determineAdultVariant(
 }
 
 interface PetStore extends PetState {
+  appliedRewardGrants: Record<string, PetGrantReceipt>;
   care: () => void;
   addHappiness: (amount: number) => void;
   applyDecay: () => void;
   trackEarned: (amount: number, category?: TaskCategory) => void;
   recheckEvolution: () => void; // re-run evolution check (e.g., after premium unlock)
   checkStreakMilestones: () => void;
+  unclaimedStreakMilestone: () => number | undefined;
+  recordStreakMilestone: (hit: number) => void;
   clearMilestoneBanner: () => void;
   clearPendingEvolution: () => void;
   clearPremiumGate: () => void;
+  applyRewardGrantTracked: (
+    grantId: string,
+    amount: number,
+    category?: TaskCategory,
+  ) => void;
+  applyRewardGrantCared: (grantId: string) => void;
+}
+
+export type PetGrantReceipt = {
+  tracked?: true;
+  cared?: true;
+};
+
+function computeTrackEarnedUpdate(
+  s: PetState,
+  amount: number,
+  category: TaskCategory | undefined,
+): Partial<PetState> {
+  const newTotal = s.totalPointsEarned + amount;
+
+  const newCategoryCompletions: Partial<Record<TaskCategory, number>> =
+    category
+      ? {
+          ...s.categoryCompletions,
+          [category]: (s.categoryCompletions[category] ?? 0) + 1,
+        }
+      : s.categoryCompletions;
+
+  const baseUpdate = {
+    totalPointsEarned: newTotal,
+    categoryCompletions: newCategoryCompletions,
+  };
+
+  const next = nextStage(s.evolutionStage);
+
+  // Already at max stage or ascended (not yet implemented)
+  if (!next || next === "ascended") return baseUpdate;
+
+  const threshold = EVOLUTION_THRESHOLDS[next];
+  if (!threshold) return baseUpdate;
+
+  const { activeDaysCount, isPremium } = usePlayerStore.getState();
+  const meetsConditions =
+    newTotal >= threshold.points && activeDaysCount >= threshold.days;
+  if (!meetsConditions) return baseUpdate;
+
+  // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
+  if (next === "adult") {
+    if (!isPremium) {
+      // Show gate once per stage — don't repeat if already shown
+      if (s.premiumGateShownFor === next) return baseUpdate;
+      return {
+        ...baseUpdate,
+        pendingPremiumGate: next,
+        premiumGateShownFor: next,
+      };
+    }
+  }
+
+  // Evolve!
+  const adultVariant =
+    next === "adult"
+      ? determineAdultVariant(newCategoryCompletions)
+      : s.adultVariant;
+
+  return {
+    ...baseUpdate,
+    evolutionStage: next,
+    adultVariant,
+    pendingEvolution: next,
+    pendingPremiumGate: null,
+  };
 }
 
 export const usePetStore = create<PetStore>()(
@@ -158,6 +233,7 @@ export const usePetStore = create<PetStore>()(
       pendingEvolution: null,
       pendingPremiumGate: null,
       premiumGateShownFor: null,
+      appliedRewardGrants: {},
 
       care: () => {
         set((s) => ({
@@ -177,62 +253,7 @@ export const usePetStore = create<PetStore>()(
         })),
 
       trackEarned: (amount, category) =>
-        set((s) => {
-          const newTotal = s.totalPointsEarned + amount;
-
-          const newCategoryCompletions: Partial<Record<TaskCategory, number>> =
-            category
-              ? {
-                  ...s.categoryCompletions,
-                  [category]: (s.categoryCompletions[category] ?? 0) + 1,
-                }
-              : s.categoryCompletions;
-
-          const baseUpdate = {
-            totalPointsEarned: newTotal,
-            categoryCompletions: newCategoryCompletions,
-          };
-
-          const next = nextStage(s.evolutionStage);
-
-          // Already at max stage or ascended (not yet implemented)
-          if (!next || next === "ascended") return baseUpdate;
-
-          const threshold = EVOLUTION_THRESHOLDS[next];
-          if (!threshold) return baseUpdate;
-
-          const { activeDaysCount, isPremium } = usePlayerStore.getState();
-          const meetsConditions =
-            newTotal >= threshold.points && activeDaysCount >= threshold.days;
-          if (!meetsConditions) return baseUpdate;
-
-          // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
-          if (next === "adult") {
-            if (!isPremium) {
-              // Show gate once per stage — don't repeat if already shown
-              if (s.premiumGateShownFor === next) return baseUpdate;
-              return {
-                ...baseUpdate,
-                pendingPremiumGate: next,
-                premiumGateShownFor: next,
-              };
-            }
-          }
-
-          // Evolve!
-          const adultVariant =
-            next === "adult"
-              ? determineAdultVariant(newCategoryCompletions)
-              : s.adultVariant;
-
-          return {
-            ...baseUpdate,
-            evolutionStage: next,
-            adultVariant,
-            pendingEvolution: next,
-            pendingPremiumGate: null,
-          };
-        }),
+        set((s) => computeTrackEarnedUpdate(s, amount, category)),
 
       recheckEvolution: () => {
         const s = get();
@@ -282,11 +303,67 @@ export const usePetStore = create<PetStore>()(
         usePlayerStore.getState().earnPoints(50);
       },
 
+      unclaimedStreakMilestone: () => {
+        const streak = usePlayerStore.getState().streak;
+        const { claimedStreakMilestones } = get();
+        return STREAK_MILESTONES.find(
+          (m) => streak >= m && !claimedStreakMilestones.includes(m),
+        );
+      },
+
+      recordStreakMilestone: (hit) => {
+        set((s) => {
+          if (s.claimedStreakMilestones.includes(hit)) {
+            return s.pendingMilestoneBanner === hit
+              ? {}
+              : { pendingMilestoneBanner: hit };
+          }
+          return {
+            claimedStreakMilestones: [...s.claimedStreakMilestones, hit],
+            pendingMilestoneBanner: hit,
+          };
+        });
+      },
+
       clearMilestoneBanner: () => set({ pendingMilestoneBanner: null }),
 
       clearPendingEvolution: () => set({ pendingEvolution: null }),
 
       clearPremiumGate: () => set({ pendingPremiumGate: null }),
+
+      applyRewardGrantTracked: (grantId, amount, category) => {
+        set((s) => {
+          if (s.appliedRewardGrants[grantId]?.tracked) return {};
+          return {
+            ...computeTrackEarnedUpdate(s, amount, category),
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: { ...s.appliedRewardGrants[grantId], tracked: true },
+            },
+          };
+        });
+      },
+
+      applyRewardGrantCared: (grantId) => {
+        let applied = false;
+        set((s) => {
+          if (s.appliedRewardGrants[grantId]?.cared) return {};
+          applied = true;
+          return {
+            health: clamp(s.health + HEALTH_CARE_BOOST),
+            happiness: clamp(s.happiness + HAPPINESS_CARE_BOOST),
+            lastCaredAt: Date.now(),
+            appliedRewardGrants: {
+              ...s.appliedRewardGrants,
+              [grantId]: { ...s.appliedRewardGrants[grantId], cared: true },
+            },
+          };
+        });
+        if (applied) {
+          const { monsterName } = usePlayerStore.getState();
+          void rescheduleDailyNudges(monsterName, true);
+        }
+      },
 
       applyDecay: () => {
         const now = Date.now();
@@ -314,7 +391,7 @@ export const usePetStore = create<PetStore>()(
     }),
     {
       name: "mm-pet",
-      version: 2,
+      version: 3,
       migrate: (persistedState: any): any => {
         // Migrate from old integer stage (0=hatchling, 1=growing, 2=mature, 3=evolved)
         const STAGE_MAP: Record<number, EvolutionStage> = {
@@ -341,6 +418,7 @@ export const usePetStore = create<PetStore>()(
           // Repair only — never overwrite a legitimate existing timestamp.
           lastSessionAt: safeTimestamp(persistedState?.lastSessionAt, now),
           lastCaredAt: safeTimestamp(persistedState?.lastCaredAt, now),
+          appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
         };
       },
       storage: createJSONStorage(() => AsyncStorage),

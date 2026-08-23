@@ -29,6 +29,7 @@ import {
   rescheduleDailyNudges,
 } from "@/utils/daily-nudge";
 import { PresetTask } from "@/store/preset-tasks";
+import { recoverUnsettledGrants } from "@/store/recover-unsettled-grants";
 import { STORE_ITEMS } from "@/store/store-items";
 import { TaskCategory } from "@/store/types";
 import { usePetStore } from "@/store/use-pet-store";
@@ -58,19 +59,13 @@ const fontRounded = Platform.select({
 });
 
 export default function TasksScreen() {
-  const addTask = useTasksStore((s) => s.addTask);
   const dailyRoll = useTasksStore((s) => s.dailyRoll);
   const refreshDailyRoll = useTasksStore((s) => s.refreshDailyRoll);
-  const earnPoints = usePlayerStore((s) => s.earnPoints);
-  const recordActivity = usePlayerStore((s) => s.recordActivity);
   const monsterName = usePlayerStore((s) => s.monsterName);
   const notifPermissionAsked = usePlayerStore((s) => s.notifPermissionAsked);
   const markNotifPermissionAsked = usePlayerStore(
     (s) => s.markNotifPermissionAsked,
   );
-  const care = usePetStore((s) => s.care);
-  const trackEarned = usePetStore((s) => s.trackEarned);
-  const checkStreakMilestones = usePetStore((s) => s.checkStreakMilestones);
   const addPhoto = usePhotoStore((s) => s.addPhoto);
   const buyItem = useStoreStore((s) => s.buyItem);
   // The task flow writes to all five persisted stores; a write landing before
@@ -288,15 +283,10 @@ export default function TasksScreen() {
       // Strong success haptic feedback for reward claim
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Award points and track
-      earnPoints(finalPoints);
-      trackEarned(finalPoints, task.category);
-
-      // Log the task
-      addTask({ ...task, completedAt: Date.now() });
-      recordActivity();
-      checkStreakMilestones();
-      care();
+      // Reservation already persisted the unsettled grant. Apply (or resume)
+      // points / tracking / history / activity / care through the same
+      // idempotent recovery path used after a crash.
+      recoverUnsettledGrants();
 
       // Photo-verified tasks get the full celebration modal; others get the
       // lightweight pill.
@@ -319,12 +309,6 @@ export default function TasksScreen() {
     [
       hydrated,
       claimTaskReward,
-      earnPoints,
-      trackEarned,
-      addTask,
-      recordActivity,
-      checkStreakMilestones,
-      care,
       showCelebration,
       notifPermissionAsked,
       markNotifPermissionAsked,
@@ -344,16 +328,7 @@ export default function TasksScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const { finalPoints } = claimedReward.rewardInfo;
-      earnPoints(finalPoints);
-      trackEarned(finalPoints, claimedReward.category);
-      addTask({
-        id: claimedReward.taskId,
-        label: claimedReward.label,
-        category: claimedReward.category,
-        pointValue: claimedReward.pointValue,
-        completedAt: Date.now(),
-      });
-      care();
+      recoverUnsettledGrants();
 
       const { outcome, basePoints, freeItemName } = claimedReward.rewardInfo;
       if (claimedReward.hasPhoto && outcome) {
@@ -371,10 +346,6 @@ export default function TasksScreen() {
     },
     [
       hydrated,
-      earnPoints,
-      trackEarned,
-      addTask,
-      care,
       claimPendingReward,
       showCelebration,
       notifPermissionAsked,
