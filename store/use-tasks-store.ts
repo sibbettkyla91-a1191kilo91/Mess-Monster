@@ -67,7 +67,8 @@ interface TasksState {
    * Per-task progress for today's roll. Persisted so an app restart mid-wait
    * resumes the time lock (wall-clock based) instead of resetting to idle,
    * and so an already-rolled reward can't be re-rolled by force-quitting.
-   * Cleared whenever the daily roll refreshes.
+   * Reset whenever the daily roll refreshes, except for time locks still
+   * counting down — those carry over anchored to their original waitStartedAt.
    */
   taskProgress: Record<string, TaskProgress>;
   addTask: (task: CleaningTask) => void;
@@ -104,13 +105,25 @@ export const useTasksStore = create<TasksState>()(
         // day rolled over must not vanish. Harvest reward_ready entries into
         // the persistent queue before the per-day progress map resets.
         const carried: PendingReward[] = [];
+        // A time lock in flight is wall-clock based, anchored to its
+        // waitStartedAt. The day rolling over mid-wait must neither restart it
+        // nor throw the wait away, so the entry carries over untouched — and
+        // its task carries into the new roll, keeping the timer on screen so
+        // it can still finish (immediately, if the wait already elapsed).
+        const carriedProgress: Record<string, TaskProgress> = {};
+        const carriedTasks: PresetTask[] = [];
         for (const [taskId, progress] of Object.entries(s.taskProgress)) {
-          if (progress.state !== "reward_ready" || !progress.rewardInfo)
-            continue;
           const task =
             s.dailyRoll.find((t) => t.id === taskId) ??
             PRESET_TASKS.find((t) => t.id === taskId);
           if (!task) continue;
+          if (progress.state === "waiting") {
+            carriedProgress[taskId] = progress;
+            carriedTasks.push(task);
+            continue;
+          }
+          if (progress.state !== "reward_ready" || !progress.rewardInfo)
+            continue;
           carried.push({
             id: `${s.dailyRollDate}:${taskId}`,
             taskId,
@@ -123,10 +136,16 @@ export const useTasksStore = create<TasksState>()(
           });
         }
 
+        const nextRoll = getDailyRoll(today);
+        const nextRollIds = new Set(nextRoll.map((t) => t.id));
+
         set({
-          dailyRoll: getDailyRoll(today),
+          dailyRoll: [
+            ...nextRoll,
+            ...carriedTasks.filter((t) => !nextRollIds.has(t.id)),
+          ],
           dailyRollDate: today,
-          taskProgress: {},
+          taskProgress: carriedProgress,
           pendingRewards: [...s.pendingRewards, ...carried],
         });
       },

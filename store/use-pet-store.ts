@@ -59,6 +59,36 @@ function safeTimestamp(value: unknown, now: number): number {
   return isValidTimestamp(value, now) ? value : now;
 }
 
+/**
+ * Re-run the existing evolution check for a premium player once both sides of
+ * it are actually restored. The check straddles two independently persisted
+ * stores — stage and lifetime points here, isPremium and activeDaysCount in
+ * the player store — and otherwise only ever runs from the upgrade button. A
+ * player who force-quit between unlocking premium and evolving would come back
+ * premium at teen with the gate already marked shown, leaving nothing to
+ * trigger it. Non-premium players are left alone: an unhydrated default must
+ * never stand in for a real answer, and cold start is no place to raise a
+ * paywall.
+ */
+function recheckPremiumEvolutionOnceHydrated(): void {
+  const recheckIfPremium = () => {
+    if (!usePlayerStore.getState().isPremium) return;
+    usePetStore.getState().recheckEvolution();
+  };
+
+  if (usePlayerStore.persist.hasHydrated()) {
+    recheckIfPremium();
+    return;
+  }
+
+  // Hydration order between the two stores isn't guaranteed; wait for the
+  // authoritative premium value rather than reading defaults.
+  const stopListening = usePlayerStore.persist.onFinishHydration(() => {
+    stopListening();
+    recheckIfPremium();
+  });
+}
+
 export function deriveMood(health: number, happiness: number): PetMood {
   const avg = (health + happiness) / 2;
   if (avg >= 75) return "thriving";
@@ -331,6 +361,7 @@ export const usePetStore = create<PetStore>()(
             const caredToday =
               localDayString(new Date(lastCaredAt)) === localDayString();
             void rescheduleDailyNudges(monsterName, caredToday);
+            recheckPremiumEvolutionOnceHydrated();
           };
           // Use setImmediate to schedule decay on the next event loop iteration.
           // This allows React to complete the initial render before we do heavy calculations.

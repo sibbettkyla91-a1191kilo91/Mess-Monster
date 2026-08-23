@@ -1,3 +1,4 @@
+import { DEFAULT_MIN_TIME, TASK_MIN_TIMES } from "@/constants/task-timers";
 import { getDailyRoll, PRESET_TASKS } from "@/store/preset-tasks";
 import { CleaningTask } from "@/store/types";
 import { TaskProgress, useTasksStore } from "@/store/use-tasks-store";
@@ -306,8 +307,9 @@ describe("pending rewards across day rollover", () => {
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
   });
 
-  it("only reward_ready entries carry — claimed/idle/waiting are not queued", () => {
+  it("only reward_ready entries queue as rewards — claimed/idle/waiting do not", () => {
     const roll = getDailyRoll("2020-01-01");
+    const waitStartedAt = Date.now();
     useTasksStore.setState({
       dailyRollDate: "2020-01-01",
       dailyRoll: roll,
@@ -317,7 +319,7 @@ describe("pending rewards across day rollover", () => {
         [roll[2].id]: {
           state: "waiting",
           hasPhoto: false,
-          waitStartedAt: Date.now(),
+          waitStartedAt,
         },
       },
     });
@@ -325,7 +327,11 @@ describe("pending rewards across day rollover", () => {
     useTasksStore.getState().refreshDailyRoll();
 
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
-    expect(useTasksStore.getState().taskProgress).toEqual({});
+    // Finished-with days are dropped, but a time lock still counting down is
+    // wall-clock based and survives the rollover (see the waiting suites below).
+    expect(useTasksStore.getState().taskProgress).toEqual({
+      [roll[2].id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+    });
   });
 
   it("rewards stack across multiple missed days instead of overwriting", () => {
@@ -385,5 +391,216 @@ describe("pending rewards across day rollover", () => {
     expect(attempts[0]).toEqual(reward);
     expect(attempts.slice(1)).toEqual([null, null]);
     expect(useTasksStore.getState().pendingRewards).toHaveLength(0);
+  });
+});
+
+// ─── waiting time lock across a day rollover ──────────────────────────────────
+// A time lock is wall-clock based: it is anchored to waitStartedAt, so the
+// calendar day rolling over mid-wait must neither restart nor discard it.
+
+describe("waiting time lock across a day rollover", () => {
+  const task = PRESET_TASKS.find((t) => t.id === "wash-dishes")!;
+  const minTime = TASK_MIN_TIMES[task.id] ?? DEFAULT_MIN_TIME;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Mirrors TaskTimer's wall-clock remaining calculation. */
+  const remainingSeconds = (waitStartedAt: number) =>
+    Math.max(0, minTime - Math.floor((Date.now() - waitStartedAt) / 1000));
+
+  /** Seed yesterday's roll with this task in-flight (and optional neighbours). */
+  const seedYesterday = (
+    rollDate: string,
+    progressById: Record<string, TaskProgress>,
+  ) => {
+    const roll = [
+      task,
+      ...getDailyRoll(rollDate).filter((t) => t.id !== task.id),
+    ].slice(0, 6);
+    useTasksStore.setState({
+      dailyRollDate: rollDate,
+      dailyRoll: roll,
+      taskProgress: progressById,
+      pendingRewards: [],
+    });
+    return roll;
+  };
+
+  it("carries a waiting task across local midnight with its original waitStartedAt", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 58, 0)); // May 27, 11:58pm local
+    const startDay = localDayString();
+    const waitStartedAt = Date.now();
+    seedYesterday(startDay, {
+      [task.id]: {
+        state: "waiting",
+        hasPhoto: true,
+        photoUri: "file://dishes.jpg",
+        waitStartedAt,
+      },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0)); // May 28, 12:01am local
+    expect(localDayString()).not.toBe(startDay);
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    expect(s.dailyRollDate).toBe(localDayString());
+    expect(s.taskProgress[task.id].state).toBe("waiting");
+    expect(s.taskProgress[task.id].waitStartedAt).toBe(waitStartedAt);
+    expect(s.taskProgress[task.id].hasPhoto).toBe(true);
+    expect(s.taskProgress[task.id].photoUri).toBe("file://dishes.jpg");
+    expect(s.dailyRoll.map((t) => t.id)).toContain(task.id);
+    expect(s.pendingRewards).toHaveLength(0);
+  });
+
+  it("preserves remaining wall-clock duration when the wait has not elapsed", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 58, 0));
+    const startDay = localDayString();
+    const waitStartedAt = Date.now();
+    seedYesterday(startDay, {
+      [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0)); // 180 s of 300 s
+    useTasksStore.getState().refreshDailyRoll();
+
+    expect(useTasksStore.getState().taskProgress[task.id].waitStartedAt).toBe(
+      waitStartedAt,
+    );
+    expect(remainingSeconds(waitStartedAt)).toBe(minTime - 180);
+    expect(remainingSeconds(waitStartedAt)).toBeGreaterThan(0);
+  });
+
+  it("lets an already-elapsed wait complete immediately after rollover", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 50, 0));
+    const startDay = localDayString();
+    const waitStartedAt = Date.now();
+    seedYesterday(startDay, {
+      [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0)); // 11 min > 5 min lock
+    useTasksStore.getState().refreshDailyRoll();
+
+    const progress = useTasksStore.getState().taskProgress[task.id];
+    expect(progress.state).toBe("waiting");
+    expect(progress.waitStartedAt).toBe(waitStartedAt);
+    // Zero remaining on arrival: TaskTimer fires onComplete without a new wait.
+    expect(remainingSeconds(waitStartedAt)).toBe(0);
+
+    useTasksStore.getState().setTaskProgress(task.id, {
+      ...progress,
+      state: "reward_ready",
+      rewardInfo,
+    });
+    expect(useTasksStore.getState().taskProgress[task.id].state).toBe(
+      "reward_ready",
+    );
+  });
+
+  it("does not restart the wait after midnight — it finishes from the original start", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 58, 0));
+    const waitStartedAt = Date.now();
+    seedYesterday(localDayString(), {
+      [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0));
+    useTasksStore.getState().refreshDailyRoll();
+    expect(remainingSeconds(waitStartedAt)).toBeGreaterThan(0);
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 3, 0)); // 300 s from the start
+    expect(remainingSeconds(waitStartedAt)).toBe(0);
+
+    const progress = useTasksStore.getState().taskProgress[task.id];
+    useTasksStore.getState().setTaskProgress(task.id, {
+      ...progress,
+      state: "reward_ready",
+      rewardInfo,
+    });
+    expect(useTasksStore.getState().taskProgress[task.id].state).toBe(
+      "reward_ready",
+    );
+  });
+
+  it("still moves reward_ready into pendingRewards alongside a carried wait", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 58, 0));
+    const startDay = localDayString();
+    const waitStartedAt = Date.now();
+    const readyId = "make-bed";
+    seedYesterday(startDay, {
+      [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+      [readyId]: {
+        state: "reward_ready",
+        hasPhoto: false,
+        rewardInfo,
+      },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0));
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    expect(s.taskProgress[task.id].state).toBe("waiting");
+    expect(s.taskProgress[readyId]).toBeUndefined();
+    expect(s.pendingRewards).toHaveLength(1);
+    expect(s.pendingRewards[0]).toMatchObject({
+      taskId: readyId,
+      earnedDate: startDay,
+      rewardInfo: { finalPoints: 20 },
+    });
+  });
+
+  it("does not carry claimed or idle entries", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 23, 58, 0));
+    const startDay = localDayString();
+    const waitStartedAt = Date.now();
+    const claimedId = "wipe-counters";
+    const idleId = "vacuum";
+    seedYesterday(startDay, {
+      [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+      [claimedId]: { state: "claimed", hasPhoto: false },
+      [idleId]: { state: "idle", hasPhoto: false },
+    });
+
+    jest.setSystemTime(new Date(2026, 4, 28, 0, 1, 0));
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    expect(s.taskProgress[task.id].state).toBe("waiting");
+    expect(s.taskProgress[claimedId]).toBeUndefined();
+    expect(s.taskProgress[idleId]).toBeUndefined();
+    expect(s.pendingRewards).toHaveLength(0);
+  });
+
+  it("a same-day refresh is a no-op for an in-flight wait", () => {
+    jest.setSystemTime(new Date(2026, 4, 27, 12, 0, 0));
+    const today = localDayString();
+    const waitStartedAt = Date.now();
+    const roll = getDailyRoll(today);
+    useTasksStore.setState({
+      dailyRollDate: today,
+      dailyRoll: roll,
+      taskProgress: {
+        [task.id]: { state: "waiting", hasPhoto: false, waitStartedAt },
+      },
+    });
+    const rollIdsBefore = roll.map((t) => t.id);
+
+    jest.setSystemTime(new Date(2026, 4, 27, 12, 1, 0));
+    useTasksStore.getState().refreshDailyRoll();
+
+    const s = useTasksStore.getState();
+    expect(s.dailyRollDate).toBe(today);
+    expect(s.dailyRoll.map((t) => t.id)).toEqual(rollIdsBefore);
+    expect(s.taskProgress[task.id].state).toBe("waiting");
+    expect(s.taskProgress[task.id].waitStartedAt).toBe(waitStartedAt);
+    expect(s.pendingRewards).toHaveLength(0);
   });
 });
