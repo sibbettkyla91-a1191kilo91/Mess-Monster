@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { usePlayerStore } from "./use-player-store";
+
 export type SubscriptionTier = "free" | "monthly" | "yearly";
 export type SubscriptionStatus = "trial" | "active" | "expired" | "none";
 
@@ -43,6 +45,10 @@ interface SubscriptionStore extends SubscriptionState {
 }
 
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+
+function playerIsPremium(): boolean {
+  return usePlayerStore.getState().isPremium;
+}
 
 export const useSubscriptionStore = create<SubscriptionStore>()(
   persist(
@@ -145,13 +151,9 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         });
       },
 
-      // Feature gates
-      isPremium: () => {
-        const state = get();
-        if (state.status === "active") return true;
-        if (state.status === "trial") return true;
-        return false;
-      },
+      // Entitlement is usePlayerStore.isPremium. status/trial/receipt stay
+      // scaffolding for later IAP and must not grant app premium on their own.
+      isPremium: () => playerIsPremium(),
 
       isOnTrial: () => get().status === "trial",
 
