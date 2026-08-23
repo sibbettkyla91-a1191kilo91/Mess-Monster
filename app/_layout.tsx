@@ -13,6 +13,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePetStore } from "@/store/use-pet-store";
 import { useTasksStore } from "@/store/use-tasks-store";
 import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
+import { subscribeUnsettledPurchaseRecovery } from "@/store/recover-unsettled-purchases";
 import { initNotifications } from "@/utils/daily-nudge";
 
 export const unstable_settings = {
@@ -57,6 +58,7 @@ export default function RootLayout() {
   // live in other stores. After a crash between those writes, replay any
   // leftover intent once all three stores have actually rehydrated.
   useEffect(() => subscribeUnsettledGrantRecovery(), []);
+  useEffect(() => subscribeUnsettledPurchaseRecovery(), []);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>

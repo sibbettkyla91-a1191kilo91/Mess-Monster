@@ -19,9 +19,11 @@ export function migratePlayerState(persistedState: any, version: number): any {
     tapReactionCount: 0,
     statPanelCollapsed: false,
     appliedRewardGrants: {},
+    appliedPurchases: {},
     ...persistedState,
   };
   migrated.appliedRewardGrants = persistedState?.appliedRewardGrants ?? {};
+  migrated.appliedPurchases = persistedState?.appliedPurchases ?? {};
   // v3 -> v4: availablePointsValue was a persisted cache of
   // totalPoints - spentPoints that could desync from its inputs.
   // It is now always derived on read; strip the stale copy.
@@ -48,6 +50,7 @@ interface PlayerStore extends PlayerProfile {
   notifPermissionAsked: boolean; // asked once ever, at the first reward claim
   statPanelCollapsed: boolean; // Home stat panel shrunk to its peek handle
   appliedRewardGrants: Record<string, PlayerGrantReceipt>;
+  appliedPurchases: Record<string, PlayerPurchaseReceipt>;
   markNotifPermissionAsked: () => void;
   toggleStatPanel: () => void;
   availablePoints: () => number; // derived: totalPoints - spentPoints
@@ -62,12 +65,25 @@ interface PlayerStore extends PlayerProfile {
   applyRewardGrantPoints: (grantId: string, amount: number) => void;
   applyRewardGrantActivity: (grantId: string, activityDay: string) => void;
   applyRewardGrantStreakBonus: (grantId: string, amount: number) => void;
+  chargePurchase: (
+    purchaseId: string,
+    itemId: string,
+    price: number,
+    autoConsume: boolean,
+  ) => void;
 }
 
 export type PlayerGrantReceipt = {
   points?: true;
   activity?: true;
   streak?: true;
+};
+
+export type PlayerPurchaseReceipt = {
+  charged?: true;
+  itemId: string;
+  price: number;
+  autoConsume: boolean;
 };
 
 export const usePlayerStore = create<PlayerStore>()(
@@ -89,6 +105,7 @@ export const usePlayerStore = create<PlayerStore>()(
       // version) or the migrate defaults (older versions) — no version bump.
       statPanelCollapsed: false,
       appliedRewardGrants: {},
+      appliedPurchases: {},
 
       // Always derived from totalPoints/spentPoints — never stored, so it
       // can't desync. In components, select the primitive directly:
@@ -202,6 +219,26 @@ export const usePlayerStore = create<PlayerStore>()(
             appliedRewardGrants: {
               ...s.appliedRewardGrants,
               [grantId]: { ...s.appliedRewardGrants[grantId], streak: true },
+            },
+          };
+        });
+      },
+
+      chargePurchase: (purchaseId, itemId, price, autoConsume) => {
+        set((s) => {
+          const receipts = s.appliedPurchases ?? {};
+          if (receipts[purchaseId]?.charged) return {};
+          if (s.totalPoints - s.spentPoints < price) return {};
+          return {
+            spentPoints: s.spentPoints + price,
+            appliedPurchases: {
+              ...receipts,
+              [purchaseId]: {
+                charged: true,
+                itemId,
+                price,
+                autoConsume,
+              },
             },
           };
         });

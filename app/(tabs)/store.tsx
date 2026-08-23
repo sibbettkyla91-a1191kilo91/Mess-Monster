@@ -14,6 +14,7 @@ import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
+import { executePaidShopPurchase } from "@/store/recover-unsettled-purchases";
 import { useStoreStore } from "@/store/use-store-store";
 import {
   STORE_CATEGORIES,
@@ -30,9 +31,7 @@ const fontRounded = Platform.select({
 
 export default function StoreScreen() {
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
-  const spendPoints = usePlayerStore((s) => s.spendPoints);
   const care = usePetStore((s) => s.care);
-  const buyItem = useStoreStore((s) => s.buyItem);
   const isOwned = useStoreStore((s) => s.isOwned);
   const consumeItem = useStoreStore((s) => s.useItem);
   const owned = useStoreStore((s) => s.owned);
@@ -112,24 +111,17 @@ export default function StoreScreen() {
 
       // Grant the item before charging: if the app is killed between the
       // two writes, the player keeps the item rather than losing points
-      // with nothing to show for it.
-      const bought = buyItem(item);
+      // with nothing to show for it. Recovery never retroactively charges.
+      const bought = executePaidShopPurchase(item);
       if (!bought) {
         showFeedback("\u274c Something went wrong");
         return;
       }
 
-      // Affordability was checked above; if points shifted underneath us
-      // the item stays granted \u2014 the failure mode always favors the player.
-      spendPoints(item.price);
-
-      // For food (the only repeatable category), auto-use immediately —
-      // it boosts mood. Toys, accessories, and decor are permanent
-      // collectibles and take the branch below.
+      // For food (the only repeatable category), auto-use is part of the
+      // paid purchase transaction. Toys, accessories, and decor stay in
+      // the collection.
       if (item.repeatable) {
-        consumeItem(item.id);
-        // Apply mood boost by calling care (resets lastCaredAt)
-        care();
         showFeedback(`\ud83c\udf89 ${item.name} used! +${item.moodBoost} mood`);
       } else {
         showFeedback(`\ud83d\udecd\ufe0f ${item.name} added to collection!`);
@@ -138,8 +130,6 @@ export default function StoreScreen() {
     [
       hydrated,
       availablePoints,
-      spendPoints,
-      buyItem,
       isOwned,
       consumeItem,
       care,

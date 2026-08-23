@@ -4,6 +4,18 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { STORE_ITEMS, StoreItem } from "./store-items";
 
+export type UnsettledPurchase = {
+  id: string;
+  itemId: string;
+  price: number;
+  autoConsume: boolean;
+};
+
+export type StorePurchaseReceipt = {
+  granted?: true;
+  consumed?: true;
+};
+
 // Exported for tests.
 export function migrateStoreState(persistedState: any, version: number): any {
   const migrated = {
@@ -11,6 +23,8 @@ export function migrateStoreState(persistedState: any, version: number): any {
     // v0 → v1: decor placement added. Items owned before this feature
     // simply become placeable (unplaced); nothing is lost.
     placed: persistedState?.placed ?? {},
+    unsettledPurchases: persistedState?.unsettledPurchases ?? [],
+    appliedPurchases: persistedState?.appliedPurchases ?? {},
   };
   // v1 → v2: toys changed from consumables (auto-used at purchase, so their
   // owned entry sat at quantity 0) to permanent collectibles like decor.
@@ -48,11 +62,23 @@ export interface OwnedEntry {
   purchasedAt: number;
 }
 
+function upsertUnsettled(
+  list: UnsettledPurchase[] | undefined,
+  purchase: UnsettledPurchase,
+): UnsettledPurchase[] {
+  const current = list ?? [];
+  if (current.some((p) => p.id === purchase.id)) return current;
+  return [...current, purchase];
+}
+
 interface StoreStore {
   owned: Record<string, OwnedEntry>;
 
   /** Item ids currently placed in the habitat room (decor and toys). */
   placed: Record<string, true>;
+
+  unsettledPurchases: UnsettledPurchase[];
+  appliedPurchases: Record<string, StorePurchaseReceipt>;
 
   /** Add an item to the owned collection. Returns true on success. */
   buyItem: (item: StoreItem) => boolean;
@@ -71,6 +97,10 @@ interface StoreStore {
 
   /** Returns true if the item is currently placed in the room. */
   isPlaced: (id: string) => boolean;
+
+  grantPurchase: (purchase: UnsettledPurchase) => void;
+  consumePurchase: (purchaseId: string, itemId: string) => void;
+  clearUnsettledPurchase: (purchaseId: string) => void;
 }
 
 export const useStoreStore = create<StoreStore>()(
@@ -78,6 +108,8 @@ export const useStoreStore = create<StoreStore>()(
     (set, get) => ({
       owned: {},
       placed: {},
+      unsettledPurchases: [],
+      appliedPurchases: {},
 
       buyItem: (item) => {
         set((s) => {
@@ -131,6 +163,69 @@ export const useStoreStore = create<StoreStore>()(
       },
 
       isPlaced: (id) => !!get().placed[id],
+
+      grantPurchase: (purchase) => {
+        set((s) => {
+          const receipts = s.appliedPurchases ?? {};
+          const unsettled = upsertUnsettled(s.unsettledPurchases, purchase);
+          if (receipts[purchase.id]?.granted) {
+            return { unsettledPurchases: unsettled };
+          }
+          const catalogItem = STORE_ITEMS.find((i) => i.id === purchase.itemId);
+          if (!catalogItem) return { unsettledPurchases: unsettled };
+          const existing = s.owned[purchase.itemId];
+          const alreadyOwned =
+            !catalogItem.repeatable && (existing?.quantity ?? 0) > 0;
+          const owned = alreadyOwned
+            ? s.owned
+            : {
+                ...s.owned,
+                [purchase.itemId]: {
+                  item: catalogItem,
+                  quantity: (existing?.quantity ?? 0) + 1,
+                  purchasedAt: existing?.purchasedAt ?? Date.now(),
+                },
+              };
+          return {
+            owned,
+            unsettledPurchases: unsettled,
+            appliedPurchases: {
+              ...receipts,
+              [purchase.id]: { ...receipts[purchase.id], granted: true },
+            },
+          };
+        });
+      },
+
+      consumePurchase: (purchaseId, itemId) => {
+        set((s) => {
+          const receipts = s.appliedPurchases ?? {};
+          if (receipts[purchaseId]?.consumed) return {};
+          const entry = s.owned[itemId];
+          const nextOwned =
+            entry && entry.quantity > 0
+              ? {
+                  ...s.owned,
+                  [itemId]: { ...entry, quantity: entry.quantity - 1 },
+                }
+              : s.owned;
+          return {
+            owned: nextOwned,
+            appliedPurchases: {
+              ...receipts,
+              [purchaseId]: { ...receipts[purchaseId], consumed: true },
+            },
+          };
+        });
+      },
+
+      clearUnsettledPurchase: (purchaseId) => {
+        set((s) => ({
+          unsettledPurchases: (s.unsettledPurchases ?? []).filter(
+            (p) => p.id !== purchaseId,
+          ),
+        }));
+      },
     }),
     {
       name: "mm-store-owned",

@@ -132,6 +132,7 @@ function determineAdultVariant(
 
 interface PetStore extends PetState {
   appliedRewardGrants: Record<string, PetGrantReceipt>;
+  appliedPurchases: Record<string, PetPurchaseReceipt>;
   care: () => void;
   addHappiness: (amount: number) => void;
   applyDecay: () => void;
@@ -150,12 +151,17 @@ interface PetStore extends PetState {
   ) => void;
   applyRewardGrantCared: (grantId: string) => void;
   applyRewardGrantStreakMilestone: (grantId: string, hit: number) => void;
+  applyPurchaseCared: (purchaseId: string) => void;
 }
 
 export type PetGrantReceipt = {
   tracked?: true;
   cared?: true;
   streakMilestone?: number;
+};
+
+export type PetPurchaseReceipt = {
+  cared?: true;
 };
 
 function computeTrackEarnedUpdate(
@@ -236,6 +242,7 @@ export const usePetStore = create<PetStore>()(
       pendingPremiumGate: null,
       premiumGateShownFor: null,
       appliedRewardGrants: {},
+      appliedPurchases: {},
 
       care: () => {
         set((s) => ({
@@ -395,6 +402,28 @@ export const usePetStore = create<PetStore>()(
         });
       },
 
+      applyPurchaseCared: (purchaseId) => {
+        let applied = false;
+        set((s) => {
+          const receipts = s.appliedPurchases ?? {};
+          if (receipts[purchaseId]?.cared) return {};
+          applied = true;
+          return {
+            health: clamp(s.health + HEALTH_CARE_BOOST),
+            happiness: clamp(s.happiness + HAPPINESS_CARE_BOOST),
+            lastCaredAt: Date.now(),
+            appliedPurchases: {
+              ...receipts,
+              [purchaseId]: { ...receipts[purchaseId], cared: true },
+            },
+          };
+        });
+        if (applied) {
+          const { monsterName } = usePlayerStore.getState();
+          void rescheduleDailyNudges(monsterName, true);
+        }
+      },
+
       applyDecay: () => {
         const now = Date.now();
         const { lastSessionAt, health, happiness } = get();
@@ -449,6 +478,7 @@ export const usePetStore = create<PetStore>()(
           lastSessionAt: safeTimestamp(persistedState?.lastSessionAt, now),
           lastCaredAt: safeTimestamp(persistedState?.lastCaredAt, now),
           appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
+          appliedPurchases: persistedState?.appliedPurchases ?? {},
         };
       },
       storage: createJSONStorage(() => AsyncStorage),
