@@ -27,11 +27,8 @@ jobs:
         # Honored via .npmrc (legacy-peer-deps=true).
         run: npm ci
 
-      - name: Type check (informational)
-        # continue-on-error so pre-existing missing-module errors don't block CI.
-        # Remove continue-on-error once all modules referenced in the codebase exist.
-        run: npx tsc --noEmit
-        continue-on-error: true
+      - name: Type check
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
