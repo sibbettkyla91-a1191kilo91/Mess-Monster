@@ -80,9 +80,16 @@ describe("totalPhotos", () => {
   });
 });
 
-// ─── todayPhotos ──────────────────────────────────────────────────────────────
+// ─── photos taken today (safe caller-side filter) ─────────────────────────────
+// Do not add a store helper that returns photos.filter(...). Subscribing to
+// that from a screen creates a new array every render and loops. Watch the
+// photos array, then derive "today" in the caller.
 
-describe("todayPhotos", () => {
+function photosTakenOnOrAfter(startMs: number) {
+  return usePhotoStore.getState().photos.filter((p) => p.takenAt >= startMs);
+}
+
+describe("photos taken today", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date("2026-05-27T12:00:00Z"));
@@ -92,8 +99,14 @@ describe("todayPhotos", () => {
     jest.useRealTimers();
   });
 
-  it("returns an empty array when no photos exist", () => {
-    expect(usePhotoStore.getState().todayPhotos()).toHaveLength(0);
+  const todayStart = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now.getTime();
+  };
+
+  it("finds none when no photos exist", () => {
+    expect(photosTakenOnOrAfter(todayStart())).toHaveLength(0);
   });
 
   it("includes photos taken today", () => {
@@ -101,7 +114,7 @@ describe("todayPhotos", () => {
       takenAt: new Date("2026-05-27T09:00:00Z").getTime(),
     });
     usePhotoStore.getState().addPhoto(todayPhoto);
-    expect(usePhotoStore.getState().todayPhotos()).toHaveLength(1);
+    expect(photosTakenOnOrAfter(todayStart())).toHaveLength(1);
   });
 
   it("excludes photos taken before today", () => {
@@ -109,7 +122,7 @@ describe("todayPhotos", () => {
       takenAt: new Date("2026-05-26T23:59:59Z").getTime(),
     });
     usePhotoStore.getState().addPhoto(yesterday);
-    expect(usePhotoStore.getState().todayPhotos()).toHaveLength(0);
+    expect(photosTakenOnOrAfter(todayStart())).toHaveLength(0);
   });
 
   it("correctly separates today and yesterday photos", () => {
@@ -125,7 +138,7 @@ describe("todayPhotos", () => {
     usePhotoStore.getState().addPhoto(todayPhoto);
     usePhotoStore.getState().addPhoto(oldPhoto);
 
-    const todays = usePhotoStore.getState().todayPhotos();
+    const todays = photosTakenOnOrAfter(todayStart());
     expect(todays).toHaveLength(1);
     expect(todays[0].taskId).toBe("vacuum");
   });

@@ -9,7 +9,7 @@ export interface PhotoRecord {
 }
 
 interface PhotoState {
-  /** History of all photo verifications */
+  /** History of all photo verifications. Watch this array; never expose a filtered-array helper. */
   photos: PhotoRecord[];
 
   /** Add a new photo verification record */
@@ -17,15 +17,6 @@ interface PhotoState {
 
   /** Get total photo count (for stats) */
   totalPhotos: () => number;
-
-  /** Get photos taken today */
-  todayPhotos: () => PhotoRecord[];
-}
-
-function todayStart(): number {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now.getTime();
 }
 
 export const usePhotoStore = create<PhotoState>()(
@@ -37,11 +28,6 @@ export const usePhotoStore = create<PhotoState>()(
         set((s) => ({ photos: [record, ...s.photos].slice(0, 200) })), // keep last 200
 
       totalPhotos: () => get().photos.length,
-
-      todayPhotos: () => {
-        const start = todayStart();
-        return get().photos.filter((p) => p.takenAt >= start);
-      },
     }),
     {
       name: "mm-photos",

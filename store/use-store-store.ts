@@ -72,6 +72,7 @@ function upsertUnsettled(
 }
 
 interface StoreStore {
+  /** Watch this map from screens; never expose a filtered-array helper. */
   owned: Record<string, OwnedEntry>;
 
   /** Item ids currently placed in the habitat room (decor and toys). */
@@ -88,9 +89,6 @@ interface StoreStore {
 
   /** Consume one unit of a repeatable item. Returns true if successful. */
   useItem: (id: string) => boolean;
-
-  /** Get all owned entries with quantity > 0. */
-  getOwnedItems: () => OwnedEntry[];
 
   /** Place or remove an owned item in the habitat room. No-op if not owned. */
   togglePlaced: (id: string) => void;
@@ -144,9 +142,6 @@ export const useStoreStore = create<StoreStore>()(
         }));
         return true;
       },
-
-      getOwnedItems: () =>
-        Object.values(get().owned).filter((e) => e.quantity > 0),
 
       togglePlaced: (id) => {
         const entry = get().owned[id];
