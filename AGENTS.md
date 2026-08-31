@@ -1,8 +1,12 @@
 # Mess Monster
 
-PROJECT: React Native/Expo cleaning-motivation app. Two monsters (Nilly, Luna). Evolution: egg → baby → teen → adult. Points from chores, spent in the points store.
+PROJECT: React Native/Expo (SDK 54, Expo Router) cleaning-motivation app. Two monsters: Nilly (mint, kawaii) and Luna (dark, witchy). Evolution: egg → baby → teen → adult. Points from chores, spent in the points store. Neglect makes the pet sad/sick; cleaning makes it thrive.
+
+UX: low pressure, zero shame — every choice should make starting a chore easier.
 
 OWNER: Builds via AI-assisted prompting; not a coding background. Explain changes in plain language, not syntax. Propose a plan before large changes.
+
+STACK: `npm start` / `npm test` / `npm run lint`. Imports use `@/` for the repo root. New tab icons need an entry in `components/ui/icon-symbol.tsx` `MAPPING`. React Compiler is on.
 
 ## Hard rules
 
