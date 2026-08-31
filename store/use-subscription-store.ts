@@ -31,9 +31,6 @@ interface SubscriptionStore extends SubscriptionState {
   cancelSubscription: () => void;
 
   isOnTrial: () => boolean;
-
-  // Receipt validation
-  validateReceipt: (receiptToken: string) => Promise<boolean>;
 }
 
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
@@ -140,20 +137,6 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
       },
 
       isOnTrial: () => get().status === "trial",
-
-      // Validate receipt with Google Play (simplified for now)
-      // In production, this would call your backend to verify with Google
-      validateReceipt: async (receiptToken: string) => {
-        try {
-          // TODO: Implement actual receipt validation with Google Play API
-          // For now, we accept all receipts as valid
-          console.log("Receipt validation:", receiptToken);
-          return true;
-        } catch (error) {
-          console.error("Receipt validation failed:", error);
-          return false;
-        }
-      },
     }),
     {
       name: "mm-subscription",
