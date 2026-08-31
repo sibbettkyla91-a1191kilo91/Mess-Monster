@@ -387,12 +387,7 @@ export default function TasksScreen() {
   return (
     <View style={[styles.container, { backgroundColor: page }]}>
       <View style={styles.header}>
-        <Text
-          style={[
-            styles.title,
-            { color: ink, fontFamily: fontRounded },
-          ]}
-        >
+        <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
           Today’s Tasks
         </Text>
         <View style={styles.subrow}>
@@ -433,7 +428,7 @@ export default function TasksScreen() {
                 Rewards waiting for you
               </Text>
               <Text style={[styles.carriedSubtitle, { color: inkMuted }]}>
-                Earned earlier — yours whenever you're ready.
+                Earned earlier — yours whenever you{"'"}re ready.
               </Text>
               {pendingRewards.map((reward) => (
                 <View
@@ -637,7 +632,9 @@ export default function TasksScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Skip photo"
                       >
-                        <Text style={[styles.skipButtonText, { color: inkMuted }]}>
+                        <Text
+                          style={[styles.skipButtonText, { color: inkMuted }]}
+                        >
                           Skip
                         </Text>
                       </Pressable>
@@ -655,7 +652,9 @@ export default function TasksScreen() {
                           { backgroundColor: accentSoft },
                         ]}
                       >
-                        <Text style={[styles.photoBadgeText, { color: onSoft }]}>
+                        <Text
+                          style={[styles.photoBadgeText, { color: onSoft }]}
+                        >
                           Photo saved
                         </Text>
                       </View>
