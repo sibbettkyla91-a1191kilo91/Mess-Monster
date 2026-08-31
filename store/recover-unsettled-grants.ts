@@ -1,6 +1,7 @@
 import { localDayString } from "@/utils/local-day";
 import { usePetStore } from "./use-pet-store";
 import { usePlayerStore } from "./use-player-store";
+import { useStoreStore } from "./use-store-store";
 import { UnsettledRewardGrant, useTasksStore } from "./use-tasks-store";
 
 const STREAK_MILESTONE_BONUS = 50;
@@ -9,7 +10,8 @@ function storesHydrated(): boolean {
   return (
     useTasksStore.persist.hasHydrated() &&
     usePlayerStore.persist.hasHydrated() &&
-    usePetStore.persist.hasHydrated()
+    usePetStore.persist.hasHydrated() &&
+    useStoreStore.persist.hasHydrated()
   );
 }
 
@@ -67,13 +69,20 @@ function applyOneGrant(grant: UnsettledRewardGrant): void {
   applyGrantStreakMilestone(grant);
   // 6. pet care
   usePetStore.getState().applyRewardGrantCared(grant.id);
-  // 7. drop the intent once every effect has a durable receipt
+  // 7. free snack, only when this roll recorded a catalog id (claim-time grant)
+  if (grant.rewardInfo.freeItemId) {
+    useStoreStore
+      .getState()
+      .applyRewardGrantFreeItem(grant.id, grant.rewardInfo.freeItemId);
+  }
+  // 8. drop the intent once every effect has a durable receipt
   useTasksStore.getState().clearUnsettledGrant(grant.id);
 }
 
 /**
- * Finish applying any reserved reward grants. No-op until all three stores
- * have rehydrated, and no-op per-effect where a receipt already exists.
+ * Finish applying any reserved reward grants. No-op until tasks, player,
+ * pet, and store have rehydrated, and no-op per-effect where a receipt
+ * already exists.
  * Safe to call from the live claim path and from cold-start recovery.
  */
 export function recoverUnsettledGrants(): void {
@@ -85,7 +94,7 @@ export function recoverUnsettledGrants(): void {
 }
 
 /**
- * Run recoverUnsettledGrants once all three persisted stores have hydrated,
+ * Run recoverUnsettledGrants once all four persisted stores have hydrated,
  * regardless of which store finishes first. Cleans up the hydration
  * listeners after the first successful pass.
  */
@@ -109,6 +118,9 @@ export function subscribeUnsettledGrantRecovery(): () => void {
   }
   if (!usePetStore.persist.hasHydrated()) {
     unsubs.push(usePetStore.persist.onFinishHydration(onReady));
+  }
+  if (!useStoreStore.persist.hasHydrated()) {
+    unsubs.push(useStoreStore.persist.onFinishHydration(onReady));
   }
 
   onReady();

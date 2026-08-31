@@ -17,7 +17,6 @@ import { PhotoRewardModal } from "@/components/photo-reward-modal";
 import { TaskTimer } from "@/components/task-timer";
 import {
   DEFAULT_MIN_TIME,
-  FREE_ITEM_MAX_PRICE,
   RewardOutcome,
   TASK_MIN_TIMES,
   rollReward,
@@ -29,8 +28,8 @@ import {
   rescheduleDailyNudges,
 } from "@/utils/daily-nudge";
 import { PresetTask } from "@/store/preset-tasks";
+import { finishPhotoTaskWait } from "@/store/photo-task-reward";
 import { recoverUnsettledGrants } from "@/store/recover-unsettled-grants";
-import { STORE_ITEMS } from "@/store/store-items";
 import { TaskCategory } from "@/store/types";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePhotoStore } from "@/store/use-photo-store";
@@ -67,7 +66,6 @@ export default function TasksScreen() {
     (s) => s.markNotifPermissionAsked,
   );
   const addPhoto = usePhotoStore((s) => s.addPhoto);
-  const buyItem = useStoreStore((s) => s.buyItem);
   // The task flow writes to all five persisted stores; a write landing before
   // AsyncStorage rehydration completes gets clobbered when the hydration
   // merge arrives, so the task list stays closed until every store is ready.
@@ -211,7 +209,9 @@ export default function TasksScreen() {
     [hydrated, setTaskProgress],
   );
 
-  // Step 3: Time lock expires → show claim button (don't award yet)
+  // Step 3: Time lock expires → show claim button (don't award yet).
+  // A free snack is recorded on the roll here and granted at claim, so a
+  // crash before claim cannot add a second item if the timer fires again.
   const handleTimerComplete = useCallback(
     (task: PresetTask) => {
       if (!hydrated) return;
@@ -221,40 +221,10 @@ export default function TasksScreen() {
       if (!progress || progress.state !== "waiting") return;
 
       if (progress.hasPhoto) {
-        // Calculate photo reward
-        const reward = rollReward();
-        const finalPoints = Math.round(
-          task.pointValue * reward.pointsMultiplier,
+        setTaskProgress(
+          task.id,
+          finishPhotoTaskWait(task, progress, rollReward()),
         );
-
-        // Handle free item if applicable
-        let freeItemName: string | undefined;
-        if (reward.includesFreeItem) {
-          const affordableItems = STORE_ITEMS.filter(
-            (i) => i.price <= FREE_ITEM_MAX_PRICE && i.repeatable,
-          );
-          if (affordableItems.length > 0) {
-            const randomItem =
-              affordableItems[
-                Math.floor(Math.random() * affordableItems.length)
-              ];
-            buyItem(randomItem);
-            freeItemName = `${randomItem.emoji} ${randomItem.name}`;
-          }
-        }
-
-        // Transition to reward_ready with reward info
-        setTaskProgress(task.id, {
-          ...progress,
-          state: "reward_ready",
-          rewardInfo: {
-            basePoints: task.pointValue,
-            pointsMultiplier: reward.pointsMultiplier,
-            finalPoints,
-            freeItemName,
-            outcome: reward,
-          },
-        });
       } else {
         // No photo — base points only
         setTaskProgress(task.id, {
@@ -268,7 +238,7 @@ export default function TasksScreen() {
         });
       }
     },
-    [hydrated, taskProgress, buyItem, setTaskProgress],
+    [hydrated, taskProgress, setTaskProgress],
   );
 
   // Step 4: User claims reward → award points and mark as claimed

@@ -1,7 +1,7 @@
 /**
- * Recovery must wait until tasks, player, and pet have all rehydrated,
- * regardless of which store finishes first. These tests seed a reserved
- * grant in the persisted tasks save and resolve the three stores in
+ * Recovery must wait until tasks, player, pet, and store have all
+ * rehydrated, regardless of which store finishes first. These tests seed
+ * a reserved grant in the persisted tasks save and resolve the stores in
  * different orders.
  */
 const mockResolvers: Record<string, (value: string | null) => void> = {};
@@ -102,6 +102,22 @@ const OLD_PLAYER_SAVE = JSON.stringify({
   version: 4,
 });
 
+const STORE_SAVE = JSON.stringify({
+  state: {
+    owned: {},
+    placed: {},
+    unsettledPurchases: [],
+    appliedPurchases: {},
+    appliedRewardGrants: {},
+  },
+  version: 3,
+});
+
+const OLD_STORE_SAVE = JSON.stringify({
+  state: { owned: {}, placed: {} },
+  version: 2,
+});
+
 const OLD_PET_SAVE = JSON.stringify({
   state: {
     health: 100,
@@ -120,6 +136,7 @@ function coldStart() {
   const { useTasksStore } = require("@/store/use-tasks-store");
   const { usePlayerStore } = require("@/store/use-player-store");
   const { usePetStore } = require("@/store/use-pet-store");
+  const { useStoreStore } = require("@/store/use-store-store");
   const {
     recoverUnsettledGrants,
     subscribeUnsettledGrantRecovery,
@@ -129,6 +146,7 @@ function coldStart() {
     useTasksStore,
     usePlayerStore,
     usePetStore,
+    useStoreStore,
     recoverUnsettledGrants,
     subscribeUnsettledGrantRecovery,
   };
@@ -152,6 +170,7 @@ describe("recovery hydration order", () => {
 
     mockResolvers["mm-tasks"](TASKS_SAVE);
     mockResolvers["mm-pet"](PET_SAVE);
+    mockResolvers["mm-store-owned"](STORE_SAVE);
     await flushHydration();
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(false);
@@ -178,6 +197,7 @@ describe("recovery hydration order", () => {
 
     mockResolvers["mm-tasks"](TASKS_SAVE);
     mockResolvers["mm-player"](PLAYER_SAVE);
+    mockResolvers["mm-store-owned"](STORE_SAVE);
     await flushHydration();
 
     expect(usePetStore.persist.hasHydrated()).toBe(false);
@@ -202,6 +222,7 @@ describe("recovery hydration order", () => {
 
     mockResolvers["mm-player"](PLAYER_SAVE);
     mockResolvers["mm-pet"](PET_SAVE);
+    mockResolvers["mm-store-owned"](STORE_SAVE);
     await flushHydration();
 
     expect(useTasksStore.persist.hasHydrated()).toBe(false);
@@ -215,7 +236,33 @@ describe("recovery hydration order", () => {
     stop();
   });
 
-  it("does not recover until all three stores are ready", async () => {
+  it("waits when store hydrates last", async () => {
+    const {
+      useTasksStore,
+      usePlayerStore,
+      useStoreStore,
+      subscribeUnsettledGrantRecovery,
+    } = coldStart();
+    const stop = subscribeUnsettledGrantRecovery();
+
+    mockResolvers["mm-tasks"](TASKS_SAVE);
+    mockResolvers["mm-player"](PLAYER_SAVE);
+    mockResolvers["mm-pet"](PET_SAVE);
+    await flushHydration();
+
+    expect(useStoreStore.persist.hasHydrated()).toBe(false);
+    expect(usePlayerStore.getState().totalPoints).toBe(100);
+    expect(useTasksStore.getState().unsettledGrants).toHaveLength(1);
+
+    mockResolvers["mm-store-owned"](STORE_SAVE);
+    await flushHydration();
+
+    expect(usePlayerStore.getState().totalPoints).toBe(120);
+    expect(useTasksStore.getState().unsettledGrants).toHaveLength(0);
+    stop();
+  });
+
+  it("does not recover until all four stores are ready", async () => {
     const { usePlayerStore, recoverUnsettledGrants } = coldStart();
 
     mockResolvers["mm-tasks"](TASKS_SAVE);
@@ -230,16 +277,19 @@ describe("recovery hydration order", () => {
   });
 
   it("older persisted versions initialize empty grant/receipt fields", async () => {
-    const { useTasksStore, usePlayerStore, usePetStore } = coldStart();
+    const { useTasksStore, usePlayerStore, usePetStore, useStoreStore } =
+      coldStart();
 
     mockResolvers["mm-tasks"](OLD_TASKS_SAVE);
     mockResolvers["mm-player"](OLD_PLAYER_SAVE);
     mockResolvers["mm-pet"](OLD_PET_SAVE);
+    mockResolvers["mm-store-owned"](OLD_STORE_SAVE);
     await flushHydration();
 
     expect(useTasksStore.getState().unsettledGrants).toEqual([]);
     expect(useTasksStore.getState().appliedRewardGrants).toEqual({});
     expect(usePlayerStore.getState().appliedRewardGrants).toEqual({});
     expect(usePetStore.getState().appliedRewardGrants).toEqual({});
+    expect(useStoreStore.getState().appliedRewardGrants).toEqual({});
   });
 });

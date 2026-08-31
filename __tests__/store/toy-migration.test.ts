@@ -110,5 +110,6 @@ describe("migrateStoreState v1 → v2", () => {
     );
 
     expect(out.owned["toy-yarn"].quantity).toBe(0);
+    expect(out.appliedRewardGrants).toEqual({});
   });
 });
