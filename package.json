@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:go": "expo start --go",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -13,7 +14,10 @@
     "build": "webpack --mode production",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "eas:android:development": "eas build --platform android --profile development",
+    "eas:android:preview": "eas build --platform android --profile preview",
+    "eas:android:production": "eas build --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -23,6 +27,7 @@
     "@react-navigation/native": "^7.1.8",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
