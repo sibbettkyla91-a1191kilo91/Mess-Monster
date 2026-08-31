@@ -19,12 +19,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          # cache: 'npm' requires a lock file; omit until package-lock.json is committed
+          cache: "npm"
 
       - name: Install dependencies
         # --legacy-peer-deps is required because React 19 breaks strict peer
         # resolution in several packages that haven't updated their peerDeps yet.
-        run: npm install --legacy-peer-deps
+        # Honored via .npmrc (legacy-peer-deps=true).
+        run: npm ci
 
       - name: Type check (informational)
         # continue-on-error so pre-existing missing-module errors don't block CI.
