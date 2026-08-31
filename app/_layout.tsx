@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 import "react-native-reanimated";
 
+import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePetStore } from "@/store/use-pet-store";
 import { useTasksStore } from "@/store/use-tasks-store";
@@ -61,12 +62,14 @@ export default function RootLayout() {
   useEffect(() => subscribeUnsettledPurchaseRecovery(), []);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 }
