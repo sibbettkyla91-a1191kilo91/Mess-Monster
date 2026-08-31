@@ -233,8 +233,8 @@ describe("premium evolution recheck after hydration", () => {
     await flushHydration();
     expect(usePetStore.getState().evolutionStage).toBe("teen");
 
-    // Mirrors Home's upgrade button: placeholder IAP, then the existing
-    // recheck. The hydration repair must not replace this call site.
+    // Direct entitlement write + recheck — Home no longer grants premium
+    // from the upgrade button. The hydration repair must not replace this.
     usePlayerStore.getState().setPremium(true);
     usePetStore.getState().recheckEvolution();
 

@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { getDecorSlot } from "@/store/decor-slots";
 import { AdultVariant, EvolutionStage } from "@/store/types";
@@ -885,14 +886,23 @@ function PremiumGateModal({
             premiumStyles.upgradeButton,
             { backgroundColor: theme.accent },
           ]}
-          onPress={onUpgrade}
+          onPress={() => {
+            if (!FOUNDING_MEMBER_PURCHASE_ENABLED) return;
+            onUpgrade();
+          }}
           accessibilityRole="button"
-          accessibilityLabel="Become a Founding Member"
+          accessibilityLabel={
+            FOUNDING_MEMBER_PURCHASE_ENABLED
+              ? "Become a Founding Member"
+              : "Founding Member coming soon"
+          }
         >
           <ThemedText
             style={[premiumStyles.upgradeButtonText, { color: theme.pillText }]}
           >
-            Become a Founding Member
+            {FOUNDING_MEMBER_PURCHASE_ENABLED
+              ? "Become a Founding Member"
+              : "Coming soon"}
           </ThemedText>
         </Pressable>
         <Pressable onPress={onDismiss} style={premiumStyles.dismissButton}>
@@ -976,13 +986,11 @@ export default function HomeScreen() {
   const clearMilestoneBanner = usePetStore((s) => s.clearMilestoneBanner);
   const clearPendingEvolution = usePetStore((s) => s.clearPendingEvolution);
   const clearPremiumGate = usePetStore((s) => s.clearPremiumGate);
-  const recheckEvolution = usePetStore((s) => s.recheckEvolution);
 
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
   const streak = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);
-  const setPremium = usePlayerStore((s) => s.setPremium);
   const isPremium = usePlayerStore((s) => s.isPremium);
   const statPanelCollapsed = usePlayerStore((s) => s.statPanelCollapsed);
   const toggleStatPanel = usePlayerStore((s) => s.toggleStatPanel);
@@ -1630,12 +1638,9 @@ export default function HomeScreen() {
             setShowUpgradeModal(false);
           }}
           onUpgrade={() => {
-            if (!hydrated) return;
-            // Placeholder: set premium true; real IAP wired in a future update
-            setPremium(true);
-            clearPremiumGate();
-            setShowUpgradeModal(false);
-            recheckEvolution();
+            // Flip FOUNDING_MEMBER_PURCHASE_ENABLED only after real billing
+            // is wired. This button must never grant premium by itself.
+            if (!FOUNDING_MEMBER_PURCHASE_ENABLED) return;
           }}
         />
       )}

@@ -114,22 +114,31 @@ describe("useItem", () => {
   });
 });
 
-// ─── getOwnedItems ────────────────────────────────────────────────────────────
+// ─── owned map reads (safe Collection pattern) ────────────────────────────────
+// Do not add a store helper that returns Object.values(owned).filter(...).
+// Subscribing to that from a screen creates a new array every render and
+// loops. Watch the owned map, then derive the list in the caller.
 
-describe("getOwnedItems", () => {
-  it("returns an empty array when nothing is owned", () => {
-    expect(useStoreStore.getState().getOwnedItems()).toHaveLength(0);
+function inStockEntries() {
+  return Object.values(useStoreStore.getState().owned).filter(
+    (e) => e.quantity > 0,
+  );
+}
+
+describe("owned map quantity reads", () => {
+  it("has no in-stock entries when nothing is owned", () => {
+    expect(inStockEntries()).toHaveLength(0);
   });
 
-  it("returns entries for all owned items", () => {
+  it("includes every item still in stock", () => {
     useStoreStore.getState().buyItem(repeatableItem);
     useStoreStore.getState().buyItem(oneTimeItem);
-    expect(useStoreStore.getState().getOwnedItems()).toHaveLength(2);
+    expect(inStockEntries()).toHaveLength(2);
   });
 
   it("excludes items whose quantity has dropped to zero", () => {
     useStoreStore.getState().buyItem(repeatableItem);
     useStoreStore.getState().useItem(repeatableItem.id); // qty → 0
-    expect(useStoreStore.getState().getOwnedItems()).toHaveLength(0);
+    expect(inStockEntries()).toHaveLength(0);
   });
 });
