@@ -73,7 +73,10 @@ beforeEach(() => {
 
 describe("single premium source", () => {
   it("does not expose premium readers on the subscription store", () => {
-    const sub = useSubscriptionStore.getState() as Record<string, unknown>;
+    const sub = useSubscriptionStore.getState() as unknown as Record<
+      string,
+      unknown
+    >;
     for (const key of FORBIDDEN_SUB_READERS) {
       expect(sub[key]).toBeUndefined();
     }
