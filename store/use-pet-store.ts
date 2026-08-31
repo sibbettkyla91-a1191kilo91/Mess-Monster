@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { rescheduleDailyNudges } from "@/utils/daily-nudge";
 import { localDayString } from "@/utils/local-day";
 import { AdultVariant, EvolutionStage, PetState, TaskCategory } from "./types";
+import { isPlayerPremium } from "./premium";
 import { usePlayerStore } from "./use-player-store";
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
@@ -72,7 +73,7 @@ function safeTimestamp(value: unknown, now: number): number {
  */
 function recheckPremiumEvolutionOnceHydrated(): void {
   const recheckIfPremium = () => {
-    if (!usePlayerStore.getState().isPremium) return;
+    if (!isPlayerPremium()) return;
     usePetStore.getState().recheckEvolution();
   };
 
@@ -192,14 +193,14 @@ function computeTrackEarnedUpdate(
   const threshold = EVOLUTION_THRESHOLDS[next];
   if (!threshold) return baseUpdate;
 
-  const { activeDaysCount, isPremium } = usePlayerStore.getState();
+  const { activeDaysCount } = usePlayerStore.getState();
   const meetsConditions =
     newTotal >= threshold.points && activeDaysCount >= threshold.days;
   if (!meetsConditions) return baseUpdate;
 
   // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
   if (next === "adult") {
-    if (!isPremium) {
+    if (!isPlayerPremium()) {
       // Show gate once per stage — don't repeat if already shown
       if (s.premiumGateShownFor === next) return baseUpdate;
       return {
@@ -266,7 +267,7 @@ export const usePetStore = create<PetStore>()(
 
       recheckEvolution: () => {
         const s = get();
-        const { activeDaysCount, isPremium } = usePlayerStore.getState();
+        const { activeDaysCount } = usePlayerStore.getState();
         const next = nextStage(s.evolutionStage);
         if (!next || next === "ascended") return;
 
@@ -278,7 +279,7 @@ export const usePetStore = create<PetStore>()(
         )
           return;
 
-        if (next === "adult" && !isPremium) {
+        if (next === "adult" && !isPlayerPremium()) {
           if (s.premiumGateShownFor !== next) {
             set({ pendingPremiumGate: next, premiumGateShownFor: next });
           }

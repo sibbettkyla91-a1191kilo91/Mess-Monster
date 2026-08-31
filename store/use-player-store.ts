@@ -137,6 +137,7 @@ export const usePlayerStore = create<PlayerStore>()(
 
       selectMonster: (monster) => set({ selectedMonster: monster }),
       setMonsterName: (name) => set({ monsterName: name }),
+      // Writer for the one premium flag. Readers go through store/premium.ts.
       setPremium: (value) => set({ isPremium: value }),
 
       recordTapReaction: () => {

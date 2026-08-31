@@ -2,8 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { usePlayerStore } from "./use-player-store";
-
 export type SubscriptionTier = "free" | "monthly" | "yearly";
 export type SubscriptionStatus = "trial" | "active" | "expired" | "none";
 
@@ -32,23 +30,13 @@ interface SubscriptionStore extends SubscriptionState {
   renewSubscription: (receiptToken: string) => void;
   cancelSubscription: () => void;
 
-  // Feature gates
-  isPremium: () => boolean;
   isOnTrial: () => boolean;
-  canUseMusic: () => boolean;
-  canSkipAds: () => boolean;
-  canEvolveToAdult: () => boolean;
-  canUseShortTimer: () => boolean;
 
   // Receipt validation
   validateReceipt: (receiptToken: string) => Promise<boolean>;
 }
 
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
-
-function playerIsPremium(): boolean {
-  return usePlayerStore.getState().isPremium;
-}
 
 export const useSubscriptionStore = create<SubscriptionStore>()(
   persist(
@@ -151,19 +139,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         });
       },
 
-      // Entitlement is usePlayerStore.isPremium. status/trial/receipt stay
-      // scaffolding for later IAP and must not grant app premium on their own.
-      isPremium: () => playerIsPremium(),
-
       isOnTrial: () => get().status === "trial",
-
-      canUseMusic: () => get().isPremium(),
-
-      canSkipAds: () => get().isPremium(),
-
-      canEvolveToAdult: () => get().isPremium(),
-
-      canUseShortTimer: () => get().isPremium(),
 
       // Validate receipt with Google Play (simplified for now)
       // In production, this would call your backend to verify with Google
@@ -186,3 +162,15 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
     },
   ),
 );
+
+type ForbiddenPremiumKeys =
+  | "isPremium"
+  | "canUseMusic"
+  | "canSkipAds"
+  | "canEvolveToAdult"
+  | "canUseShortTimer";
+
+type AssertNever<T extends never> = T;
+type _SubscriptionHasNoPremiumReader = AssertNever<
+  Extract<keyof SubscriptionStore, ForbiddenPremiumKeys>
+>;

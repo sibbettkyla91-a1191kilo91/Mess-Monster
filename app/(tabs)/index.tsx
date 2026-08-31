@@ -17,6 +17,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { getDecorSlot } from "@/store/decor-slots";
+import { useIsPremium } from "@/store/premium";
 import { AdultVariant, EvolutionStage } from "@/store/types";
 import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
@@ -983,7 +984,7 @@ export default function HomeScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);
   const setPremium = usePlayerStore((s) => s.setPremium);
-  const isPremium = usePlayerStore((s) => s.isPremium);
+  const isPremium = useIsPremium();
   const statPanelCollapsed = usePlayerStore((s) => s.statPanelCollapsed);
   const toggleStatPanel = usePlayerStore((s) => s.toggleStatPanel);
   const router = useRouter();
