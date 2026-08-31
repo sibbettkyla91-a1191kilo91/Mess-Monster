@@ -6,7 +6,6 @@ import {
   Dimensions,
   Image,
   ImageBackground,
-  ImageSourcePropType,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,13 +13,16 @@ import {
   View,
 } from "react-native";
 
+import { AccessoryLayer } from "@/components/accessory-layer";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
+import { resolveAccessoryStage } from "@/store/accessory-config";
 import { getDecorSlot } from "@/store/decor-slots";
+import { getMonsterSprite } from "@/store/monster-sprites";
 import { useIsPremium } from "@/store/premium";
-import { AdultVariant, EvolutionStage } from "@/store/types";
-import { PetMood, deriveMood, usePetStore } from "@/store/use-pet-store";
+import { EvolutionStage } from "@/store/types";
+import { deriveMood, usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
@@ -131,73 +133,10 @@ const MOOD_CONFIG = {
   },
 } as const;
 
-// ─── Stage sprite map ───────────────────────────────────────────────────────
-// All sprites live in assets/ (root). Adult variants are determined at evolution time.
-
-const STAGE_SPRITES = {
-  luna: {
-    egg: require("../../assets/images/luna_egg.png"),
-    baby: require("../../assets/images/luna_baby.png"),
-    teen: require("../../assets/images/luna_teen.png"),
-    adult: require("../../assets/images/luna_adult.png"),
-    adult_kitchen: require("../../assets/images/luna_adult_kitchen.png"),
-    adult_livingroom: require("../../assets/images/luna_adult_livingroom.png"),
-    adult_bedroom: require("../../assets/images/luna_adult_bedroom.png"),
-    adult_bathroom: require("../../assets/images/luna_adult_bathroom.png"),
-    sad_egg: require("../../assets/images/sad_luna_egg.png"),
-    sad_baby: require("../../assets/images/sad_luna_baby.png"),
-    sad_teen: require("../../assets/images/sad_luna_teen.png"),
-  },
-  nilly: {
-    egg: require("../../assets/images/nilly_egg.png"),
-    baby: require("../../assets/images/nilly_baby.png"),
-    teen: require("../../assets/images/nilly_teen.png"),
-    adult: require("../../assets/images/nilly_adult.png"),
-    adult_kitchen: require("../../assets/images/nilly_adult_kitchen.png"),
-    adult_livingroom: require("../../assets/images/nilly_adult_livingroom.png"),
-    adult_bedroom: require("../../assets/images/nilly_adult_bedroom.png"),
-    adult_bathroom: require("../../assets/images/nilly_adult_bathroom.png"),
-    sad_egg: require("../../assets/images/sad_nilly_egg.png"),
-    sad_baby: require("../../assets/images/sad_nilly_baby.png"),
-    sad_teen: require("../../assets/images/sad_nilly_teen.png"),
-  },
-} as const;
-
 const HABITAT_IMAGES = {
   nilly: require("../../assets/images/nilly-habitat.jpg"),
   luna: require("../../assets/images/luna-habitat.jpg"),
 };
-
-function getMonsterSprite(
-  monster: "nilly" | "luna",
-  stage: EvolutionStage,
-  adultVariant: AdultVariant,
-  mood: PetMood,
-): ImageSourcePropType {
-  const sprites = STAGE_SPRITES[monster];
-  // Use sad sprite variant for sad or sick mood
-  const isSadMood = mood === "sad" || mood === "sick";
-
-  if (stage === "adult" || stage === "ascended") {
-    // Ascended shows adult sprite until its own art is implemented
-    const key =
-      adultVariant === "base"
-        ? "adult"
-        : (`adult_${adultVariant}` as keyof typeof sprites);
-    // No sad variant for adult, fall back to regular adult
-    return (sprites[key] ?? sprites.adult) as ImageSourcePropType;
-  }
-
-  // For egg, baby, teen: use sad variant if applicable
-  if (isSadMood) {
-    const sadKey = `sad_${stage}` as keyof typeof sprites;
-    const sadSprite = sprites[sadKey];
-    if (sadSprite) return sadSprite as ImageSourcePropType;
-  }
-
-  return (sprites[stage as keyof typeof sprites] ??
-    sprites.egg) as ImageSourcePropType;
-}
 
 // ─── Particle definitions ────────────────────────────────────────────────────
 
@@ -992,6 +931,7 @@ export default function HomeScreen() {
   const streak = usePlayerStore((s) => s.streak);
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);
+  const equipped = useStoreStore((s) => s.equipped);
   const isPremium = useIsPremium();
   const statPanelCollapsed = usePlayerStore((s) => s.statPanelCollapsed);
   const toggleStatPanel = usePlayerStore((s) => s.toggleStatPanel);
@@ -1374,6 +1314,7 @@ export default function HomeScreen() {
     adultVariant,
     mood,
   );
+  const wearStage = resolveAccessoryStage(evolutionStage);
 
   // Until the player store rehydrates, selectedMonster still reads its default,
   // so a Luna player would get Nilly's room, sprite, and palette for a frame
@@ -1452,11 +1393,21 @@ export default function HomeScreen() {
             },
           ]}
         >
-          <Image
-            source={monsterSource}
-            style={styles.monsterImage}
-            resizeMode="contain"
-          />
+          <View style={styles.monsterImage}>
+            <Image
+              source={monsterSource}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="contain"
+            />
+            {wearStage && (
+              <AccessoryLayer
+                monster={monster}
+                stage={wearStage}
+                equipped={equipped}
+                size={IMAGE_SIZE}
+              />
+            )}
+          </View>
         </Animated.View>
       </Pressable>
 
