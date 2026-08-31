@@ -2,6 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import {
+  AccessorySlot,
+  getAccessoryDef,
+  isAccessorySlotLocked,
+  type AccessoryMonster,
+} from "./accessory-config";
 import { STORE_ITEMS, StoreItem } from "./store-items";
 
 export type UnsettledPurchase = {
@@ -23,6 +29,8 @@ export function migrateStoreState(persistedState: any, version: number): any {
     // v0 → v1: decor placement added. Items owned before this feature
     // simply become placeable (unplaced); nothing is lost.
     placed: persistedState?.placed ?? {},
+    // v2 → v3: accessories can be worn. Older saves start unequipped.
+    equipped: persistedState?.equipped ?? {},
     unsettledPurchases: persistedState?.unsettledPurchases ?? [],
     appliedPurchases: persistedState?.appliedPurchases ?? {},
   };
@@ -62,6 +70,9 @@ export interface OwnedEntry {
   purchasedAt: number;
 }
 
+/** One item id per slot. Watch this map from screens; never expose a filtered helper. */
+export type EquippedMap = Partial<Record<AccessorySlot, string>>;
+
 function upsertUnsettled(
   list: UnsettledPurchase[] | undefined,
   purchase: UnsettledPurchase,
@@ -76,6 +87,9 @@ interface StoreStore {
 
   /** Item ids currently placed in the habitat room (decor and toys). */
   placed: Record<string, true>;
+
+  /** Worn accessories, one id per slot. */
+  equipped: EquippedMap;
 
   unsettledPurchases: UnsettledPurchase[];
   appliedPurchases: Record<string, StorePurchaseReceipt>;
@@ -98,6 +112,12 @@ interface StoreStore {
   /** Returns true if the item is currently placed in the room. */
   isPlaced: (id: string) => boolean;
 
+  /** Wear an owned accessory. Replaces anything already in that slot. */
+  equipAccessory: (itemId: string, monster: AccessoryMonster) => boolean;
+
+  /** Take off whatever is in this slot. */
+  unequipSlot: (slot: AccessorySlot) => void;
+
   grantPurchase: (purchase: UnsettledPurchase) => void;
   consumePurchase: (purchaseId: string, itemId: string) => void;
   clearUnsettledPurchase: (purchaseId: string) => void;
@@ -108,6 +128,7 @@ export const useStoreStore = create<StoreStore>()(
     (set, get) => ({
       owned: {},
       placed: {},
+      equipped: {},
       unsettledPurchases: [],
       appliedPurchases: {},
 
@@ -163,6 +184,27 @@ export const useStoreStore = create<StoreStore>()(
       },
 
       isPlaced: (id) => !!get().placed[id],
+
+      equipAccessory: (itemId, monster) => {
+        const def = getAccessoryDef(itemId);
+        if (!def) return false;
+        const entry = get().owned[itemId];
+        if (!entry || entry.quantity <= 0) return false;
+        if (isAccessorySlotLocked(monster, def.slot)) return false;
+        set((s) => ({
+          equipped: { ...s.equipped, [def.slot]: itemId },
+        }));
+        return true;
+      },
+
+      unequipSlot: (slot) => {
+        set((s) => {
+          if (!s.equipped[slot]) return {};
+          const equipped = { ...s.equipped };
+          delete equipped[slot];
+          return { equipped };
+        });
+      },
 
       grantPurchase: (purchase) => {
         set((s) => {
@@ -230,7 +272,7 @@ export const useStoreStore = create<StoreStore>()(
     {
       name: "mm-store-owned",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       migrate: migrateStoreState,
     },
   ),

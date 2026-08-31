@@ -6,3 +6,5 @@ export * from "./use-store-store";
 export * from "./use-photo-store";
 export * from "./store-items";
 export * from "./name-randomizer";
+export * from "./accessory-config";
+export * from "./monster-sprites";
