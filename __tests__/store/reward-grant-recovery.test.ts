@@ -4,8 +4,11 @@
  * reservation is durable can drop the points. The unsettled-grant log plus
  * per-store receipts make that window recoverable and idempotent.
  */
+import { REWARD_TABLE } from "@/constants/task-timers";
+import { finishPhotoTaskWait } from "@/store/photo-task-reward";
 import { recoverUnsettledGrants } from "@/store/recover-unsettled-grants";
 import { PRESET_TASKS } from "@/store/preset-tasks";
+import { STORE_ITEMS } from "@/store/store-items";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
@@ -88,6 +91,13 @@ function resetStores() {
     claimedStreakMilestones: [],
     pendingMilestoneBanner: null,
     pendingEvolution: null,
+    appliedRewardGrants: {},
+  });
+  useStoreStore.setState({
+    owned: {},
+    placed: {},
+    unsettledPurchases: [],
+    appliedPurchases: {},
     appliedRewardGrants: {},
   });
 }
@@ -383,8 +393,9 @@ describe("multiple unsettled grants", () => {
 });
 
 describe("free-item exclusion", () => {
-  it("does not replay a free-item grant through recovery", () => {
-    const buyItem = jest.spyOn(useStoreStore.getState(), "buyItem");
+  it("does not grant a snack for older rolls that only stored a display name", () => {
+    // Pre-fix reward_ready rows already added the snack at timer-complete.
+    // Re-granting by name on claim would double them.
     seedReadyTask({
       hasPhoto: true,
       rewardInfo: {
@@ -392,16 +403,99 @@ describe("free-item exclusion", () => {
         freeItemName: "🍪 Cookie",
       },
     });
-    const ownedBefore = { ...useStoreStore.getState().owned };
 
     useTasksStore.getState().claimTaskReward(TASK.id);
     recoverUnsettledGrants();
 
-    expect(buyItem).not.toHaveBeenCalled();
-    expect(useStoreStore.getState().owned).toEqual(ownedBefore);
-    // Points still apply; the item itself was awarded at roll time, not claim.
+    expect(useStoreStore.getState().owned).toEqual({});
     expect(usePlayerStore.getState().totalPoints).toBe(120);
-    buyItem.mockRestore();
+  });
+});
+
+const FREE_ITEM_OUTCOME = REWARD_TABLE.find(
+  (r) => r.outcome.tier === "free_item",
+)!.outcome;
+const COOKIE = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+
+describe("free gift at claim, not at timer complete", () => {
+  it("does not add inventory when the timer finishes, even if it finishes twice", () => {
+    const waiting: TaskProgress = {
+      state: "waiting",
+      hasPhoto: true,
+      waitStartedAt: Date.now() - 60_000,
+    };
+
+    const first = finishPhotoTaskWait(TASK, waiting, FREE_ITEM_OUTCOME, COOKIE);
+    expect(first.state).toBe("reward_ready");
+    expect(first.rewardInfo?.freeItemId).toBe(COOKIE.id);
+    expect(useStoreStore.getState().owned[COOKIE.id]).toBeUndefined();
+
+    // Crash before reward_ready persisted: progress is still waiting, so the
+    // timer can complete again. The second roll still must not grant.
+    const second = finishPhotoTaskWait(TASK, waiting, FREE_ITEM_OUTCOME, COOKIE);
+    expect(second.rewardInfo?.freeItemId).toBe(COOKIE.id);
+    expect(useStoreStore.getState().owned[COOKIE.id]).toBeUndefined();
+
+    useTasksStore.setState({
+      dailyRollDate: localDayString(),
+      dailyRoll: [TASK],
+      taskProgress: { [TASK.id]: second },
+      unsettledGrants: [],
+      appliedRewardGrants: {},
+    });
+    useTasksStore.getState().claimTaskReward(TASK.id);
+    expect(useStoreStore.getState().owned[COOKIE.id]).toBeUndefined();
+
+    recoverUnsettledGrants();
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
+
+    recoverUnsettledGrants();
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
+  });
+
+  it("grants exactly once after a crash between claim reservation and store persist", () => {
+    seedReadyTask({
+      hasPhoto: true,
+      rewardInfo: {
+        ...rewardInfo,
+        freeItemName: `${COOKIE.emoji} ${COOKIE.name}`,
+        freeItemId: COOKIE.id,
+        outcome: FREE_ITEM_OUTCOME,
+      },
+    });
+
+    useTasksStore.getState().claimTaskReward(TASK.id);
+    const grant = useTasksStore.getState().unsettledGrants[0];
+    expect(grant.rewardInfo.freeItemId).toBe(COOKIE.id);
+    expect(useStoreStore.getState().owned[COOKIE.id]).toBeUndefined();
+
+    recoverUnsettledGrants();
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
+    expect(
+      useStoreStore.getState().appliedRewardGrants[grant.id]?.freeItem,
+    ).toBe(true);
+
+    recoverUnsettledGrants();
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
+  });
+
+  it("does not add a second snack when the store receipt already exists", () => {
+    seedReadyTask({
+      hasPhoto: true,
+      rewardInfo: {
+        ...rewardInfo,
+        freeItemId: COOKIE.id,
+        freeItemName: `${COOKIE.emoji} ${COOKIE.name}`,
+      },
+    });
+    useTasksStore.getState().claimTaskReward(TASK.id);
+    const grantId = useTasksStore.getState().unsettledGrants[0].id;
+
+    useStoreStore.getState().applyRewardGrantFreeItem(grantId, COOKIE.id);
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
+
+    recoverUnsettledGrants();
+    expect(useStoreStore.getState().owned[COOKIE.id]?.quantity).toBe(1);
   });
 });
 

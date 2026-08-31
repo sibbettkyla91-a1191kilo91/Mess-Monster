@@ -22,6 +22,10 @@ export type StorePurchaseReceipt = {
   consumed?: true;
 };
 
+export type StoreGrantReceipt = {
+  freeItem?: true;
+};
+
 // Exported for tests.
 export function migrateStoreState(persistedState: any, version: number): any {
   const migrated = {
@@ -33,6 +37,7 @@ export function migrateStoreState(persistedState: any, version: number): any {
     equipped: persistedState?.equipped ?? {},
     unsettledPurchases: persistedState?.unsettledPurchases ?? [],
     appliedPurchases: persistedState?.appliedPurchases ?? {},
+    appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
   };
   // v1 → v2: toys changed from consumables (auto-used at purchase, so their
   // owned entry sat at quantity 0) to permanent collectibles like decor.
@@ -83,6 +88,7 @@ function upsertUnsettled(
 }
 
 interface StoreStore {
+  /** Watch this map from screens; never expose a filtered-array helper. */
   owned: Record<string, OwnedEntry>;
 
   /** Item ids currently placed in the habitat room (decor and toys). */
@@ -93,6 +99,8 @@ interface StoreStore {
 
   unsettledPurchases: UnsettledPurchase[];
   appliedPurchases: Record<string, StorePurchaseReceipt>;
+  /** Gift receipts for reward grants, keyed by grant id. */
+  appliedRewardGrants: Record<string, StoreGrantReceipt>;
 
   /** Add an item to the owned collection. Returns true on success. */
   buyItem: (item: StoreItem) => boolean;
@@ -102,9 +110,6 @@ interface StoreStore {
 
   /** Consume one unit of a repeatable item. Returns true if successful. */
   useItem: (id: string) => boolean;
-
-  /** Get all owned entries with quantity > 0. */
-  getOwnedItems: () => OwnedEntry[];
 
   /** Place or remove an owned item in the habitat room. No-op if not owned. */
   togglePlaced: (id: string) => void;
@@ -121,6 +126,7 @@ interface StoreStore {
   grantPurchase: (purchase: UnsettledPurchase) => void;
   consumePurchase: (purchaseId: string, itemId: string) => void;
   clearUnsettledPurchase: (purchaseId: string) => void;
+  applyRewardGrantFreeItem: (grantId: string, itemId: string) => void;
 }
 
 export const useStoreStore = create<StoreStore>()(
@@ -131,6 +137,7 @@ export const useStoreStore = create<StoreStore>()(
       equipped: {},
       unsettledPurchases: [],
       appliedPurchases: {},
+      appliedRewardGrants: {},
 
       buyItem: (item) => {
         set((s) => {
@@ -165,9 +172,6 @@ export const useStoreStore = create<StoreStore>()(
         }));
         return true;
       },
-
-      getOwnedItems: () =>
-        Object.values(get().owned).filter((e) => e.quantity > 0),
 
       togglePlaced: (id) => {
         const entry = get().owned[id];
@@ -267,6 +271,33 @@ export const useStoreStore = create<StoreStore>()(
             (p) => p.id !== purchaseId,
           ),
         }));
+      },
+
+      applyRewardGrantFreeItem: (grantId, itemId) => {
+        set((s) => {
+          const receipts = s.appliedRewardGrants ?? {};
+          if (receipts[grantId]?.freeItem) return {};
+          const catalogItem = STORE_ITEMS.find((i) => i.id === itemId);
+          const nextReceipts = {
+            ...receipts,
+            [grantId]: { ...receipts[grantId], freeItem: true as const },
+          };
+          if (!catalogItem) {
+            return { appliedRewardGrants: nextReceipts };
+          }
+          const existing = s.owned[itemId];
+          return {
+            owned: {
+              ...s.owned,
+              [itemId]: {
+                item: catalogItem,
+                quantity: (existing?.quantity ?? 0) + 1,
+                purchasedAt: existing?.purchasedAt ?? Date.now(),
+              },
+            },
+            appliedRewardGrants: nextReceipts,
+          };
+        });
       },
     }),
     {

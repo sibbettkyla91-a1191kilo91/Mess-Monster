@@ -1,11 +1,12 @@
 /**
  * Cold-start hydration race for the Tasks screen's photo-reward flow
- * (addPhoto + free-item buyItem grant), mirroring store-hydration.test.ts.
+ * (addPhoto; the free snack is granted later at claim), mirroring
+ * store-hydration.test.ts.
  *
- * Snapping a verification photo writes to the photo store, and a lucky
- * reward roll grants a free repeatable item via the store store; persist's
- * shallow hydration merge erases either write if it lands before
- * rehydration completes. The Tasks screen gates on both stores.
+ * Snapping a verification photo writes to the photo store. Persist's
+ * shallow hydration merge erases that write if it lands before
+ * rehydration completes. The Tasks screen gates on both stores. A
+ * leftover buyItem in this helper still documents the store-store race.
  */
 
 // Deferred AsyncStorage keyed by persist name — see tasks-hydration.test.ts.
@@ -45,7 +46,8 @@ async function flushHydration() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 }
 
-// Mirrors handleTakePhoto + handleTimerComplete's free-item grant.
+// Mirrors handleTakePhoto plus a store write (shop or, historically, the
+// timer-complete gift). The gift itself now waits for claim.
 function snapAndWin(usePhotoStore: any, useStoreStore: any, freeItem: any) {
   usePhotoStore.getState().addPhoto({
     taskId: "wipe-counters",
@@ -101,7 +103,7 @@ describe("photo-reward cold-start hydration race", () => {
 
     // Downstream reads: photo stats see the record, and the Store screen's
     // gift badge sees the free item in inventory.
-    expect(usePhotoStore.getState().todayPhotos()).toHaveLength(1);
+    expect(usePhotoStore.getState().photos).toHaveLength(1);
     expect(usePhotoStore.getState().totalPhotos()).toBe(1);
     const giftCount =
       useStoreStore.getState().owned[freeItem.id]?.quantity ?? 0;

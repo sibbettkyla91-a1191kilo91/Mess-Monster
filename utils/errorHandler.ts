@@ -2,6 +2,8 @@
  * Centralised error handling utility for Mess Monster.
  */
 
+import { reportError } from "@/utils/crash-reporting";
+
 export type Severity = "error" | "warning" | "info";
 
 export interface LogEntry {
@@ -45,6 +47,9 @@ class ErrorHandler {
   ): void {
     const message = error instanceof Error ? error.message : error;
     this.logs.push({ message, severity, context, timestamp: Date.now() });
+    if (severity === "error") {
+      reportError(error, context, "error-handler");
+    }
   }
 
   /** Return all recorded log entries. */
@@ -66,13 +71,9 @@ class ErrorHandler {
       const data = await fn();
       return { success: true, data };
     } catch (err) {
-      const entry: LogEntry = {
-        message: err instanceof Error ? err.message : String(err),
-        severity: "error",
-        timestamp: Date.now(),
-      };
-      this.logs.push(entry);
-      return { success: false, error: entry };
+      const caught = err instanceof Error ? err : new Error(String(err));
+      this.log(caught, "error");
+      return { success: false, error: this.logs[this.logs.length - 1] };
     }
   }
 

@@ -1,6 +1,6 @@
 /**
- * P1-7: player isPremium is the only app entitlement. Subscription status,
- * trial, and receipts must not make any current premium reader disagree.
+ * Player-store isPremium is the only entitlement. The subscription store
+ * keeps trial/receipt scaffolding and must not answer "is this user premium."
  */
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -13,31 +13,18 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
+import { isPlayerPremium } from "@/store/premium";
 import { usePlayerStore } from "@/store/use-player-store";
 import { usePetStore } from "@/store/use-pet-store";
 import { useSubscriptionStore } from "@/store/use-subscription-store";
 
-function entitlementReaders() {
-  const sub = useSubscriptionStore.getState();
-  return {
-    player: usePlayerStore.getState().isPremium,
-    isPremium: sub.isPremium(),
-    canUseMusic: sub.canUseMusic(),
-    canSkipAds: sub.canSkipAds(),
-    canEvolveToAdult: sub.canEvolveToAdult(),
-    canUseShortTimer: sub.canUseShortTimer(),
-  };
-}
-
-function expectAllReaders(value: boolean) {
-  const r = entitlementReaders();
-  expect(r.player).toBe(value);
-  expect(r.isPremium).toBe(value);
-  expect(r.canUseMusic).toBe(value);
-  expect(r.canSkipAds).toBe(value);
-  expect(r.canEvolveToAdult).toBe(value);
-  expect(r.canUseShortTimer).toBe(value);
-}
+const FORBIDDEN_SUB_READERS = [
+  "isPremium",
+  "canUseMusic",
+  "canSkipAds",
+  "canEvolveToAdult",
+  "canUseShortTimer",
+] as const;
 
 function seedAdultEligibleTeen() {
   const now = Date.now();
@@ -84,26 +71,38 @@ beforeEach(() => {
   seedAdultEligibleTeen();
 });
 
-describe("P1-7 player isPremium is the only entitlement", () => {
-  it("defaults to non-premium across every current reader", () => {
-    expectAllReaders(false);
+describe("single premium source", () => {
+  it("does not expose premium readers on the subscription store", () => {
+    const sub = useSubscriptionStore.getState() as unknown as Record<
+      string,
+      unknown
+    >;
+    for (const key of FORBIDDEN_SUB_READERS) {
+      expect(sub[key]).toBeUndefined();
+    }
   });
 
-  it("setPremium(true) makes every current reader report premium", () => {
+  it("isPlayerPremium matches the player-store flag only", () => {
+    expect(isPlayerPremium()).toBe(false);
     usePlayerStore.getState().setPremium(true);
-    expectAllReaders(true);
+    expect(isPlayerPremium()).toBe(true);
+    usePlayerStore.getState().setPremium(false);
+    expect(isPlayerPremium()).toBe(false);
+  });
+
+  it("setPremium(true) is what evolves an eligible teen", () => {
+    usePlayerStore.getState().setPremium(true);
+    expect(isPlayerPremium()).toBe(true);
 
     usePetStore.getState().recheckEvolution();
     expect(usePetStore.getState().evolutionStage).toBe("adult");
     expect(usePetStore.getState().pendingEvolution).toBe("adult");
   });
 
-  it("setPremium(false) makes every current reader report non-premium", () => {
+  it("setPremium(false) leaves an eligible teen ungated-but-not-evolved", () => {
     usePlayerStore.getState().setPremium(true);
-    expectAllReaders(true);
-
     usePlayerStore.getState().setPremium(false);
-    expectAllReaders(false);
+    expect(isPlayerPremium()).toBe(false);
 
     usePetStore.getState().recheckEvolution();
     expect(usePetStore.getState().evolutionStage).toBe("teen");
@@ -117,12 +116,17 @@ describe("P1-7 player isPremium is the only entitlement", () => {
       trialExpiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000,
     });
 
-    expect(usePlayerStore.getState().isPremium).toBe(false);
-    expectAllReaders(false);
+    expect(isPlayerPremium()).toBe(false);
     expect(useSubscriptionStore.getState().isOnTrial()).toBe(true);
 
     usePetStore.getState().recheckEvolution();
     expect(usePetStore.getState().evolutionStage).toBe("teen");
+  });
+
+  it("subscription store has no accept-all receipt validator", () => {
+    expect(useSubscriptionStore.getState()).not.toHaveProperty(
+      "validateReceipt",
+    );
   });
 
   it("subscription active status alone cannot grant premium", () => {
@@ -133,8 +137,7 @@ describe("P1-7 player isPremium is the only entitlement", () => {
       subscriptionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
     });
 
-    expect(usePlayerStore.getState().isPremium).toBe(false);
-    expectAllReaders(false);
+    expect(isPlayerPremium()).toBe(false);
 
     usePetStore.getState().recheckEvolution();
     expect(usePetStore.getState().evolutionStage).toBe("teen");
