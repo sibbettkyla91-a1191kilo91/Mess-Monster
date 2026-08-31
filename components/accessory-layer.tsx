@@ -100,13 +100,7 @@ function TransformWrap({
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-function AccessoryPiece({
-  item,
-  size,
-}: {
-  item: LayerItem;
-  size: number;
-}) {
+function AccessoryPiece({ item, size }: { item: LayerItem; size: number }) {
   const { anchor } = item;
   const pieceSize = Math.max(4, anchor.scale * size);
   const left = anchor.x * size - pieceSize / 2;

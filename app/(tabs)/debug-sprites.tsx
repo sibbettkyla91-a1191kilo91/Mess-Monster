@@ -41,9 +41,27 @@ const FIELDS: {
 }[] = [
   { key: "x", label: "x — left / right", min: 0, max: 1, step: 0.01 },
   { key: "y", label: "y — up / down", min: 0, max: 1, step: 0.01 },
-  { key: "scale", label: "scale — size vs monster", min: 0.1, max: 1.2, step: 0.01 },
-  { key: "rotation", label: "rotation — tilt (degrees)", min: -45, max: 45, step: 1 },
-  { key: "zIndex", label: "zIndex — in front of other items", min: 0, max: 10, step: 1 },
+  {
+    key: "scale",
+    label: "scale — size vs monster",
+    min: 0.1,
+    max: 1.2,
+    step: 0.01,
+  },
+  {
+    key: "rotation",
+    label: "rotation — tilt (degrees)",
+    min: -45,
+    max: 45,
+    step: 1,
+  },
+  {
+    key: "zIndex",
+    label: "zIndex — in front of other items",
+    min: 0,
+    max: 10,
+    step: 1,
+  },
 ];
 
 function Chip({
@@ -125,8 +143,7 @@ export default function DebugSpritesScreen() {
   const overrides = useMemo(() => ({ [slot]: anchor }), [slot, anchor]);
   const snippet = formatAnchorSnippet(monster, stage, slot, anchor);
   const sprite = getMonsterSprite(monster, stage, "base", "happy");
-  const itemName =
-    STORE_ITEMS.find((i) => i.id === itemId)?.name ?? itemId;
+  const itemName = STORE_ITEMS.find((i) => i.id === itemId)?.name ?? itemId;
 
   const setField = (key: Field, n: number) => {
     const spec = FIELDS.find((f) => f.key === key)!;
@@ -211,7 +228,11 @@ export default function DebugSpritesScreen() {
         ))}
 
         <ThemedText style={styles.section}>Copy into config</ThemedText>
-        <Text selectable style={styles.snippet} accessibilityLabel="anchor snippet">
+        <Text
+          selectable
+          style={styles.snippet}
+          accessibilityLabel="anchor snippet"
+        >
           {snippet}
         </Text>
       </ScrollView>

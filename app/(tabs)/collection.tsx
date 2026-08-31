@@ -76,7 +76,9 @@ export default function CollectionScreen() {
         </View>
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
-          <ThemedText style={styles.loadingText}>Opening collection…</ThemedText>
+          <ThemedText style={styles.loadingText}>
+            Opening collection…
+          </ThemedText>
         </View>
       </ThemedView>
     );
@@ -199,9 +201,7 @@ export default function CollectionScreen() {
                       }}
                       accessibilityRole="button"
                       accessibilityLabel={
-                        isWorn
-                          ? `Take off ${item.name}`
-                          : `Wear ${item.name}`
+                        isWorn ? `Take off ${item.name}` : `Wear ${item.name}`
                       }
                     >
                       <Text
