@@ -125,6 +125,12 @@ describe("P1-7 player isPremium is the only entitlement", () => {
     expect(usePetStore.getState().evolutionStage).toBe("teen");
   });
 
+  it("subscription store has no accept-all receipt validator", () => {
+    expect(useSubscriptionStore.getState()).not.toHaveProperty(
+      "validateReceipt",
+    );
+  });
+
   it("subscription active status alone cannot grant premium", () => {
     useSubscriptionStore.setState({
       tier: "monthly",

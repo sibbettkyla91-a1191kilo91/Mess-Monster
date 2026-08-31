@@ -101,7 +101,7 @@ describe("photo-reward cold-start hydration race", () => {
 
     // Downstream reads: photo stats see the record, and the Store screen's
     // gift badge sees the free item in inventory.
-    expect(usePhotoStore.getState().todayPhotos()).toHaveLength(1);
+    expect(usePhotoStore.getState().photos).toHaveLength(1);
     expect(usePhotoStore.getState().totalPhotos()).toBe(1);
     const giftCount =
       useStoreStore.getState().owned[freeItem.id]?.quantity ?? 0;

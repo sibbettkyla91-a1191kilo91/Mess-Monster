@@ -39,9 +39,6 @@ interface SubscriptionStore extends SubscriptionState {
   canSkipAds: () => boolean;
   canEvolveToAdult: () => boolean;
   canUseShortTimer: () => boolean;
-
-  // Receipt validation
-  validateReceipt: (receiptToken: string) => Promise<boolean>;
 }
 
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
@@ -99,7 +96,8 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         return Math.ceil(remainingMs / (24 * 60 * 60 * 1000)); // Convert to days
       },
 
-      // Record a subscription purchase
+      // Records local subscription metadata only. Must not grant
+      // usePlayerStore.isPremium — that waits for real store billing.
       purchaseSubscription: (
         tier: "monthly" | "yearly",
         receiptToken: string,
@@ -164,20 +162,6 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
       canEvolveToAdult: () => get().isPremium(),
 
       canUseShortTimer: () => get().isPremium(),
-
-      // Validate receipt with Google Play (simplified for now)
-      // In production, this would call your backend to verify with Google
-      validateReceipt: async (receiptToken: string) => {
-        try {
-          // TODO: Implement actual receipt validation with Google Play API
-          // For now, we accept all receipts as valid
-          console.log("Receipt validation:", receiptToken);
-          return true;
-        } catch (error) {
-          console.error("Receipt validation failed:", error);
-          return false;
-        }
-      },
     }),
     {
       name: "mm-subscription",
