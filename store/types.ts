@@ -41,7 +41,7 @@ export interface PlayerProfile {
   streak: number; // consecutive days with at least one task
   lastActiveDay: string; // YYYY-MM-DD — used to calculate streak
   activeDaysCount: number; // total unique days with any task completion (drives evolution)
-  isPremium: boolean; // temporary flag until real IAP is wired
+  isPremium: boolean; // authoritative entitlement; read via store/premium.ts
   selectedMonster: "nilly" | "luna" | null;
   monsterName: string; // player-chosen pet name (set during onboarding)
   hasCompletedOnboarding: boolean; // gates the onboarding flow redirect

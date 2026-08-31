@@ -2,8 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { usePlayerStore } from "./use-player-store";
-
 export type SubscriptionTier = "free" | "monthly" | "yearly";
 export type SubscriptionStatus = "trial" | "active" | "expired" | "none";
 
@@ -32,20 +30,10 @@ interface SubscriptionStore extends SubscriptionState {
   renewSubscription: (receiptToken: string) => void;
   cancelSubscription: () => void;
 
-  // Feature gates
-  isPremium: () => boolean;
   isOnTrial: () => boolean;
-  canUseMusic: () => boolean;
-  canSkipAds: () => boolean;
-  canEvolveToAdult: () => boolean;
-  canUseShortTimer: () => boolean;
 }
 
 const TRIAL_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
-
-function playerIsPremium(): boolean {
-  return usePlayerStore.getState().isPremium;
-}
 
 export const useSubscriptionStore = create<SubscriptionStore>()(
   persist(
@@ -96,8 +84,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         return Math.ceil(remainingMs / (24 * 60 * 60 * 1000)); // Convert to days
       },
 
-      // Records local subscription metadata only. Must not grant
-      // usePlayerStore.isPremium — that waits for real store billing.
+      // Record a subscription purchase
       purchaseSubscription: (
         tier: "monthly" | "yearly",
         receiptToken: string,
@@ -149,19 +136,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         });
       },
 
-      // Entitlement is usePlayerStore.isPremium. status/trial/receipt stay
-      // scaffolding for later IAP and must not grant app premium on their own.
-      isPremium: () => playerIsPremium(),
-
       isOnTrial: () => get().status === "trial",
-
-      canUseMusic: () => get().isPremium(),
-
-      canSkipAds: () => get().isPremium(),
-
-      canEvolveToAdult: () => get().isPremium(),
-
-      canUseShortTimer: () => get().isPremium(),
     }),
     {
       name: "mm-subscription",
@@ -170,3 +145,15 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
     },
   ),
 );
+
+type ForbiddenPremiumKeys =
+  | "isPremium"
+  | "canUseMusic"
+  | "canSkipAds"
+  | "canEvolveToAdult"
+  | "canUseShortTimer";
+
+type AssertNever<T extends never> = T;
+type _SubscriptionHasNoPremiumReader = AssertNever<
+  Extract<keyof SubscriptionStore, ForbiddenPremiumKeys>
+>;

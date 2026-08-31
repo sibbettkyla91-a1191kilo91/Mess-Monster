@@ -8,7 +8,7 @@ import {
   Image,
 } from "react-native";
 import { useMusicStore } from "@/store/use-music-store";
-import { usePlayerStore } from "@/store/use-player-store";
+import { useIsPremium } from "@/store/premium";
 import { ThemedText } from "./themed-text";
 
 export function MusicPlayer() {
@@ -24,7 +24,7 @@ export function MusicPlayer() {
   const togglePlay = useMusicStore((s) => s.togglePlay);
   const fetchPopularHits = useMusicStore((s) => s.fetchPopularHits);
 
-  const canUseMusic = usePlayerStore((s) => s.isPremium);
+  const canUseMusic = useIsPremium();
 
   // Load music on mount if premium
   useEffect(() => {
