@@ -159,9 +159,7 @@ export default function StoreScreen() {
   return (
     <View style={[styles.container, { backgroundColor: page }]}>
       <View style={styles.header}>
-        <Text
-          style={[styles.title, { color: ink, fontFamily: fontRounded }]}
-        >
+        <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
           Points Store
         </Text>
         <View style={[styles.pointsBadge, { backgroundColor: accentSoft }]}>
