@@ -21,5 +21,11 @@ jest.mock("expo-router", () => ({
   usePathname: jest.fn(() => "/"),
 }));
 
+jest.mock("@sentry/react-native", () => ({
+  init: jest.fn(),
+  wrap: (component) => component,
+  captureException: jest.fn(),
+}));
+
 // Global test utilities
 global.__DEV__ = true;

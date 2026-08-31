@@ -2,6 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 
 import { AppErrorBoundary } from "@/components/app-error-boundary";
+import { reportError } from "@/utils/crash-reporting";
+
+jest.mock("@/utils/crash-reporting", () => ({
+  reportError: jest.fn(),
+}));
 
 function Boom({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) {
@@ -15,6 +20,7 @@ describe("AppErrorBoundary", () => {
 
   beforeEach(() => {
     console.error = jest.fn();
+    jest.mocked(reportError).mockClear();
   });
 
   afterEach(() => {
@@ -40,5 +46,19 @@ describe("AppErrorBoundary", () => {
 
     expect(screen.getByText("All good")).toBeTruthy();
     expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
+
+  it("reports the caught render error so a crash is not silent", () => {
+    render(
+      <AppErrorBoundary>
+        <Boom shouldThrow />
+      </AppErrorBoundary>,
+    );
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "boom" }),
+      expect.objectContaining({ componentStack: expect.any(String) }),
+      "error-boundary",
+    );
   });
 });

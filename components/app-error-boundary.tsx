@@ -1,12 +1,15 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { reportError } from "@/utils/crash-reporting";
+
 type Props = { children: ReactNode };
 type State = { hasError: boolean };
 
 /**
  * App-shell safety net. A JS throw in any screen used to white-screen
  * with no way back. Tap remounts the tree; saved progress is untouched.
+ * The caught error is sent to crash reporting so it is not silent.
  */
 export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
@@ -16,6 +19,11 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    reportError(
+      error,
+      { componentStack: info.componentStack ?? "" },
+      "error-boundary",
+    );
     if (__DEV__) {
       console.error("AppErrorBoundary", error, info.componentStack);
     }

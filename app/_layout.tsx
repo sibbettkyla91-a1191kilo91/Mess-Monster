@@ -15,13 +15,16 @@ import { usePetStore } from "@/store/use-pet-store";
 import { useTasksStore } from "@/store/use-tasks-store";
 import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
 import { subscribeUnsettledPurchaseRecovery } from "@/store/recover-unsettled-purchases";
+import { initCrashReporting, wrapRoot } from "@/utils/crash-reporting";
 import { initNotifications } from "@/utils/daily-nudge";
+
+initCrashReporting();
 
 export const unstable_settings = {
   anchor: "onboarding",
 };
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
@@ -73,3 +76,5 @@ export default function RootLayout() {
     </AppErrorBoundary>
   );
 }
+
+export default wrapRoot(RootLayout);
