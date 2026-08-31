@@ -16,6 +16,10 @@ export type StorePurchaseReceipt = {
   consumed?: true;
 };
 
+export type StoreGrantReceipt = {
+  freeItem?: true;
+};
+
 // Exported for tests.
 export function migrateStoreState(persistedState: any, version: number): any {
   const migrated = {
@@ -25,6 +29,7 @@ export function migrateStoreState(persistedState: any, version: number): any {
     placed: persistedState?.placed ?? {},
     unsettledPurchases: persistedState?.unsettledPurchases ?? [],
     appliedPurchases: persistedState?.appliedPurchases ?? {},
+    appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
   };
   // v1 → v2: toys changed from consumables (auto-used at purchase, so their
   // owned entry sat at quantity 0) to permanent collectibles like decor.
@@ -80,6 +85,8 @@ interface StoreStore {
 
   unsettledPurchases: UnsettledPurchase[];
   appliedPurchases: Record<string, StorePurchaseReceipt>;
+  /** Gift receipts for reward grants, keyed by grant id. */
+  appliedRewardGrants: Record<string, StoreGrantReceipt>;
 
   /** Add an item to the owned collection. Returns true on success. */
   buyItem: (item: StoreItem) => boolean;
@@ -99,6 +106,7 @@ interface StoreStore {
   grantPurchase: (purchase: UnsettledPurchase) => void;
   consumePurchase: (purchaseId: string, itemId: string) => void;
   clearUnsettledPurchase: (purchaseId: string) => void;
+  applyRewardGrantFreeItem: (grantId: string, itemId: string) => void;
 }
 
 export const useStoreStore = create<StoreStore>()(
@@ -108,6 +116,7 @@ export const useStoreStore = create<StoreStore>()(
       placed: {},
       unsettledPurchases: [],
       appliedPurchases: {},
+      appliedRewardGrants: {},
 
       buyItem: (item) => {
         set((s) => {
@@ -221,11 +230,38 @@ export const useStoreStore = create<StoreStore>()(
           ),
         }));
       },
+
+      applyRewardGrantFreeItem: (grantId, itemId) => {
+        set((s) => {
+          const receipts = s.appliedRewardGrants ?? {};
+          if (receipts[grantId]?.freeItem) return {};
+          const catalogItem = STORE_ITEMS.find((i) => i.id === itemId);
+          const nextReceipts = {
+            ...receipts,
+            [grantId]: { ...receipts[grantId], freeItem: true as const },
+          };
+          if (!catalogItem) {
+            return { appliedRewardGrants: nextReceipts };
+          }
+          const existing = s.owned[itemId];
+          return {
+            owned: {
+              ...s.owned,
+              [itemId]: {
+                item: catalogItem,
+                quantity: (existing?.quantity ?? 0) + 1,
+                purchasedAt: existing?.purchasedAt ?? Date.now(),
+              },
+            },
+            appliedRewardGrants: nextReceipts,
+          };
+        });
+      },
     }),
     {
       name: "mm-store-owned",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       migrate: migrateStoreState,
     },
   ),

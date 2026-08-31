@@ -32,6 +32,8 @@ export interface TaskProgress {
     pointsMultiplier: number;
     finalPoints: number;
     freeItemName?: string;
+    /** Catalog id of the rolled gift. Present only on rolls after claim-time grant. */
+    freeItemId?: string;
     /** Rolled outcome for photo tasks — drives the celebration modal at claim */
     outcome?: RewardOutcome;
   };
