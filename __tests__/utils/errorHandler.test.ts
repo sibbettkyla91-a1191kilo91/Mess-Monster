@@ -1,8 +1,14 @@
 import { errorHandler, AppError } from "@/utils/errorHandler";
+import { reportError } from "@/utils/crash-reporting";
+
+jest.mock("@/utils/crash-reporting", () => ({
+  reportError: jest.fn(),
+}));
 
 describe("errorHandler", () => {
   beforeEach(() => {
     errorHandler.clearLogs();
+    jest.mocked(reportError).mockClear();
   });
 
   it("should log errors with context", () => {
@@ -66,6 +72,18 @@ describe("errorHandler", () => {
     expect(errorHandler.getUserMessage(networkError)).toContain(
       "Connection failed",
     );
+  });
+
+  it("forwards logged errors to crash reporting", () => {
+    const error = new Error("store write failed");
+    errorHandler.log(error, "error", { store: "player" });
+
+    expect(reportError).toHaveBeenCalledWith(error, { store: "player" }, "error-handler");
+  });
+
+  it("does not report warnings as crashes", () => {
+    errorHandler.log("not urgent", "warning");
+    expect(reportError).not.toHaveBeenCalled();
   });
 
   it("should handle unknown errors gracefully", () => {
