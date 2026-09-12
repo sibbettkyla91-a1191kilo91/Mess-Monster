@@ -408,7 +408,7 @@ export default function TasksScreen() {
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
           <Text style={[styles.loadingText, { color: inkMuted }]}>
-                    Lining up today…
+            Lining up today…
           </Text>
         </View>
       ) : (
@@ -452,7 +452,7 @@ export default function TasksScreen() {
                         {reward.label}
                       </Text>
                       <Text style={[styles.categoryLabel, { color: inkMuted }]}>
-                      {reward.category.replace("_", " ")}
+                        {reward.category.replace("_", " ")}
                       </Text>
                     </View>
                     <Text
