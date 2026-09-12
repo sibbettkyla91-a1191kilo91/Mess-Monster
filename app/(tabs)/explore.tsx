@@ -30,7 +30,6 @@ import {
 import { PresetTask } from "@/store/preset-tasks";
 import { finishPhotoTaskWait } from "@/store/photo-task-reward";
 import { recoverUnsettledGrants } from "@/store/recover-unsettled-grants";
-import { TaskCategory } from "@/store/types";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePhotoStore } from "@/store/use-photo-store";
 import { usePlayerStore } from "@/store/use-player-store";
@@ -40,16 +39,6 @@ import {
   TaskProgress,
   useTasksStore,
 } from "@/store/use-tasks-store";
-
-const CATEGORY_EMOJI: Record<TaskCategory, string> = {
-  kitchen: "🍳",
-  bathroom: "🛁",
-  bedroom: "🛏",
-  living_room: "🛋",
-  laundry: "👕",
-  trash: "🗑",
-  other: "📦",
-};
 
 const fontRounded = Platform.select({
   ios: "ui-rounded",
@@ -358,11 +347,11 @@ export default function TasksScreen() {
     <View style={[styles.container, { backgroundColor: page }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
-          Today’s Tasks
+          Today
         </Text>
         <View style={styles.subrow}>
           <Text style={[styles.count, { color: inkMuted }]}>
-            {completedCount}/{dailyRoll.length} done
+            {completedCount}/{dailyRoll.length} claimed
           </Text>
           {celebration && (
             <View
@@ -382,7 +371,7 @@ export default function TasksScreen() {
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
           <Text style={[styles.loadingText, { color: inkMuted }]}>
-            Getting your tasks ready…
+                    Lining up today…
           </Text>
         </View>
       ) : (
@@ -395,10 +384,10 @@ export default function TasksScreen() {
           {pendingRewards.length > 0 && (
             <View style={styles.carriedSection}>
               <Text style={[styles.carriedTitle, { color: ink }]}>
-                Rewards waiting for you
+                Still yours
               </Text>
               <Text style={[styles.carriedSubtitle, { color: inkMuted }]}>
-                Earned earlier — yours whenever you{"'"}re ready.
+                From earlier — claim whenever you want.
               </Text>
               {pendingRewards.map((reward) => (
                 <View
@@ -426,8 +415,7 @@ export default function TasksScreen() {
                         {reward.label}
                       </Text>
                       <Text style={[styles.categoryLabel, { color: inkMuted }]}>
-                        {CATEGORY_EMOJI[reward.category]}{" "}
-                        {reward.category.replace("_", " ")}
+                      {reward.category.replace("_", " ")}
                       </Text>
                     </View>
                     <Text
@@ -485,8 +473,9 @@ export default function TasksScreen() {
                   styles.taskCard,
                   {
                     backgroundColor: isReady ? surfaceRaised : surface,
-                    borderColor: line,
-                    opacity: isClaimed ? 0.72 : 1,
+                    borderColor: isReady ? accent : line,
+                    borderWidth: isReady ? 1.5 : 1,
+                    opacity: isClaimed ? 0.64 : 1,
                   },
                   cardLift,
                 ]}
@@ -523,7 +512,6 @@ export default function TasksScreen() {
                       {task.label}
                     </Text>
                     <Text style={[styles.categoryLabel, { color: inkMuted }]}>
-                      {CATEGORY_EMOJI[task.category]}{" "}
                       {task.category.replace("_", " ")}
                     </Text>
                   </View>
@@ -562,7 +550,7 @@ export default function TasksScreen() {
                         { color: accentInk, fontFamily: fontRounded },
                       ]}
                     >
-                      Mark done
+                      That{"'"}s done
                     </Text>
                   </Pressable>
                 )}
@@ -570,9 +558,16 @@ export default function TasksScreen() {
                 {/* State: pending_photo — show photo + skip options */}
                 {progress.state === "pending_photo" && (
                   <View style={styles.photoSection}>
-                    <Text style={[styles.photoPrompt, { color: ink }]}>
-                      {photoPrompt}
-                    </Text>
+                    <View
+                      style={[
+                        styles.photoChrome,
+                        { backgroundColor: accentSoft },
+                      ]}
+                    >
+                      <Text style={[styles.photoPrompt, { color: onSoft }]}>
+                        {photoPrompt}
+                      </Text>
+                    </View>
                     <View style={styles.photoActions}>
                       <Pressable
                         style={({ pressed }) => [
@@ -636,7 +631,7 @@ export default function TasksScreen() {
                       active={true}
                     />
                     <Text style={[styles.waitHint, { color: inkMuted }]}>
-                      Reward ready when timer expires...
+                      Settling. The reward waits on the timer.
                     </Text>
                   </View>
                 )}
@@ -823,9 +818,14 @@ const styles = StyleSheet.create({
   photoSection: {
     gap: 8,
   },
+  photoChrome: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
   photoPrompt: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
     textAlign: "center",
   },
   photoActions: {

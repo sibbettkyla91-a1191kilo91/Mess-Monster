@@ -12,7 +12,7 @@ const MIN_STORE_ITEM_COST = 20;
 export default function TabLayout() {
   // Derived primitive selector — re-renders only when the balance changes.
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
-  const { tabTint } = useMonsterTheme();
+  const { tabTint, chrome, line, inkMuted } = useMonsterTheme();
 
   // PERFORMANCE: Memoize the badge value to prevent tab options recalculation on every render
   const storeBadge = useMemo(
@@ -26,8 +26,14 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: tabTint,
+        tabBarInactiveTintColor: inkMuted,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: chrome,
+          borderTopColor: line,
+          borderTopWidth: 1,
+        },
       }}
     >
       <Tabs.Screen

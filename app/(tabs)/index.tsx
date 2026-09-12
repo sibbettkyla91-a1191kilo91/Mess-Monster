@@ -17,6 +17,7 @@ import { AccessoryLayer } from "@/components/accessory-layer";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
+import { LUNA_PALETTE, MonsterPalette, NILLY_PALETTE } from "@/monster-theme";
 import { resolveAccessoryStage } from "@/store/accessory-config";
 import { getDecorSlot } from "@/store/decor-slots";
 import { getMonsterSprite } from "@/store/monster-sprites";
@@ -42,7 +43,7 @@ const STAGE_LABELS: Record<EvolutionStage, string> = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HABITAT_WIDTH = SCREEN_WIDTH;
-const IMAGE_SIZE = Math.round(HABITAT_WIDTH * 0.55);
+const IMAGE_SIZE = Math.round(HABITAT_WIDTH * 0.64);
 
 // Visible sliver of the bottom panel when collapsed: the panel's top padding
 // (16) plus the toggle handle row (20), with a hair of the gap below so the
@@ -51,33 +52,26 @@ const PANEL_PEEK_HEIGHT = 40;
 
 // ─── Theme ───────────────────────────────────────────────────────────
 
+function homeChrome(p: MonsterPalette) {
+  return {
+    background: p.page,
+    accent: p.accent,
+    text: p.ink,
+    cardBg: p.surfaceRaised,
+    pillText: p.monster === "luna" ? p.ink : "#ffffff",
+    cardBorder: p.line,
+    radialColor: p.glow,
+    glowColor: p.glow,
+    particleColor: p.particle,
+    barTrack: p.barTrack,
+    panelBg: p.panelBg,
+    habitatScrim: p.habitatScrim,
+  };
+}
+
 const THEMES = {
-  nilly: {
-    background: "#f0faf5",
-    accent: "#52b788",
-    text: "#2d3436",
-    cardBg: "#ffffff",
-    pillText: "#ffffff",
-    cardBorder: "rgba(0,0,0,0.07)",
-    radialColor: "rgba(155,230,195,0.18)",
-    glowColor: "rgba(82,183,136,0.13)",
-    particleColor: "#3aab6f",
-    barTrack: "rgba(0,0,0,0.10)",
-    panelBg: "rgba(240,250,245,0.88)",
-  },
-  luna: {
-    background: "#1a1a2e",
-    accent: "#cc2222",
-    text: "#f0e6d3",
-    cardBg: "#2a2a3e",
-    pillText: "#f0e6d3",
-    cardBorder: "rgba(255,255,255,0.09)",
-    radialColor: "rgba(60,20,80,0.22)",
-    glowColor: "rgba(90,35,160,0.16)",
-    particleColor: "#d8c0ff",
-    barTrack: "rgba(255,255,255,0.12)",
-    panelBg: "rgba(10,10,20,0.82)",
-  },
+  nilly: homeChrome(NILLY_PALETTE),
+  luna: homeChrome(LUNA_PALETTE),
 } as const;
 
 // ─── Mood config ─────────────────────────────────────────────────────────
@@ -85,50 +79,46 @@ const THEMES = {
 const MOOD_CONFIG = {
   nilly: {
     thriving: {
-      label: "Thriving",
-      message:
-        "Nilly is absolutely thriving! She loves how clean everything is.",
+      label: "Settled",
+      message: "The room feels like hers. She's easy in it.",
     },
     happy: {
-      label: "Happy",
-      message: "Nilly is happy and content. Keep up the good work!",
+      label: "Easy",
+      message: "She's good. A little work, whenever you have it.",
     },
     neutral: {
-      label: "Neutral",
-      message: "Nilly could use some attention. Maybe tackle a quick task?",
+      label: "Waiting",
+      message: "She's around. No rush — pick something small.",
     },
     sad: {
-      label: "Sad",
-      message: "Nilly is feeling neglected… she misses seeing you clean.",
+      label: "Quiet",
+      message: "She's quieter today. One task is enough.",
     },
     sick: {
-      label: "Sad",
-      message:
-        "Nilly is really struggling. Even a small task will help her feel better.",
+      label: "Quiet",
+      message: "A rough stretch. Even one thing helps.",
     },
   },
   luna: {
     thriving: {
-      label: "Thriving",
-      message:
-        "Luna is radiant. The realm is spotless and her power is at its peak.",
+      label: "Steady",
+      message: "The room holds. Her light is even.",
     },
     happy: {
-      label: "Happy",
-      message: "Luna is pleased. The chaos is under control — for now.",
+      label: "Pleased",
+      message: "The shadows stay put. She's watching, not waiting.",
     },
     neutral: {
-      label: "Neutral",
-      message: "Luna stirs uneasily. The mess grows in the shadows.",
+      label: "Watching",
+      message: "She'll keep the chair warm. Whenever you're ready.",
     },
     sad: {
-      label: "Sad",
-      message: "Luna fades. Neglect weakens her magic — she needs you.",
+      label: "Dim",
+      message: "The spark is low. One task is plenty.",
     },
     sick: {
-      label: "Sad",
-      message:
-        "Luna's magic dims. A little cleaning is all it takes to bring her back.",
+      label: "Dim",
+      message: "A thin night. Start with something small.",
     },
   },
 } as const;
@@ -358,7 +348,7 @@ const NILLY_PARTICLES: ParticleDef[] = [
     id: "n9",
     x: 0.04,
     y: 0.54,
-    char: "🍃",
+    char: "✧",
     size: 14,
     opacity: 0.35,
     duration: 4800,
@@ -369,7 +359,7 @@ const NILLY_PARTICLES: ParticleDef[] = [
     id: "n10",
     x: 0.93,
     y: 0.43,
-    char: "🍃",
+    char: "✧",
     size: 11,
     opacity: 0.28,
     duration: 3400,
@@ -1333,6 +1323,13 @@ export default function HomeScreen() {
         style={StyleSheet.absoluteFillObject}
         resizeMode="cover"
       />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: theme.habitatScrim },
+        ]}
+      />
 
       {/* ── Placed decor items ── */}
       <DecorLayer monster={monster} />
@@ -1344,20 +1341,20 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <View style={styles.pillScrim}>
           <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
-            ⭐ {availablePoints} pts
+            {availablePoints} pts
           </ThemedText>
         </View>
         {streak > 0 && (
           <View style={styles.pillScrim}>
             <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
-              🔥 {streak}d streak
+              {streak}d together
             </ThemedText>
           </View>
         )}
-        {doneToday > 0 && (
+        {dailyRollSize > 0 && (
           <View style={styles.pillScrim}>
             <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
-              ✓ {doneToday}/{dailyRollSize} done
+              {doneToday}/{dailyRollSize} today
             </ThemedText>
           </View>
         )}
@@ -1393,6 +1390,10 @@ export default function HomeScreen() {
             },
           ]}
         >
+          <View
+            pointerEvents="none"
+            style={[styles.monsterGlow, { backgroundColor: theme.glowColor }]}
+          />
           <View style={styles.monsterImage}>
             <Image
               source={monsterSource}
@@ -1545,7 +1546,7 @@ export default function HomeScreen() {
             accessibilityLabel="Go clean something"
           >
             <ThemedText style={[styles.ctaText, { color: theme.pillText }]}>
-              Clean Something →
+              {doneToday === 0 ? "Start with one thing →" : "Keep going →"}
             </ThemedText>
           </Pressable>
         </View>
@@ -1634,6 +1635,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
+  },
+  monsterGlow: {
+    position: "absolute",
+    alignSelf: "center",
+    width: IMAGE_SIZE * 0.86,
+    height: IMAGE_SIZE * 0.86,
+    borderRadius: IMAGE_SIZE,
+    top: IMAGE_SIZE * 0.08,
+    opacity: 0.9,
   },
   monsterImage: {
     width: IMAGE_SIZE,
