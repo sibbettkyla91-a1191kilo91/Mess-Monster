@@ -272,13 +272,18 @@ export default function StoreScreen() {
                     <View
                       style={[styles.stateChip, { backgroundColor: accent }]}
                     >
-                      <Text style={[styles.stateChipText, { color: accentInk }]}>
+                      <Text
+                        style={[styles.stateChipText, { color: accentInk }]}
+                      >
                         Equipped
                       </Text>
                     </View>
                   ) : ownedForever ? (
                     <View
-                      style={[styles.stateChip, { backgroundColor: accentSoft }]}
+                      style={[
+                        styles.stateChip,
+                        { backgroundColor: accentSoft },
+                      ]}
                     >
                       <Text style={[styles.stateChipText, { color: onSoft }]}>
                         Owned
@@ -288,7 +293,11 @@ export default function StoreScreen() {
                     <View
                       style={[
                         styles.stateChip,
-                        { backgroundColor: surface, borderColor: line, borderWidth: 1 },
+                        {
+                          backgroundColor: surface,
+                          borderColor: line,
+                          borderWidth: 1,
+                        },
                       ]}
                     >
                       <Text style={[styles.stateChipText, { color: inkMuted }]}>

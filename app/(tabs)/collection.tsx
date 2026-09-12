@@ -137,7 +137,10 @@ export default function CollectionScreen() {
         />
         <View style={styles.companionCopy}>
           <Text
-            style={[styles.companionName, { color: ink, fontFamily: fontRounded }]}
+            style={[
+              styles.companionName,
+              { color: ink, fontFamily: fontRounded },
+            ]}
           >
             {displayName}
           </Text>
