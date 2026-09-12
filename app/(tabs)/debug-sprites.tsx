@@ -127,6 +127,13 @@ function FieldRow({
 }
 
 export default function DebugSpritesScreen() {
+  if (!__DEV__) {
+    return null;
+  }
+  return <DebugSpritesTuner />;
+}
+
+function DebugSpritesTuner() {
   const [monster, setMonster] = useState<AccessoryMonster>("nilly");
   const [stage, setStage] = useState<AccessoryStage>("teen");
   const [itemId, setItemId] = useState("acc-bow");

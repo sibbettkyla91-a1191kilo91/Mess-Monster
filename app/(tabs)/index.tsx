@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AccessoryLayer } from "@/components/accessory-layer";
 import { ThemedText } from "@/components/themed-text";
@@ -953,6 +954,7 @@ export default function HomeScreen() {
   const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
 
   const [panelHeight, setPanelHeight] = useState(0);
+  const insets = useSafeAreaInsets();
 
   // Stat panel collapse: 0 = expanded, 1 = collapsed to the peek handle.
   // The panel is an absolute overlay on the room, so sliding it down truly
@@ -1341,7 +1343,7 @@ export default function HomeScreen() {
       <MonsterHabitat monster={monster} />
 
       {/* ── Top pills ── */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <View style={styles.pillScrim}>
           <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
             ⭐ {availablePoints} pts
@@ -1611,7 +1613,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    paddingTop: 54,
     paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",

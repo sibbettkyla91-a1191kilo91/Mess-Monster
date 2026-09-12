@@ -27,5 +27,9 @@ jest.mock("@sentry/react-native", () => ({
   captureException: jest.fn(),
 }));
 
+jest.mock("react-native-safe-area-context", () =>
+  require("react-native-safe-area-context/jest/mock"),
+);
+
 // Global test utilities
 global.__DEV__ = true;
