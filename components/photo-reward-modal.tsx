@@ -22,12 +22,14 @@ export function PhotoRewardModal({
 }: PhotoRewardModalProps) {
   const {
     accent,
-    accentLight,
-    accentDark,
-    text: accentText,
-    monster,
+    accentInk,
+    accentSoft,
+    onSoft,
+    surfaceRaised,
+    ink,
+    inkMuted,
+    line,
   } = useMonsterTheme();
-  const isDark = monster === "luna";
 
   const totalPoints = Math.round(basePoints * reward.pointsMultiplier);
   const bonusPoints = totalPoints - basePoints;
@@ -35,59 +37,49 @@ export function PhotoRewardModal({
   return (
     <View style={styles.overlay}>
       <View
-        style={[styles.modal, { backgroundColor: isDark ? "#1a1a2e" : "#fff" }]}
+        style={[
+          styles.modal,
+          { backgroundColor: surfaceRaised, borderColor: line },
+        ]}
       >
-        {/* Big emoji */}
         <Text style={styles.bigEmoji}>{reward.emoji}</Text>
 
-        {/* Title */}
         <Text style={[styles.title, { color: accent }]}>{reward.label}</Text>
 
-        {/* Description */}
-        <Text style={[styles.description, { color: isDark ? "#ccc" : "#555" }]}>
+        <Text style={[styles.description, { color: inkMuted }]}>
           {reward.description}
         </Text>
 
-        {/* Points breakdown */}
-        <View
-          style={[
-            styles.pointsBox,
-            { backgroundColor: isDark ? accentDark : accentLight },
-          ]}
-        >
-          <Text style={[styles.pointsLine, { color: accentText }]}>
+        <View style={[styles.pointsBox, { backgroundColor: accentSoft }]}>
+          <Text style={[styles.pointsLine, { color: onSoft }]}>
             Base: +{basePoints} pts
           </Text>
           {bonusPoints > 0 && (
             <Text
               style={[styles.pointsLine, styles.bonusLine, { color: accent }]}
             >
-              Bonus: +{bonusPoints} pts
+              Extra: +{bonusPoints} pts
             </Text>
           )}
-          <Text style={[styles.pointsTotal, { color: accentText }]}>
+          <Text style={[styles.pointsTotal, { color: ink }]}>
             Total: +{totalPoints} pts
           </Text>
         </View>
 
-        {/* Free item callout */}
         {reward.includesFreeItem && freeItemName && (
           <View style={[styles.itemBox, { borderColor: accent }]}>
-            <Text
-              style={[styles.itemText, { color: isDark ? "#eee" : "#333" }]}
-            >
-              {"\ud83c\udf81"} Free item: {freeItemName}
+            <Text style={[styles.itemText, { color: ink }]}>
+              Along with it: {freeItemName}
             </Text>
           </View>
         )}
 
-        {/* Dismiss button */}
         <TouchableOpacity
           style={[styles.dismissButton, { backgroundColor: accent }]}
           onPress={onDismiss}
           activeOpacity={0.7}
         >
-          <Text style={styles.dismissText}>Awesome!</Text>
+          <Text style={[styles.dismissText, { color: accentInk }]}>Onward</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -105,7 +97,8 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: "100%",
-    borderRadius: 20,
+    borderRadius: 22,
+    borderWidth: 1,
     padding: 28,
     alignItems: "center",
     gap: 12,
@@ -168,7 +161,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   dismissText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "800",
   },

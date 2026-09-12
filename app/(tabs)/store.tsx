@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -35,6 +36,7 @@ export default function StoreScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const isOwned = useStoreStore((s) => s.isOwned);
   const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
+  const equipped = useStoreStore((s) => s.byMonster[selectedMonster].equipped);
   // handleBuy writes to all three persisted stores; a purchase made before
   // AsyncStorage rehydration completes gets clobbered when the hydration
   // merge lands, so the shop stays closed until every store is hydrated.
@@ -91,13 +93,13 @@ export default function StoreScreen() {
 
       // Check if non-repeatable and already owned
       if (!item.repeatable && isOwned(item.id)) {
-        showFeedback("\u2705 Already owned!");
+        showFeedback("Already in the collection.");
         return;
       }
 
       // Check if player can afford it
       if (availablePoints < item.price) {
-        showFeedback("\ud83d\ude05 Not enough points!");
+        showFeedback("Not enough points yet.");
         return;
       }
 
@@ -107,14 +109,16 @@ export default function StoreScreen() {
       // Food goes into this monster's bag and is used later from Home.
       const bought = executePaidShopPurchase(item);
       if (!bought) {
-        showFeedback("\u274c Something went wrong");
+        showFeedback("Something went wrong.");
         return;
       }
 
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
       if (item.repeatable) {
-        showFeedback(`\ud83d\uded2 ${item.name} added to the bag!`);
+        showFeedback(`${item.name} — in the bag.`);
       } else {
-        showFeedback(`\ud83d\udecd\ufe0f ${item.name} added to collection!`);
+        showFeedback(`${item.name} is theirs now.`);
       }
     },
     [hydrated, availablePoints, isOwned, showFeedback],
@@ -147,7 +151,7 @@ export default function StoreScreen() {
     >
       <View style={styles.header}>
         <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
-          Points Store
+          The Shop
         </Text>
         <View style={[styles.pointsBadge, { backgroundColor: accentSoft }]}>
           <Text
@@ -224,6 +228,11 @@ export default function StoreScreen() {
               : 0;
             const canAfford = availablePoints >= item.price;
             const canPress = canAfford;
+            const isEquipped =
+              !item.repeatable &&
+              !!equipped &&
+              Object.values(equipped).includes(item.id);
+            const lockedLook = !ownedForever && !canPress;
 
             return (
               <View
@@ -231,14 +240,49 @@ export default function StoreScreen() {
                 style={[
                   styles.itemCard,
                   {
-                    backgroundColor: ownedForever ? surface : surfaceRaised,
-                    borderColor: line,
-                    opacity: ownedForever ? 0.72 : 1,
+                    backgroundColor:
+                      ownedForever || isEquipped ? surface : surfaceRaised,
+                    borderColor: isEquipped ? accent : line,
+                    opacity: lockedLook ? 0.58 : ownedForever ? 0.88 : 1,
                   },
                   cardLift,
                 ]}
               >
-                <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                <View style={styles.cardTop}>
+                  <View
+                    style={[styles.emojiWell, { backgroundColor: accentSoft }]}
+                  >
+                    <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                  </View>
+                  {isEquipped ? (
+                    <View
+                      style={[styles.stateChip, { backgroundColor: accent }]}
+                    >
+                      <Text style={[styles.stateChipText, { color: accentInk }]}>
+                        Equipped
+                      </Text>
+                    </View>
+                  ) : ownedForever ? (
+                    <View
+                      style={[styles.stateChip, { backgroundColor: accentSoft }]}
+                    >
+                      <Text style={[styles.stateChipText, { color: onSoft }]}>
+                        Owned
+                      </Text>
+                    </View>
+                  ) : lockedLook ? (
+                    <View
+                      style={[
+                        styles.stateChip,
+                        { backgroundColor: surface, borderColor: line, borderWidth: 1 },
+                      ]}
+                    >
+                      <Text style={[styles.stateChipText, { color: inkMuted }]}>
+                        {item.price} pts
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text
                   style={[
                     styles.itemName,
@@ -275,7 +319,7 @@ export default function StoreScreen() {
                       ]}
                     >
                       <Text style={[styles.ownedText, { color: onSoft }]}>
-                        Owned
+                        {isEquipped ? "On them" : "In collection"}
                       </Text>
                     </View>
                   ) : (
@@ -400,9 +444,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
   },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  emojiWell: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   itemEmoji: {
-    fontSize: 36,
-    marginBottom: 4,
+    fontSize: 28,
+  },
+  stateChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  stateChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   itemName: {
     fontSize: 16,

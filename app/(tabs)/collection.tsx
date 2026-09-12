@@ -2,17 +2,16 @@ import * as Haptics from "expo-haptics";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import {
@@ -30,6 +29,17 @@ const SLOT_LABEL: Record<AccessorySlot, string> = {
   neck: "Neck",
 };
 
+const COMPANION_ART = {
+  nilly: require("../../assets/images/nilly_adult.png"),
+  luna: require("../../assets/images/luna_adult.png"),
+};
+
+const fontRounded = Platform.select({
+  ios: "ui-rounded",
+  android: "sans-serif-medium",
+  default: "system-ui",
+});
+
 export default function CollectionScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
@@ -38,24 +48,39 @@ export default function CollectionScreen() {
   const togglePlaced = useStoreStore((s) => s.togglePlaced);
   const equipAccessory = useStoreStore((s) => s.equipAccessory);
   const unequipSlot = useStoreStore((s) => s.unequipSlot);
+  const monsterName = usePlayerStore((s) => s.monsterName);
   const storeHydrated = useHasHydrated(useStoreStore);
   const playerHydrated = useHasHydrated(usePlayerStore);
   const hydrated = storeHydrated && playerHydrated;
   const insets = useSafeAreaInsets();
-  const containerStyle = [styles.container, { paddingTop: insets.top + 14 }];
 
   const ownedItems = useMemo(
     () => Object.values(owned).filter((e) => e.quantity > 0),
     [owned],
   );
-  const scheme = useColorScheme();
-  const isDark = scheme === "dark";
   const {
     accent,
-    accentLight,
-    accentDark,
-    text: accentText,
+    accentSoft,
+    onSoft,
+    page,
+    surface,
+    surfaceRaised,
+    ink,
+    inkMuted,
+    line,
+    monster,
   } = useMonsterTheme();
+  const containerStyle = [
+    styles.container,
+    { backgroundColor: page, paddingTop: insets.top + 14 },
+  ];
+
+  const displayName =
+    monsterName || (selectedMonster === "luna" ? "Luna" : "Nilly");
+  const worldLine =
+    monster === "luna"
+      ? "Night things. Kept for her."
+      : "Sunlit things. Kept for her.";
 
   const collectionItems = ownedItems.filter((entry) => !entry.item.repeatable);
   const hasItems = collectionItems.length > 0;
@@ -73,32 +98,59 @@ export default function CollectionScreen() {
 
   if (!hydrated) {
     return (
-      <ThemedView style={containerStyle}>
+      <View style={containerStyle}>
         <View style={styles.header}>
-          <ThemedText type="title">My Collection</ThemedText>
+          <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
+            Collection
+          </Text>
         </View>
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={accent} />
-          <ThemedText style={styles.loadingText}>
+          <Text style={[styles.loadingText, { color: inkMuted }]}>
             Opening collection…
-          </ThemedText>
+          </Text>
         </View>
-      </ThemedView>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={containerStyle}>
+    <View style={containerStyle}>
       <View style={styles.header}>
-        <ThemedText type="title">My Collection</ThemedText>
+        <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
+          Collection
+        </Text>
         {wearingBySlot.length > 0 && (
-          <ThemedText style={styles.wearingSummary}>
+          <Text style={[styles.wearingSummary, { color: inkMuted }]}>
             Wearing:{" "}
             {wearingBySlot
               .map((row) => `${SLOT_LABEL[row.slot]} · ${row.name}`)
               .join("  ")}
-          </ThemedText>
+          </Text>
         )}
+      </View>
+
+      <View
+        style={[
+          styles.companionCard,
+          { backgroundColor: surfaceRaised, borderColor: line },
+        ]}
+      >
+        <Image
+          source={COMPANION_ART[selectedMonster === "luna" ? "luna" : "nilly"]}
+          style={styles.companionArt}
+          resizeMode="contain"
+        />
+        <View style={styles.companionCopy}>
+          <Text
+            style={[styles.companionName, { color: ink, fontFamily: fontRounded }]}
+          >
+            {displayName}
+          </Text>
+          <Text style={[styles.companionWorld, { color: inkMuted }]}>
+            {worldLine}
+          </Text>
+        </View>
       </View>
 
       {hasItems ? (
@@ -116,25 +168,40 @@ export default function CollectionScreen() {
             const isWorn = !!acc && equipped?.[acc.slot] === item.id;
             const headLocked =
               !!acc && isAccessorySlotLocked(selectedMonster, acc.slot);
+            const raised = isWorn || isPlaced;
 
             return (
               <View
                 key={item.id}
                 style={[
                   styles.itemCard,
-                  isDark ? styles.itemCardDark : styles.itemCardLight,
+                  {
+                    backgroundColor: raised ? surfaceRaised : surface,
+                    borderColor: raised ? accent : line,
+                  },
                 ]}
               >
-                <Text style={styles.itemEmoji}>{item.emoji}</Text>
-                <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                <ThemedText style={styles.itemDesc}>
+                <View
+                  style={[styles.emojiWell, { backgroundColor: accentSoft }]}
+                >
+                  <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.itemName,
+                    { color: ink, fontFamily: fontRounded },
+                  ]}
+                >
+                  {item.name}
+                </Text>
+                <Text style={[styles.itemDesc, { color: inkMuted }]}>
                   {item.description}
-                </ThemedText>
+                </Text>
                 {isAccessory && acc && (
-                  <ThemedText style={styles.slotHint}>
+                  <Text style={[styles.slotHint, { color: inkMuted }]}>
                     {SLOT_LABEL[acc.slot]} slot
                     {isWorn ? " · on your monster" : ""}
-                  </ThemedText>
+                  </Text>
                 )}
 
                 <View style={styles.itemFooter}>
@@ -164,7 +231,7 @@ export default function CollectionScreen() {
                       <Text
                         style={[
                           styles.placeButtonText,
-                          { color: isPlaced ? accentText : accent },
+                          { color: isPlaced ? onSoft : accent },
                         ]}
                       >
                         {isPlaced ? "In the room \u2713" : "Place in room"}
@@ -210,7 +277,7 @@ export default function CollectionScreen() {
                       <Text
                         style={[
                           styles.placeButtonText,
-                          { color: isWorn ? accentText : accent },
+                          { color: isWorn ? onSoft : accent },
                         ]}
                       >
                         {isWorn ? "Wearing \u2713" : "Wear"}
@@ -218,21 +285,18 @@ export default function CollectionScreen() {
                     </Pressable>
                   )}
                   <View
-                    style={[
-                      styles.ownedBadge,
-                      { backgroundColor: isDark ? accentDark : accentLight },
-                    ]}
+                    style={[styles.ownedBadge, { backgroundColor: accentSoft }]}
                   >
-                    <Text style={[styles.ownedText, { color: accentText }]}>
+                    <Text style={[styles.ownedText, { color: onSoft }]}>
                       {"\u2713"} Owned
                     </Text>
                   </View>
                 </View>
                 {isAccessory && acc && headLocked && (
-                  <ThemedText style={styles.lockNote}>
+                  <Text style={[styles.lockNote, { color: inkMuted }]}>
                     Luna&apos;s hat is already part of her look — head items
                     unlock when hatless art arrives.
-                  </ThemedText>
+                  </Text>
                 )}
               </View>
             );
@@ -240,29 +304,64 @@ export default function CollectionScreen() {
         </ScrollView>
       ) : (
         <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyEmoji}>🎁</ThemedText>
-          <ThemedText style={styles.emptyTitle}>Collection Empty</ThemedText>
-          <ThemedText style={styles.emptyMessage}>
-            Visit the Points Store to collect toys, accessories, and decor!
-          </ThemedText>
+          <Text style={[styles.emptyTitle, { color: ink }]}>
+            Nothing here yet
+          </Text>
+          <Text style={[styles.emptyMessage, { color: inkMuted }]}>
+            The shop has toys, wearables, and a few things for the room. Buy
+            something once — it lives here.
+          </Text>
         </View>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.3,
   },
   wearingSummary: {
     marginTop: 8,
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  companionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  companionArt: {
+    width: 72,
+    height: 104,
+  },
+  companionCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  companionName: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  companionWorld: {
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
   },
   loadingWrap: {
     flex: 1,
@@ -272,28 +371,26 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    opacity: 0.6,
   },
   itemsGrid: {
     gap: 12,
     paddingBottom: 40,
   },
   itemCard: {
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
   },
-  itemCardLight: {
-    backgroundColor: "#fafafa",
-    borderColor: "#e8e8e8",
-  },
-  itemCardDark: {
-    backgroundColor: "#1e2124",
-    borderColor: "#2e3236",
+  emojiWell: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
   itemEmoji: {
-    fontSize: 36,
-    marginBottom: 6,
+    fontSize: 28,
   },
   itemName: {
     fontSize: 17,
@@ -302,12 +399,12 @@ const styles = StyleSheet.create({
   },
   itemDesc: {
     fontSize: 13,
-    opacity: 0.6,
+    fontWeight: "500",
     marginBottom: 12,
   },
   slotHint: {
     fontSize: 12,
-    opacity: 0.55,
+    fontWeight: "500",
     marginTop: -8,
     marginBottom: 12,
   },
@@ -338,27 +435,24 @@ const styles = StyleSheet.create({
   },
   lockNote: {
     fontSize: 12,
-    opacity: 0.55,
+    fontWeight: "500",
     marginTop: 10,
+    lineHeight: 17,
   },
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-  },
-  emptyEmoji: {
-    fontSize: 48,
+    gap: 10,
+    paddingHorizontal: 12,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700",
-    marginTop: 8,
   },
   emptyMessage: {
     fontSize: 14,
-    opacity: 0.6,
+    lineHeight: 21,
     textAlign: "center",
-    paddingHorizontal: 20,
   },
 });
