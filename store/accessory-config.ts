@@ -102,9 +102,10 @@ const NILLY_ANCHORS: Record<AccessoryStage, Record<AccessorySlot, SlotAnchor>> =
       neck: { x: 0.5, y: 0.56, scale: 0.38, rotation: 0, zIndex: 1 },
     },
     adult: {
-      head: { x: 0.5, y: 0.16, scale: 0.38, rotation: 0, zIndex: 2 },
-      face: { x: 0.5, y: 0.34, scale: 0.32, rotation: 0, zIndex: 3 },
-      neck: { x: 0.5, y: 0.54, scale: 0.36, rotation: 0, zIndex: 1 },
+      // Canonical adult art is a tall full-body crop (horns, tuft, sunflower).
+      head: { x: 0.5, y: 0.2, scale: 0.34, rotation: 0, zIndex: 2 },
+      face: { x: 0.5, y: 0.38, scale: 0.28, rotation: 0, zIndex: 3 },
+      neck: { x: 0.5, y: 0.56, scale: 0.34, rotation: 0, zIndex: 1 },
     },
   };
 
@@ -120,9 +121,10 @@ const LUNA_ANCHORS: Record<AccessoryStage, Record<AccessorySlot, SlotAnchor>> = 
     neck: { x: 0.5, y: 0.54, scale: 0.38, rotation: 0, zIndex: 1 },
   },
   adult: {
-    head: { x: 0.5, y: 0.12, scale: 0.4, rotation: 0, zIndex: 2 },
-    face: { x: 0.5, y: 0.32, scale: 0.32, rotation: 0, zIndex: 3 },
-    neck: { x: 0.5, y: 0.52, scale: 0.36, rotation: 0, zIndex: 1 },
+    // Canonical adult art: painted-in hat + horns, amber eyes lower in frame.
+    head: { x: 0.5, y: 0.18, scale: 0.36, rotation: 0, zIndex: 2 },
+    face: { x: 0.5, y: 0.42, scale: 0.26, rotation: 0, zIndex: 3 },
+    neck: { x: 0.5, y: 0.58, scale: 0.32, rotation: 0, zIndex: 1 },
   },
 };
 

@@ -3,6 +3,12 @@ import { ImageSourcePropType } from "react-native";
 import { AdultVariant, EvolutionStage } from "./types";
 import { PetMood } from "./use-pet-store";
 
+/**
+ * Stage art. `adult` is the canonical companion look (photoreal Luna / Nilly).
+ * Egg, baby, teen, sad, and room-variant sheets stay on the older stage art
+ * until those stages are redrawn — do not invent missing evolution art here.
+ */
+
 export const STAGE_SPRITES = {
   luna: {
     egg: require("../assets/images/luna_egg.png"),
