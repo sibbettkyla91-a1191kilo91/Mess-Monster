@@ -55,11 +55,11 @@ async function getNotifications() {
     if (Platform.OS === "web") return null;
     const [
       { setNotificationHandler },
-      { setNotificationChannelAsync },
+      setNotificationChannelAsyncModule,
       { AndroidImportance },
       { getPermissionsAsync, requestPermissionsAsync },
-      { cancelScheduledNotificationAsync },
-      { scheduleNotificationAsync },
+      cancelScheduledNotificationAsyncModule,
+      scheduleNotificationAsyncModule,
       { SchedulableTriggerInputTypes },
     ] = await Promise.all([
       import("expo-notifications/build/NotificationsHandler"),
@@ -70,14 +70,16 @@ async function getNotifications() {
       import("expo-notifications/build/scheduleNotificationAsync"),
       import("expo-notifications/build/Notifications.types"),
     ]);
+    // SDK 54 ships these three as default exports; named destructure is SDK 55+.
     return {
       setNotificationHandler,
-      setNotificationChannelAsync,
+      setNotificationChannelAsync: setNotificationChannelAsyncModule.default,
       AndroidImportance,
       getPermissionsAsync,
       requestPermissionsAsync,
-      cancelScheduledNotificationAsync,
-      scheduleNotificationAsync,
+      cancelScheduledNotificationAsync:
+        cancelScheduledNotificationAsyncModule.default,
+      scheduleNotificationAsync: scheduleNotificationAsyncModule.default,
       SchedulableTriggerInputTypes,
     };
   } catch {

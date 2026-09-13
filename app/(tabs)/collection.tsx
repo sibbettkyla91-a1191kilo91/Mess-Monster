@@ -9,6 +9,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -40,6 +41,8 @@ export default function CollectionScreen() {
   const storeHydrated = useHasHydrated(useStoreStore);
   const playerHydrated = useHasHydrated(usePlayerStore);
   const hydrated = storeHydrated && playerHydrated;
+  const insets = useSafeAreaInsets();
+  const containerStyle = [styles.container, { paddingTop: insets.top + 14 }];
 
   const ownedItems = useMemo(
     () => Object.values(owned).filter((e) => e.quantity > 0),
@@ -70,7 +73,7 @@ export default function CollectionScreen() {
 
   if (!hydrated) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={containerStyle}>
         <View style={styles.header}>
           <ThemedText type="title">My Collection</ThemedText>
         </View>
@@ -85,7 +88,7 @@ export default function CollectionScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={containerStyle}>
       <View style={styles.header}>
         <ThemedText type="title">My Collection</ThemedText>
         {wearingBySlot.length > 0 && (
@@ -251,7 +254,6 @@ export default function CollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
     paddingHorizontal: 16,
   },
   header: {

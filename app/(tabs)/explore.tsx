@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PhotoRewardModal } from "@/components/photo-reward-modal";
 import { TaskTimer } from "@/components/task-timer";
@@ -109,6 +110,7 @@ export default function TasksScreen() {
   } | null>(null);
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let mounted = true;
@@ -355,7 +357,12 @@ export default function TasksScreen() {
     reduceMotion ? 1 : pressed ? 0.98 : 1;
 
   return (
-    <View style={[styles.container, { backgroundColor: page }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: page, paddingTop: insets.top + 8 },
+      ]}
+    >
       <View style={styles.header}>
         <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
           Today’s Tasks
@@ -732,7 +739,7 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 54, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: 20 },
   header: { marginBottom: 20, gap: 8 },
   title: {
     fontSize: 28,

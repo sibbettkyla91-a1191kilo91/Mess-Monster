@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
@@ -42,6 +43,7 @@ export default function StoreScreen() {
   const playerHydrated = useHasHydrated(usePlayerStore);
   const petHydrated = useHasHydrated(usePetStore);
   const hydrated = storeHydrated && playerHydrated && petHydrated;
+  const insets = useSafeAreaInsets();
   const {
     accent,
     accentInk,
@@ -157,7 +159,12 @@ export default function StoreScreen() {
     reduceMotion ? 1 : pressed ? 0.98 : 1;
 
   return (
-    <View style={[styles.container, { backgroundColor: page }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: page, paddingTop: insets.top + 8 },
+      ]}
+    >
       <View style={styles.header}>
         <Text style={[styles.title, { color: ink, fontFamily: fontRounded }]}>
           Points Store
@@ -341,7 +348,6 @@ export default function StoreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 54,
     paddingHorizontal: 20,
   },
   header: {

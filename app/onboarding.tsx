@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { randomMonsterName } from "@/store/name-randomizer";
@@ -43,8 +44,9 @@ const HOW_STEPS = [
 // ─── Slide 0 — Welcome ───────────────────────────────────────────────────────
 
 function WelcomeSlide({ onNext }: { onNext: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[s.slide, { width: W }]}>
+    <View style={[s.slide, { width: W, paddingTop: insets.top + 8 }]}>
       <View style={s.slideBody}>
         <Text style={s.appTitle}>Mess{"\n"}Monster</Text>
         <Text style={s.tagline}>
@@ -69,8 +71,9 @@ function WelcomeSlide({ onNext }: { onNext: () => void }) {
 // ─── Slide 1 — How it works ──────────────────────────────────────────────────
 
 function HowSlide({ onNext }: { onNext: () => void }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[s.slide, { width: W }]}>
+    <View style={[s.slide, { width: W, paddingTop: insets.top + 8 }]}>
       <View style={s.slideBody}>
         <Text style={s.slideHeading}>How it works</Text>
 
@@ -112,13 +115,15 @@ function ChooseSlide({
   const [selected, setSelected] = useState<"nilly" | "luna" | null>(null);
   const [nameVal, setNameVal] = useState("");
 
+  const insets = useSafeAreaInsets();
+
   const handleSelect = (m: "nilly" | "luna") => {
     setSelected(m);
     setNameVal(randomMonsterName(m));
   };
 
   return (
-    <View style={[s.slide, { width: W }]}>
+    <View style={[s.slide, { width: W, paddingTop: insets.top + 8 }]}>
       <View style={s.slideBody}>
         <Text style={s.slideHeading}>Choose your{"\n"}monster</Text>
 
@@ -285,8 +290,6 @@ export default function OnboardingScreen() {
 
 // ─── Shared slide styles ─────────────────────────────────────────────────────
 
-const SLIDE_PT = Platform.OS === "android" ? 52 : 68;
-
 const s = StyleSheet.create({
   root: {
     flex: 1,
@@ -297,7 +300,6 @@ const s = StyleSheet.create({
   slide: {
     flex: 1,
     backgroundColor: "#0d0118",
-    paddingTop: SLIDE_PT,
     paddingHorizontal: 28,
     paddingBottom: 24,
     justifyContent: "space-between",
