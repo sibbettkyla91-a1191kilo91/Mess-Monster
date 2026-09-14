@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
 import {
   localDayString,
@@ -8,7 +7,18 @@ import {
   localYesterdayString,
 } from "@/utils/local-day";
 
-import { MonsterId, resolveMonsterId } from "./monster-id";
+import { MONSTER_IDS, MonsterId, resolveMonsterId } from "./monster-id";
+import {
+  booleanOr,
+  countOr,
+  createSafeStorage,
+  finiteNumberOr,
+  oneOfOrNull,
+  recordOfRecords,
+  recordOr,
+  safeMigrate,
+  stringOr,
+} from "./safe-persist";
 import { PlayerProfile } from "./types";
 
 // Exported for tests.
@@ -58,6 +68,88 @@ function todayISO() {
 }
 
 export type TapReactionSlice = { date: string; count: number };
+
+type PersistedPlayerState = Omit<
+  PlayerStore,
+  {
+    [K in keyof PlayerStore]: PlayerStore[K] extends (
+      ...args: never[]
+    ) => unknown
+      ? K
+      : never;
+  }[keyof PlayerStore]
+>;
+
+function pickTapReaction(source: unknown): TapReactionSlice {
+  const src = recordOr(source);
+  return { date: stringOr(src.date, ""), count: countOr(src.count) };
+}
+
+/**
+ * Give a persisted player record — same version, migrated, or damaged — a
+ * shape the store can run on. Points stay finite and never negative, the
+ * monster choice is a real id or null, and the tap-cap slices exist for
+ * both monsters. Exported for tests.
+ *
+ * `hasCompletedOnboarding` arrived well after `selectedMonster`. A save from
+ * that window carries a monster but no flag; the choice is only ever made in
+ * onboarding, so it counts as completed. Sending that player back through
+ * onboarding would let them re-pick, which the product forbids.
+ */
+export function sanitizePlayerPersisted(
+  persisted: unknown,
+  defaults: PersistedPlayerState,
+): PersistedPlayerState {
+  const src = recordOr(persisted);
+  const totalPoints = Math.max(
+    0,
+    finiteNumberOr(src.totalPoints, defaults.totalPoints),
+  );
+  const spentPoints = Math.min(
+    totalPoints,
+    Math.max(0, finiteNumberOr(src.spentPoints, defaults.spentPoints)),
+  );
+  const selectedMonster = oneOfOrNull(src.selectedMonster, MONSTER_IDS);
+  const reactions = recordOr(src.tapReactions);
+  const tapReactions: Record<MonsterId, TapReactionSlice> = {
+    nilly: pickTapReaction(reactions.nilly),
+    luna: pickTapReaction(reactions.luna),
+  };
+  const active = tapReactions[resolveMonsterId(selectedMonster)];
+  return {
+    totalPoints,
+    spentPoints,
+    streak: countOr(src.streak),
+    lastActiveDay: stringOr(src.lastActiveDay, ""),
+    activeDaysCount: countOr(src.activeDaysCount),
+    isPremium: booleanOr(src.isPremium, false),
+    selectedMonster,
+    monsterName: stringOr(src.monsterName, ""),
+    hasCompletedOnboarding: booleanOr(
+      src.hasCompletedOnboarding,
+      selectedMonster !== null,
+    ),
+    lastTapReactionDate: active.date,
+    tapReactionCount: active.count,
+    tapReactions,
+    notifPermissionAsked: booleanOr(src.notifPermissionAsked, false),
+    statPanelCollapsed: booleanOr(src.statPanelCollapsed, false),
+    appliedRewardGrants: recordOfRecords(
+      src.appliedRewardGrants,
+    ) as PlayerStore["appliedRewardGrants"],
+    appliedPurchases: recordOfRecords(
+      src.appliedPurchases,
+    ) as PlayerStore["appliedPurchases"],
+  };
+}
+
+function mergePlayerState(
+  persisted: unknown,
+  current: PlayerStore,
+): PlayerStore {
+  if (persisted === undefined) return current;
+  return { ...current, ...sanitizePlayerPersisted(persisted, current) };
+}
 
 interface PlayerStore extends PlayerProfile {
   lastTapReactionDate: string; // ISO date of last tap reaction (active monster)
@@ -295,8 +387,9 @@ export const usePlayerStore = create<PlayerStore>()(
     {
       name: "mm-player",
       version: 6,
-      migrate: migratePlayerState,
-      storage: createJSONStorage(() => AsyncStorage),
+      migrate: safeMigrate("mm-player", migratePlayerState),
+      storage: createSafeStorage(),
+      merge: mergePlayerState,
     },
   ),
 );

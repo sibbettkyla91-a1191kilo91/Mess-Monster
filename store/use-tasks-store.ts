@@ -1,10 +1,22 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import { RewardOutcome } from "@/constants/task-timers";
 import { localDayString } from "@/utils/local-day";
 
 import { getDailyRoll, PRESET_TASKS, PresetTask } from "./preset-tasks";
+import {
+  arrayOr,
+  booleanOr,
+  createSafeStorage,
+  finiteNumberOr,
+  guardHydrationStep,
+  isRecord,
+  oneOf,
+  recordOfRecords,
+  recordOr,
+  safeMigrate,
+  stringOr,
+} from "./safe-persist";
 import { CleaningTask, TaskCategory } from "./types";
 
 function todayStr(): string {
@@ -122,7 +134,10 @@ function lookupTask(
   s: Pick<TasksState, "dailyRoll">,
   taskId: string,
 ): PresetTask | undefined {
-  return s.dailyRoll.find((t) => t.id === taskId) ?? PRESET_TASKS.find((t) => t.id === taskId);
+  return (
+    s.dailyRoll.find((t) => t.id === taskId) ??
+    PRESET_TASKS.find((t) => t.id === taskId)
+  );
 }
 
 export function migrateTasksState(persistedState: any): any {
@@ -133,6 +148,145 @@ export function migrateTasksState(persistedState: any): any {
     unsettledGrants: persistedState?.unsettledGrants ?? [],
     appliedRewardGrants: persistedState?.appliedRewardGrants ?? {},
   };
+}
+
+const TASK_STATES: readonly TaskState[] = [
+  "idle",
+  "pending_photo",
+  "waiting",
+  "reward_ready",
+  "claimed",
+];
+
+const LOCAL_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The fields a preset task, history entry, and reward all share. */
+function pickTaskFields(source: unknown): PresetTask | null {
+  if (!isRecord(source)) return null;
+  if (typeof source.id !== "string" || typeof source.label !== "string") {
+    return null;
+  }
+  return {
+    id: source.id,
+    label: source.label,
+    category: stringOr(source.category, "other") as TaskCategory,
+    pointValue: Math.max(0, finiteNumberOr(source.pointValue, 0)),
+  };
+}
+
+function pickHistoryTask(source: unknown): CleaningTask | null {
+  const base = pickTaskFields(source);
+  if (!base || !isRecord(source)) return null;
+  const completedAt = finiteNumberOr(source.completedAt, NaN);
+  if (!Number.isFinite(completedAt)) return null;
+  return { ...base, completedAt };
+}
+
+function pickRewardInfo(source: unknown): TaskProgress["rewardInfo"] {
+  if (!isRecord(source)) return undefined;
+  const finalPoints = finiteNumberOr(source.finalPoints, NaN);
+  if (!Number.isFinite(finalPoints)) return undefined;
+  return {
+    ...(source as NonNullable<TaskProgress["rewardInfo"]>),
+    basePoints: finiteNumberOr(source.basePoints, finalPoints),
+    pointsMultiplier: finiteNumberOr(source.pointsMultiplier, 1),
+    finalPoints,
+  };
+}
+
+function pickProgress(source: unknown): TaskProgress | null {
+  if (!isRecord(source)) return null;
+  const waitStartedAt = finiteNumberOr(source.waitStartedAt, NaN);
+  const rewardInfo = pickRewardInfo(source.rewardInfo);
+  return {
+    state: oneOf(source.state, TASK_STATES, "idle"),
+    hasPhoto: booleanOr(source.hasPhoto, false),
+    ...(typeof source.photoUri === "string"
+      ? { photoUri: source.photoUri }
+      : {}),
+    ...(Number.isFinite(waitStartedAt) ? { waitStartedAt } : {}),
+    ...(rewardInfo ? { rewardInfo } : {}),
+  };
+}
+
+function pickPendingReward(source: unknown): PendingReward | null {
+  const base = pickTaskFields(source);
+  if (!base || !isRecord(source)) return null;
+  const rewardInfo = pickRewardInfo(source.rewardInfo);
+  if (!rewardInfo) return null;
+  return {
+    ...base,
+    id: stringOr(source.id, base.id),
+    taskId: stringOr(source.taskId, base.id),
+    earnedDate: stringOr(source.earnedDate, ""),
+    hasPhoto: booleanOr(source.hasPhoto, false),
+    rewardInfo,
+  };
+}
+
+function pickUnsettledGrant(source: unknown): UnsettledRewardGrant | null {
+  const reward = pickPendingReward(source);
+  if (!reward || !isRecord(source)) return null;
+  return {
+    ...reward,
+    claimedAt: finiteNumberOr(source.claimedAt, Date.now()),
+    countsTowardActivity: booleanOr(source.countsTowardActivity, false),
+  };
+}
+
+type PersistedTasksState = Pick<
+  TasksState,
+  | "tasks"
+  | "dailyRoll"
+  | "dailyRollDate"
+  | "taskProgress"
+  | "pendingRewards"
+  | "unsettledGrants"
+  | "appliedRewardGrants"
+>;
+
+/**
+ * Give a persisted tasks record — same version, migrated, or damaged — a
+ * shape the store can run on. A roll that cannot be read is regenerated for
+ * its date (the roll is a pure function of the date), so today's chores are
+ * always on screen. Exported for tests.
+ */
+export function sanitizeTasksPersisted(
+  persisted: unknown,
+): PersistedTasksState {
+  const src = recordOr(persisted);
+  const storedDate = stringOr(src.dailyRollDate, "");
+  const dailyRollDate = LOCAL_DAY.test(storedDate) ? storedDate : todayStr();
+  const roll = arrayOr(src.dailyRoll)
+    .map(pickTaskFields)
+    .filter((t): t is PresetTask => t !== null);
+  const taskProgress: Record<string, TaskProgress> = {};
+  for (const [taskId, progress] of Object.entries(recordOr(src.taskProgress))) {
+    const clean = pickProgress(progress);
+    if (clean) taskProgress[taskId] = clean;
+  }
+  return {
+    tasks: arrayOr(src.tasks)
+      .map(pickHistoryTask)
+      .filter((t): t is CleaningTask => t !== null),
+    dailyRoll: roll.length > 0 ? roll : getDailyRoll(dailyRollDate),
+    dailyRollDate,
+    taskProgress,
+    pendingRewards: arrayOr(src.pendingRewards)
+      .map(pickPendingReward)
+      .filter((r): r is PendingReward => r !== null),
+    unsettledGrants: arrayOr(src.unsettledGrants)
+      .map(pickUnsettledGrant)
+      .filter((g): g is UnsettledRewardGrant => g !== null),
+    appliedRewardGrants: recordOfRecords(
+      src.appliedRewardGrants,
+    ) as TasksState["appliedRewardGrants"],
+  };
+}
+
+function mergeTasksState(persisted: unknown, current: TasksState): TasksState {
+  if (persisted === undefined) return current;
+  return { ...current, ...sanitizeTasksPersisted(persisted) };
 }
 
 export const useTasksStore = create<TasksState>()(
@@ -290,19 +444,21 @@ export const useTasksStore = create<TasksState>()(
     }),
     {
       name: "mm-tasks",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createSafeStorage(),
       version: 3,
+      merge: mergeTasksState,
       // v0 → v1: per-task progress is now persisted; older state just starts
       // with an empty progress map.
       // v1 → v2: uncollected rewards carry across rollovers; older state
       // starts with an empty queue.
       // v2 → v3: reserved grants persist as an intent log so a crash between
       // claim and player/pet writes can still complete the grant.
-      migrate: migrateTasksState,
+      migrate: safeMigrate("mm-tasks", migrateTasksState),
       // After AsyncStorage rehydration, refresh the roll if the device date has
       // moved past the stored roll date (e.g. app left open overnight).
       onRehydrateStorage: () => (state) => {
-        state?.refreshDailyRoll();
+        if (!state) return;
+        guardHydrationStep("mm-tasks", () => state.refreshDailyRoll());
       },
     },
   ),
