@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { Ref, useEffect, useImperativeHandle, useRef } from "react";
+import { Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   Animated,
   Image,
@@ -26,7 +26,16 @@ import { PetMood } from "@/store/use-pet-store";
 export type LivingMonsterHandle = {
   /** The quick 1.12× tap bounce every care action shares. */
   bounce: () => void;
+  /**
+   * A 1.2–1.8 s care moment, started AFTER the store write has landed:
+   * feed = the snack flies in and two chomps; play = the toy bounces twice
+   * while the monster hops in sync; pet = a lean in; welcome = a perk-up.
+   * Starting a new moment cancels the one in flight. Never touches state.
+   */
+  careMoment: (kind: CareMomentKind, emoji?: string) => void;
 };
+
+export type CareMomentKind = "feed" | "play" | "pet" | "welcome";
 
 type Props = {
   monster: "nilly" | "luna";
@@ -104,9 +113,16 @@ export function LivingMonster({
   // player-triggered reactions (the tap bounce) still run.
   const reduceMotion = useReduceMotion();
 
+  // Animated values shared between the idle loops, touch, and care moments.
+  // Declared up front so every section below can reach them.
+  const squishAnim = useRef(new Animated.Value(0)).current; // tap / chomp
+  const leanAnim = useRef(new Animated.Value(0)).current; // hold / pet
+  const hopAnim = useRef(new Animated.Value(0)).current; // idle perk-up
+  // Care moments hop on their own value: the idle perk-up effect resets
+  // hopAnim whenever mood changes, and a care action changes mood.
+  const careHopAnim = useRef(new Animated.Value(0)).current;
+
   // ── Touch: squish on tap, lean while held ──────────────────────────────
-  const squishAnim = useRef(new Animated.Value(0)).current;
-  const leanAnim = useRef(new Animated.Value(0)).current;
   const holdTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -178,26 +194,20 @@ export function LivingMonster({
   // ── Tap bounce ─────────────────────────────────────────────────────────
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      bounce: () => {
-        Animated.sequence([
-          Animated.timing(tapScaleAnim, {
-            toValue: 1.12,
-            duration: 120,
-            useNativeDriver: true,
-          }),
-          Animated.timing(tapScaleAnim, {
-            toValue: 1.0,
-            duration: 120,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      },
-    }),
-    [tapScaleAnim],
-  );
+  const bounce = () => {
+    Animated.sequence([
+      Animated.timing(tapScaleAnim, {
+        toValue: 1.12,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tapScaleAnim, {
+        toValue: 1.0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   useEffect(() => {
     return () => {
@@ -205,6 +215,138 @@ export function LivingMonster({
       tapScaleAnim.setValue(1);
     };
   }, [tapScaleAnim]);
+
+  // ── Care moments ───────────────────────────────────────────────────────
+  // The "prop" is the snack or toy emoji that flies in / bounces. Only one
+  // moment runs at a time; a new one stops the old one cold and resets.
+  const [prop, setProp] = useState<{
+    char: string;
+    kind: "feed" | "play";
+  } | null>(null);
+  const propY = useRef(new Animated.Value(0)).current;
+  const propScale = useRef(new Animated.Value(1)).current;
+  const propOpacity = useRef(new Animated.Value(0)).current;
+  const momentRef = useRef<Animated.CompositeAnimation | null>(null);
+  const mountedRef = useRef(true);
+
+  const stopMoment = () => {
+    momentRef.current?.stop();
+    momentRef.current = null;
+    propOpacity.setValue(0);
+    propY.setValue(0);
+    propScale.setValue(1);
+    careHopAnim.setValue(0);
+  };
+
+  const runMoment = (anim: Animated.CompositeAnimation, done?: () => void) => {
+    momentRef.current = anim;
+    anim.start(() => {
+      if (momentRef.current === anim) momentRef.current = null;
+      if (mountedRef.current) done?.();
+    });
+  };
+
+  const t = (
+    value: Animated.Value,
+    toValue: number,
+    duration: number,
+  ): Animated.CompositeAnimation =>
+    Animated.timing(value, { toValue, duration, useNativeDriver: true });
+
+  const careMoment = (kind: CareMomentKind, emoji?: string) => {
+    stopMoment();
+    if (reduceMotion) {
+      setProp(null);
+      bounce();
+      return;
+    }
+    switch (kind) {
+      case "feed": {
+        setProp({ char: emoji ?? "🍪", kind: "feed" });
+        propY.setValue(-size * 0.95);
+        propScale.setValue(1);
+        propOpacity.setValue(1);
+        runMoment(
+          Animated.sequence([
+            Animated.parallel([
+              t(propY, -size * 0.3, 420),
+              t(propScale, 0.55, 420),
+            ]),
+            t(propOpacity, 0, 110),
+            // Two chomps.
+            t(squishAnim, 1, 110),
+            t(squishAnim, 0, 120),
+            t(squishAnim, 1, 110),
+            t(squishAnim, 0, 140),
+          ]),
+          () => setProp(null),
+        );
+        return;
+      }
+      case "play": {
+        setProp({ char: emoji ?? "🧶", kind: "play" });
+        propY.setValue(0);
+        propScale.setValue(1);
+        propOpacity.setValue(1);
+        const bounceOnce = () =>
+          Animated.sequence([
+            Animated.parallel([
+              t(propY, -size * 0.36, 210),
+              t(careHopAnim, -PERK_HEIGHT, 190),
+            ]),
+            Animated.parallel([t(propY, 0, 230), t(careHopAnim, 0, 220)]),
+          ]);
+        runMoment(
+          Animated.sequence([
+            bounceOnce(),
+            bounceOnce(),
+            t(propOpacity, 0, 160),
+          ]),
+          () => setProp(null),
+        );
+        return;
+      }
+      case "pet": {
+        setProp(null);
+        runMoment(
+          Animated.sequence([
+            t(leanAnim, 1, 220),
+            Animated.delay(380),
+            Animated.spring(leanAnim, {
+              toValue: 0,
+              tension: 70,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+        return;
+      }
+      case "welcome": {
+        setProp(null);
+        runMoment(
+          Animated.sequence([
+            t(careHopAnim, -PERK_HEIGHT - 6, 170),
+            t(careHopAnim, 0, 220),
+            t(careHopAnim, -PERK_HEIGHT * 0.6, 140),
+            t(careHopAnim, 0, 200),
+          ]),
+        );
+        return;
+      }
+    }
+  };
+
+  useImperativeHandle(ref, () => ({ bounce, careMoment }));
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopMoment();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Bob ────────────────────────────────────────────────────────────────
   const bobAnim = useRef(new Animated.Value(0)).current;
@@ -317,8 +459,6 @@ export function LivingMonster({
   }, [glanceAnim, reduceMotion]);
 
   // ── Perk-up hop (thriving only) ────────────────────────────────────────
-  const hopAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     if (reduceMotion || mood !== "thriving") {
       hopAnim.setValue(0);
@@ -554,7 +694,7 @@ export function LivingMonster({
   // Ground shadow follows the body's height: higher off the floor means a
   // smaller, fainter ellipse. Bob and hop both lift the body, so they share
   // one driver.
-  const lift = Animated.add(bobAnim, hopAnim);
+  const lift = Animated.add(bobAnim, Animated.add(hopAnim, careHopAnim));
   const shadowScale = lift.interpolate({
     inputRange: [-PERK_HEIGHT - 12, 0, 6],
     outputRange: [0.72, 1, 1.05],
@@ -633,6 +773,7 @@ export function LivingMonster({
             transform: [
               { translateY: bobAnim },
               { translateY: hopAnim },
+              { translateY: careHopAnim },
               { scale: breathAnim },
               { scale: scaleAnim },
               { scale: evoScaleAnim },
@@ -664,6 +805,21 @@ export function LivingMonster({
           )}
         </View>
       </Animated.View>
+      {prop ? (
+        <Animated.Text
+          pointerEvents="none"
+          testID={`care-prop-${prop.kind}`}
+          style={{
+            position: "absolute",
+            bottom: size * (prop.kind === "feed" ? 0.42 : 0.06),
+            fontSize: Math.round(size * 0.2),
+            opacity: propOpacity,
+            transform: [{ translateY: propY }, { scale: propScale }],
+          }}
+        >
+          {prop.char}
+        </Animated.Text>
+      ) : null}
     </Pressable>
   );
 }

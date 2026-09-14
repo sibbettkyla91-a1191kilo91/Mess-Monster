@@ -14,6 +14,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  BURST_DURATION_MS,
+  BurstKind,
+  BurstParticles,
+  MAX_CONCURRENT_BURSTS,
+} from "@/components/burst-particles";
+import {
   LivingMonster,
   LivingMonsterHandle,
 } from "@/components/living-monster";
@@ -21,6 +27,7 @@ import { PetInteractMenu } from "@/components/pet-interact-menu";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { getDecorSlot } from "@/store/decor-slots";
 import { useIsPremium } from "@/store/premium";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
@@ -967,8 +974,13 @@ export default function HomeScreen() {
     { id: string; x: number; y: number }[]
   >([]);
   const monsterRef = useRef<LivingMonsterHandle>(null);
+  const reduceMotion = useReduceMotion();
+  // Glyph bursts around the monster for care moments. Capped and short-lived;
+  // each one is removed on its own timer.
+  const [bursts, setBursts] = useState<{ id: string; kind: BurstKind }[]>([]);
+  const liveBurstsRef = useRef(0);
   // Monotonic id so two taps in the same millisecond can't collide, and
-  // pending heart-removal timers so unmount doesn't leak them.
+  // pending heart/burst-removal timers so unmount doesn't leak them.
   const heartSeqRef = useRef(0);
   const heartTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
@@ -1083,6 +1095,22 @@ export default function HomeScreen() {
     toggleStatPanel();
   };
 
+  // Presentation only. Skipped (not queued) once MAX_CONCURRENT_BURSTS are
+  // already on screen, so spamming a care action can't pile up glyphs.
+  const addBurst = (kind: BurstKind) => {
+    if (liveBurstsRef.current >= MAX_CONCURRENT_BURSTS) return;
+    liveBurstsRef.current += 1;
+    heartSeqRef.current += 1;
+    const id = `burst-${heartSeqRef.current}`;
+    setBursts((prev) => [...prev, { id, kind }]);
+    const timer = setTimeout(() => {
+      heartTimersRef.current.delete(timer);
+      liveBurstsRef.current -= 1;
+      setBursts((prev) => prev.filter((b) => b.id !== id));
+    }, BURST_DURATION_MS);
+    heartTimersRef.current.add(timer);
+  };
+
   const playTapReaction = (grantHappiness: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -1126,6 +1154,9 @@ export default function HomeScreen() {
   const petMonster = () => {
     const withinDailyAllowance = recordTapReaction();
     playTapReaction(withinDailyAllowance);
+    // Everything from here is presentation, after the write above.
+    monsterRef.current?.careMoment("pet");
+    addBurst("pet");
     speak("pet");
   };
 
@@ -1155,18 +1186,28 @@ export default function HomeScreen() {
     setPicker("play");
   };
 
+  // Feed / Play: the store write (executeFeed / executePlay) is immediate
+  // and complete before any of the moment starts. The moment is only how the
+  // monster shows it — an interrupted one leaves nothing half-applied.
   const handleChooseFeed = (itemId: string) => {
     if (!hydrated) return;
+    // Look the emoji up before the consume: the last unit leaves the bag.
+    const emoji = owned[itemId]?.item.emoji;
     if (!executeFeed(itemId, monster)) return;
-    playTapReaction(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    monsterRef.current?.careMoment("feed", emoji);
+    addBurst("feed");
     speak("feed");
     closeMenu();
   };
 
   const handleChoosePlay = (itemId: string) => {
     if (!hydrated) return;
+    const emoji = owned[itemId]?.item.emoji;
     if (!executePlay(itemId, monster)) return;
-    playTapReaction(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    monsterRef.current?.careMoment("play", emoji);
+    addBurst("play");
     speak("play");
     closeMenu();
   };
@@ -1332,6 +1373,28 @@ export default function HomeScreen() {
       {tapHearts.map((heart) => (
         <TapReactionHeart key={heart.id} x={heart.x} y={heart.y} />
       ))}
+
+      {/* ── Care-moment bursts, radiating from the monster's middle ── */}
+      {bursts.length > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.burstLayer,
+            panelHeight > 0 && {
+              bottom: panelHeight + MONSTER_BOTTOM_GAP + IMAGE_SIZE * 0.5,
+            },
+          ]}
+        >
+          {bursts.map((b) => (
+            <BurstParticles
+              key={b.id}
+              monster={monster}
+              kind={b.kind}
+              reduceMotion={reduceMotion}
+            />
+          ))}
+        </View>
+      ) : null}
 
       {/* ── Bottom panel ── */}
       {/* Collapsing slides the panel down until only the handle row peeks
@@ -1555,6 +1618,14 @@ const styles = StyleSheet.create({
     right: 16,
     alignItems: "center",
     zIndex: 8,
+  },
+  burstLayer: {
+    position: "absolute",
+    bottom: "40%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 6,
   },
   voiceCaptionWrap: {
     position: "absolute",
