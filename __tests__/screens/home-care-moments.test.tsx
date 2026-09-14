@@ -14,6 +14,7 @@ import {
   BURST_DURATION_MS,
   MAX_CONCURRENT_BURSTS,
 } from "@/components/burst-particles";
+import { VOICE_LINES } from "@/store/monster-voice";
 import { STORE_ITEMS } from "@/store/store-items";
 import { PetSlice } from "@/store/types";
 import { usePetStore } from "@/store/use-pet-store";
@@ -199,6 +200,62 @@ describe("care moments", () => {
     });
     expect(usePetStore.getState().happiness).toBe(58);
     expect(usePetStore.getState().health).toBe(53);
+  });
+
+  it("a refused feed shows nothing: a snack the catalog no longer knows is listed, tapped, and declined", async () => {
+    const screen = await mountHome();
+    // A bag entry whose id is gone from STORE_ITEMS (an item retired from
+    // the catalog). Home still lists it under Feed; executeFeed refuses it.
+    const phantom = { ...cookie, id: "food-phantom", name: "Phantom Snack" };
+    act(() => {
+      useStoreStore.getState().buyItem(cookie);
+      const s = useStoreStore.getState();
+      const owned = {
+        ...s.byMonster.nilly.owned,
+        "food-phantom": { item: phantom, quantity: 1, purchasedAt: Date.now() },
+      };
+      useStoreStore.setState({
+        byMonster: {
+          ...s.byMonster,
+          nilly: { ...s.byMonster.nilly, owned },
+        },
+        owned,
+      });
+    });
+    // Idle chatter is already up; a feed line would replace it.
+    act(() => {
+      jest.advanceTimersByTime(0);
+    });
+    const feedLineBefore = VOICE_LINES.nilly.feed.find((l) =>
+      screen.queryByText(l),
+    );
+    expect(feedLineBefore).toBeUndefined();
+    const pet = usePetStore.getState();
+    const player = usePlayerStore.getState();
+    const store = useStoreStore.getState();
+
+    fireEvent.press(screen.getByLabelText("Care for Nilly"));
+    fireEvent.press(screen.getByLabelText("Feed Nilly"));
+    fireEvent.press(screen.getByLabelText("Feed Phantom Snack"));
+
+    // Nothing of the success — snack, chomps, burst, haptic, line — plays,
+    // and every store is the same object it was.
+    expect(usePetStore.getState()).toBe(pet);
+    expect(usePlayerStore.getState()).toBe(player);
+    expect(useStoreStore.getState()).toBe(store);
+    expect(usePetStore.getState().health).toBe(50);
+    expect(screen.queryByTestId("care-prop-feed")).toBeNull();
+    expect(liveBursts(screen)).toBe(0);
+    expect(Haptics.impactAsync).not.toHaveBeenCalledWith("medium");
+    expect(
+      VOICE_LINES.nilly.feed.find((l) => screen.queryByText(l)),
+    ).toBeUndefined();
+    // The menu stays open: the player can pick a real snack instead.
+    expect(screen.getByLabelText("Feed Cookie")).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText("Feed Cookie"));
+    expect(usePetStore.getState().health).toBe(58);
+    expect(screen.getByTestId("care-prop-feed")).toBeTruthy();
   });
 
   it("feeding Luna leaves Nilly's bag and stats untouched", async () => {
