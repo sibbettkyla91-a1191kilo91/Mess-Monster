@@ -6,7 +6,6 @@ import {
   Dimensions,
   Image,
   ImageBackground,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,23 +13,35 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AccessoryLayer } from "@/components/accessory-layer";
+import {
+  BURST_DURATION_MS,
+  BurstKind,
+  BurstParticles,
+  MAX_CONCURRENT_BURSTS,
+} from "@/components/burst-particles";
+import {
+  LivingMonster,
+  LivingMonsterHandle,
+} from "@/components/living-monster";
 import { PetInteractMenu } from "@/components/pet-interact-menu";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
-import { resolveAccessoryStage } from "@/store/accessory-config";
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { getDecorSlot } from "@/store/decor-slots";
-import { getMonsterSprite } from "@/store/monster-sprites";
 import { useIsPremium } from "@/store/premium";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
+import { currentTimeOfDay, LastAction, pickLine } from "@/store/monster-voice";
 import {
   deriveMood,
   PET_HAPPINESS_BOOST,
+  PetMood,
   usePetStore,
 } from "@/store/use-pet-store";
+import { PresetTask } from "@/store/preset-tasks";
 import { usePlayerStore } from "@/store/use-player-store";
+import { pickTinyDare, useSessionStore } from "@/store/use-session-store";
 import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
 import { localDayString } from "@/utils/local-day";
@@ -87,58 +98,27 @@ const THEMES = {
   },
 } as const;
 
-// ─── Mood config ─────────────────────────────────────────────────────────
+// ─── Mood labels ─────────────────────────────────────────────────────────
+// Just the word. What the monster has to say about its day comes from the
+// talk-back line under the sprite (store/monster-voice.ts), never a verdict.
 
-const MOOD_CONFIG = {
-  nilly: {
-    thriving: {
-      label: "Thriving",
-      message:
-        "Nilly is absolutely thriving! She loves how clean everything is.",
-    },
-    happy: {
-      label: "Happy",
-      message: "Nilly is happy and content. Keep up the good work!",
-    },
-    neutral: {
-      label: "Neutral",
-      message: "Nilly could use some attention. Maybe tackle a quick task?",
-    },
-    sad: {
-      label: "Sad",
-      message: "Nilly is feeling neglected… she misses seeing you clean.",
-    },
-    sick: {
-      label: "Sad",
-      message:
-        "Nilly is really struggling. Even a small task will help her feel better.",
-    },
-  },
-  luna: {
-    thriving: {
-      label: "Thriving",
-      message:
-        "Luna is radiant. The realm is spotless and her power is at its peak.",
-    },
-    happy: {
-      label: "Happy",
-      message: "Luna is pleased. The chaos is under control — for now.",
-    },
-    neutral: {
-      label: "Neutral",
-      message: "Luna stirs uneasily. The mess grows in the shadows.",
-    },
-    sad: {
-      label: "Sad",
-      message: "Luna fades. Neglect weakens her magic — she needs you.",
-    },
-    sick: {
-      label: "Sad",
-      message:
-        "Luna's magic dims. A little cleaning is all it takes to bring her back.",
-    },
-  },
-} as const;
+const MOOD_LABELS: Record<PetMood, string> = {
+  thriving: "Thriving",
+  happy: "Happy",
+  neutral: "Neutral",
+  sad: "Sad",
+  sick: "Sad",
+};
+
+// How long one talk-back line stays up while nothing happens.
+const VOICE_IDLE_MS = 15_000;
+// Room reserved under the sprite for the talk-back caption.
+const VOICE_CAPTION_SPACE = 44;
+const MONSTER_BOTTOM_GAP = 16 + VOICE_CAPTION_SPACE;
+// Welcome-back "tiny dare" chip: how long it stays, and how far the monster
+// lifts (a transform, not layout) to make room for it under the caption.
+const DARE_CHIP_MS = 20_000;
+const DARE_CHIP_LIFT = 38;
 
 const HABITAT_IMAGES = {
   nilly: require("../../assets/images/nilly-habitat.jpg"),
@@ -922,19 +902,6 @@ const premiumStyles = StyleSheet.create({
 
 // ─── HomeScreen ───────────────────────────────────────────────────────
 
-const REACTIONS = {
-  nilly: {
-    pet: "Hehe — that tickles!",
-    feed: "Yum! Thank you.",
-    play: "This is so fun!",
-  },
-  luna: {
-    pet: "…fine. That was nice.",
-    feed: "An acceptable offering.",
-    play: "I suppose this is entertaining.",
-  },
-} as const;
-
 export default function HomeScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const health = usePetStore((s) => s.byMonster[selectedMonster].health);
@@ -974,6 +941,10 @@ export default function HomeScreen() {
   const petHydrated = useHasHydrated(usePetStore);
   const storeHydrated = useHasHydrated(useStoreStore);
   const hydrated = playerHydrated && petHydrated && storeHydrated;
+  // The welcome-back dare reads today's task progress; until that save
+  // lands, every task looks untouched and the chip could offer one already
+  // finished this morning. Only the hello waits on it.
+  const tasksHydrated = useHasHydrated(useTasksStore);
 
   // Manual entry point for the upgrade modal — the auto-popup only shows
   // once per stage, so non-premium users need a way to reopen it anytime.
@@ -981,6 +952,18 @@ export default function HomeScreen() {
 
   const tasks = useTasksStore((s) => s.tasks);
   const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
+  // Raw state references (never derived arrays) for the welcome-back dare.
+  const dailyRoll = useTasksStore((s) => s.dailyRoll);
+  const taskProgress = useTasksStore((s) => s.taskProgress);
+
+  // Welcome-back: set by the root layout when the active monster's last
+  // session was 4+ hours ago (cold start or foreground return). Consumed here
+  // so the hello happens once per return. In-memory only.
+  const pendingWelcome = useSessionStore((s) => s.pendingWelcome);
+  const consumeWelcome = useSessionStore((s) => s.consumeWelcome);
+  const [dare, setDare] = useState<PresetTask | null>(null);
+  const dareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dareLiftAnim = useRef(new Animated.Value(0)).current;
 
   const [panelHeight, setPanelHeight] = useState(0);
   const insets = useSafeAreaInsets();
@@ -1012,17 +995,24 @@ export default function HomeScreen() {
   const [tapHearts, setTapHearts] = useState<
     { id: string; x: number; y: number }[]
   >([]);
-  const tapScaleAnim = useRef(new Animated.Value(1)).current;
+  const monsterRef = useRef<LivingMonsterHandle>(null);
+  const reduceMotion = useReduceMotion();
+  // Glyph bursts around the monster for care moments. Capped and short-lived;
+  // each one is removed on its own timer.
+  const [bursts, setBursts] = useState<{ id: string; kind: BurstKind }[]>([]);
+  const liveBurstsRef = useRef(0);
   // Monotonic id so two taps in the same millisecond can't collide, and
-  // pending heart-removal timers so unmount doesn't leak them.
+  // pending heart/burst-removal timers so unmount doesn't leak them.
   const heartSeqRef = useRef(0);
   const heartTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
   const addHappiness = usePetStore((s) => s.addHappiness);
   const [menuOpen, setMenuOpen] = useState(false);
   const [picker, setPicker] = useState<"feed" | "play" | null>(null);
-  const [reactionLine, setReactionLine] = useState<string | null>(null);
-  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Talk-back: the line under the sprite. Local state only — the monster
+  // "speaking" never touches a persisted store.
+  const [voiceLine, setVoiceLine] = useState<string | null>(null);
+  const lastVoiceRef = useRef<string | null>(null);
 
   const foods = useMemo(() => {
     const list: {
@@ -1058,15 +1048,6 @@ export default function HomeScreen() {
     return list;
   }, [owned]);
 
-  const showReaction = (line: string) => {
-    if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
-    setReactionLine(line);
-    reactionTimerRef.current = setTimeout(() => {
-      setReactionLine(null);
-      reactionTimerRef.current = null;
-    }, 2200);
-  };
-
   const closeMenu = () => {
     setMenuOpen(false);
     setPicker(null);
@@ -1083,11 +1064,111 @@ export default function HomeScreen() {
 
   const monster = selectedMonster === "luna" ? "luna" : "nilly";
   const theme = THEMES[monster];
-  // Display sick as sad to player (internal state stays sick for effects)
-  const displayMood = mood === "sick" ? "sad" : mood;
-  const moodCfg = MOOD_CONFIG[monster][displayMood];
+  const moodLabel = MOOD_LABELS[mood];
 
   const displayName = monsterName || (monster === "nilly" ? "Nilly" : "Luna");
+
+  // ── Talk-back ──────────────────────────────────────────────────────────────
+  // Called from care handlers after the store write has landed: the monster
+  // answers what just happened, then idle rotation picks up again from there.
+  const speak = (lastAction: LastAction) => {
+    const line = pickLine(
+      monster,
+      {
+        mood,
+        timeOfDay: currentTimeOfDay(),
+        lastAction,
+        stage: evolutionStage,
+      },
+      lastVoiceRef.current,
+    );
+    lastVoiceRef.current = line;
+    setVoiceLine(line);
+  };
+
+  // One idle timer. It restarts whenever the line changes, so a care line
+  // gets its full turn before the next idle line replaces it. The first line
+  // appears as soon as the room is drawn for the right monster.
+  useEffect(() => {
+    if (!playerHydrated) return;
+    const delay = voiceLine === null ? 0 : VOICE_IDLE_MS;
+    const t = setTimeout(() => {
+      const line = pickLine(
+        monster,
+        {
+          mood,
+          timeOfDay: currentTimeOfDay(),
+          lastAction: null,
+          stage: evolutionStage,
+        },
+        lastVoiceRef.current,
+      );
+      lastVoiceRef.current = line;
+      setVoiceLine(line);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [voiceLine, playerHydrated, monster, mood, evolutionStage]);
+
+  // ── Welcome-back ───────────────────────────────────────────────────────────
+  const dismissDare = () => {
+    if (dareTimerRef.current) {
+      clearTimeout(dareTimerRef.current);
+      dareTimerRef.current = null;
+    }
+    setDare(null);
+  };
+
+  useEffect(() => {
+    Animated.timing(dareLiftAnim, {
+      toValue: dare ? -DARE_CHIP_LIFT : 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [dare, dareLiftAnim]);
+
+  useEffect(
+    () => () => {
+      if (dareTimerRef.current) clearTimeout(dareTimerRef.current);
+    },
+    [],
+  );
+
+  // Show the hello exactly once per return: perk-up, burst, a welcome line,
+  // and — if today's roll has an untouched task — the tiny dare chip. Store
+  // reads only; consumeWelcome is the in-memory flag flip.
+  const welcomeHandledRef = useRef(false);
+  useEffect(() => {
+    if (!pendingWelcome) {
+      welcomeHandledRef.current = false;
+      return;
+    }
+    // The ref guards Strict Mode's double effect run in development.
+    if (!hydrated || !tasksHydrated || welcomeHandledRef.current) return;
+    welcomeHandledRef.current = true;
+    consumeWelcome();
+    monsterRef.current?.careMoment("welcome");
+    addBurst("welcome");
+    speak("welcome");
+    const task = pickTinyDare(dailyRoll, taskProgress);
+    if (!task) return;
+    if (dareTimerRef.current) clearTimeout(dareTimerRef.current);
+    setDare(task);
+    dareTimerRef.current = setTimeout(() => {
+      dareTimerRef.current = null;
+      setDare(null);
+    }, DARE_CHIP_MS);
+    // Intentionally keyed on the flag alone: the helpers close over the
+    // current monster/mood, and pendingWelcome flips false synchronously on
+    // the first run, so a re-run cannot double the hello.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingWelcome, hydrated, tasksHydrated]);
+
+  const handleDarePress = () => {
+    // Navigation only. No task progress, no points, no writes of any kind.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    dismissDare();
+    router.navigate("/(tabs)/explore");
+  };
 
   // ── Stat panel toggle ───────────────────────────────────────────────────────
   const handleStatPanelToggle = () => {
@@ -1097,21 +1178,26 @@ export default function HomeScreen() {
     toggleStatPanel();
   };
 
+  // Presentation only. Skipped (not queued) once MAX_CONCURRENT_BURSTS are
+  // already on screen, so spamming a care action can't pile up glyphs.
+  const addBurst = (kind: BurstKind) => {
+    if (liveBurstsRef.current >= MAX_CONCURRENT_BURSTS) return;
+    liveBurstsRef.current += 1;
+    heartSeqRef.current += 1;
+    const id = `burst-${heartSeqRef.current}`;
+    setBursts((prev) => [...prev, { id, kind }]);
+    const timer = setTimeout(() => {
+      heartTimersRef.current.delete(timer);
+      liveBurstsRef.current -= 1;
+      setBursts((prev) => prev.filter((b) => b.id !== id));
+    }, BURST_DURATION_MS);
+    heartTimersRef.current.add(timer);
+  };
+
   const playTapReaction = (grantHappiness: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    Animated.sequence([
-      Animated.timing(tapScaleAnim, {
-        toValue: 1.12,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(tapScaleAnim, {
-        toValue: 1.0,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    monsterRef.current?.bounce();
 
     if (grantHappiness) addHappiness(PET_HAPPINESS_BOOST);
 
@@ -1143,17 +1229,35 @@ export default function HomeScreen() {
     setPicker(null);
   };
 
-  // ── Pet from the care menu — exact previous tap mechanic ───────────────────
-  const handlePetTap = () => {
-    if (!hydrated) return;
-    // The daily allowance caps only the happiness grant (anti-farming) —
-    // never the reaction. The monster always acknowledges affection with
-    // the bounce, haptic, and heart: a capped tap silently doing nothing
-    // reads as "broken", worst of all on a sad monster being comforted.
+  // ── Pet — the one pet mechanic, reached two ways ───────────────────────────
+  // The daily allowance caps only the happiness grant (anti-farming) —
+  // never the reaction. The monster always acknowledges affection with
+  // the bounce, haptic, and heart: a capped pet silently doing nothing
+  // reads as "broken", worst of all on a sad monster being comforted.
+  const petMonster = () => {
+    dismissDare();
     const withinDailyAllowance = recordTapReaction();
     playTapReaction(withinDailyAllowance);
-    showReaction(REACTIONS[monster].pet);
+    // Everything from here is presentation, after the write above.
+    monsterRef.current?.careMoment("pet");
+    addBurst("pet");
+    speak("pet");
+  };
+
+  // From the care menu's Pet button.
+  const handlePetTap = () => {
+    if (!hydrated) return;
+    petMonster();
     closeMenu();
+  };
+
+  // From pressing and holding the monster itself. One hold = one pet; the
+  // Pressable never also fires onPress for the same touch, so the menu
+  // stays closed. An open menu just closes.
+  const handleMonsterHold = () => {
+    if (!hydrated) return;
+    if (menuOpen) closeMenu();
+    petMonster();
   };
 
   const handleAskFeed = () => {
@@ -1166,19 +1270,31 @@ export default function HomeScreen() {
     setPicker("play");
   };
 
+  // Feed / Play: the store write (executeFeed / executePlay) is immediate
+  // and complete before any of the moment starts. The moment is only how the
+  // monster shows it — an interrupted one leaves nothing half-applied.
   const handleChooseFeed = (itemId: string) => {
     if (!hydrated) return;
+    // Look the emoji up before the consume: the last unit leaves the bag.
+    const emoji = owned[itemId]?.item.emoji;
     if (!executeFeed(itemId, monster)) return;
-    playTapReaction(false);
-    showReaction(REACTIONS[monster].feed);
+    dismissDare();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    monsterRef.current?.careMoment("feed", emoji);
+    addBurst("feed");
+    speak("feed");
     closeMenu();
   };
 
   const handleChoosePlay = (itemId: string) => {
     if (!hydrated) return;
+    const emoji = owned[itemId]?.item.emoji;
     if (!executePlay(itemId, monster)) return;
-    playTapReaction(false);
-    showReaction(REACTIONS[monster].play);
+    dismissDare();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    monsterRef.current?.careMoment("play", emoji);
+    addBurst("play");
+    speak("play");
     closeMenu();
   };
 
@@ -1187,178 +1303,13 @@ export default function HomeScreen() {
     router.navigate("/(tabs)/store");
   };
 
-  // ── Bob ────────────────────────────────────────────────────────────────────
-  const bobAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const heartTimers = heartTimersRef.current;
     return () => {
-      // PERFORMANCE: Reset animation values on cleanup to prevent leaks
-      tapScaleAnim.setValue(1);
       heartTimers.forEach(clearTimeout);
       heartTimers.clear();
-      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
     };
-  }, [tapScaleAnim]);
-
-  useEffect(() => {
-    const isSad = mood === "sad" || mood === "sick";
-    const bobSpeed = mood === "thriving" ? 900 : isSad ? 2600 : 1700;
-    const bobAmt = isSad ? 6 : -12;
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobAnim, {
-          toValue: bobAmt,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bobAnim, {
-          toValue: 0,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup to prevent animation state leaks
-      bobAnim.setValue(0);
-    };
-  }, [mood, bobAnim]);
-
-  // ── Wiggle ──────────────────────────────────────────────────────────
-  const wiggleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let active = true;
-    let tid: ReturnType<typeof setTimeout>;
-
-    const schedule = () => {
-      if (!active) return;
-      tid = setTimeout(
-        () => {
-          if (!active) return;
-          Animated.sequence([
-            Animated.timing(wiggleAnim, {
-              toValue: -9,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: 9,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: -5,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: 0,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-          ]).start(() => schedule());
-        },
-        4000 + Math.random() * 4000,
-      );
-    };
-
-    schedule();
-    return () => {
-      active = false;
-      clearTimeout(tid);
-      // PERFORMANCE: Reset animation value on cleanup
-      wiggleAnim.setValue(0);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Thriving scale-pulse ────────────────────────────────��──────────────────
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (mood !== "thriving") {
-      scaleAnim.setValue(1);
-      return;
-    }
-    let active = true;
-    let tid: ReturnType<typeof setTimeout>;
-
-    const schedule = () => {
-      if (!active) return;
-      tid = setTimeout(
-        () => {
-          if (!active) return;
-          Animated.sequence([
-            Animated.timing(scaleAnim, {
-              toValue: 1.08,
-              duration: 240,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.0,
-              duration: 240,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.05,
-              duration: 180,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.0,
-              duration: 180,
-              useNativeDriver: true,
-            }),
-          ]).start(() => schedule());
-        },
-        5000 + Math.random() * 5000,
-      );
-    };
-
-    schedule();
-    return () => {
-      active = false;
-      clearTimeout(tid);
-      // PERFORMANCE: Reset animation value on cleanup
-      scaleAnim.setValue(1);
-    };
-  }, [mood, scaleAnim]);
-
-  // ── Evolution glow pulse (adult / ascended) ────────────────────────────────
-  const evoScaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const isAdult = evolutionStage === "adult" || evolutionStage === "ascended";
-    if (!isAdult) {
-      evoScaleAnim.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(evoScaleAnim, {
-          toValue: 1.04,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(evoScaleAnim, {
-          toValue: 1.0,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup
-      evoScaleAnim.setValue(1);
-    };
-  }, [evolutionStage, evoScaleAnim]);
 
   // ── Milestone banner auto-dismiss ─────────────────────────────────────────
   useEffect(() => {
@@ -1366,80 +1317,6 @@ export default function HomeScreen() {
     const t = setTimeout(clearMilestoneBanner, 3000);
     return () => clearTimeout(t);
   }, [pendingMilestoneBanner, clearMilestoneBanner]);
-
-  // ── Sick wobble ─────────────────────────────────────────────────────────
-  const sickWobbleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (mood !== "sick") {
-      sickWobbleAnim.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sickWobbleAnim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sickWobbleAnim, {
-          toValue: -1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup
-      sickWobbleAnim.setValue(0);
-    };
-  }, [mood, sickWobbleAnim]);
-
-  const wiggleRot = wiggleAnim.interpolate({
-    inputRange: [-9, 0, 9],
-    outputRange: ["-4.5deg", "0deg", "4.5deg"],
-  });
-  const sickWobbleRot = sickWobbleAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ["-8deg", "0deg", "8deg"],
-  });
-
-  // Egg stage: slightly faded to convey "not yet hatched"
-  // Sick mood: also faded to convey distress
-  const wrapperOpacity = Math.min(
-    evolutionStage === "egg" ? 0.75 : 1,
-    mood === "neutral" || mood === "sick" ? 0.75 : 1,
-  );
-
-  // Stage-based shadow intensity
-  const isAdult = evolutionStage === "adult" || evolutionStage === "ascended";
-  const shadowStyle = isAdult
-    ? {
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.75,
-        shadowRadius: 30,
-        elevation: Platform.OS === "android" ? 0 : 14,
-      }
-    : evolutionStage === "teen"
-      ? {
-          shadowColor: theme.accent,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.45,
-          shadowRadius: 18,
-          elevation: Platform.OS === "android" ? 0 : 8,
-        }
-      : null;
-
-  const monsterSource = getMonsterSprite(
-    monster,
-    evolutionStage,
-    adultVariant,
-    mood,
-  );
-  const wearStage = resolveAccessoryStage(evolutionStage);
 
   // Until the player store rehydrates, selectedMonster still reads its default,
   // so a Luna player would get Nilly's room, sprite, and palette for a frame
@@ -1489,10 +1366,6 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Monster ── */}
-      {/* Positioning lives on the Pressable: position "absolute" anchors to
-          the direct parent in RN, so it must sit on the container's child —
-          on the inner Animated.View it would anchor to the zero-height
-          Pressable and render offscreen. */}
       {menuOpen ? (
         <Pressable
           style={StyleSheet.absoluteFillObject}
@@ -1502,55 +1375,86 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      <Pressable
+      <LivingMonster
+        ref={monsterRef}
+        monster={monster}
+        stage={evolutionStage}
+        adultVariant={adultVariant}
+        mood={mood}
+        equipped={equipped}
+        size={IMAGE_SIZE}
+        accent={theme.accent}
+        accessibilityLabel={`Care for ${displayName}`}
         onPress={handleMonsterPress}
+        onLongPress={handleMonsterHold}
+        lift={dareLiftAnim}
         style={[
           styles.monsterImageWrapper,
-          panelHeight > 0 && { bottom: panelHeight + 16 },
+          panelHeight > 0 && { bottom: panelHeight + MONSTER_BOTTOM_GAP },
         ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Care for ${displayName}`}
-      >
-        <Animated.View
+      />
+
+      {/* ── Talk-back caption, tucked between the sprite and the panel ── */}
+      {voiceLine || dare ? (
+        <View
+          pointerEvents="box-none"
           style={[
-            { opacity: wrapperOpacity },
-            shadowStyle,
-            {
-              transform: [
-                { translateY: bobAnim },
-                { scale: scaleAnim },
-                { scale: evoScaleAnim },
-                { scale: tapScaleAnim },
-                { rotateZ: wiggleRot },
-                { rotateZ: sickWobbleRot },
-              ],
-            },
+            styles.voiceCaptionWrap,
+            panelHeight > 0 && { bottom: panelHeight + 10 },
           ]}
         >
-          <View style={styles.monsterImage}>
-            <Image
-              source={monsterSource}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="contain"
-            />
-            {wearStage && (
-              <AccessoryLayer
-                monster={monster}
-                stage={wearStage}
-                equipped={equipped}
-                size={IMAGE_SIZE}
-              />
-            )}
-          </View>
-        </Animated.View>
-      </Pressable>
+          {voiceLine ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.voiceBubble,
+                {
+                  backgroundColor: theme.cardBg + "E6",
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <ThemedText
+                style={[styles.voiceText, { color: theme.text }]}
+                accessibilityLiveRegion="polite"
+              >
+                {voiceLine}
+              </ThemedText>
+            </View>
+          ) : null}
+          {/* Welcome-back tiny dare: an offer, never a demand. Tapping only
+              opens the tasks tab. */}
+          {dare && !menuOpen ? (
+            <Pressable
+              onPress={handleDarePress}
+              style={({ pressed }) => [
+                styles.dareChip,
+                {
+                  backgroundColor: theme.accent + "26",
+                  borderColor: theme.accent + "66",
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Tiny dare: ${dare.label}, ${dare.pointValue} points, only if you feel like it`}
+            >
+              <ThemedText style={[styles.dareText, { color: theme.text }]}>
+                Tiny dare: {dare.label} · {dare.pointValue} pts — only if you
+                feel like it
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {menuOpen ? (
         <View
           pointerEvents="box-none"
           style={[
             styles.interactMenuWrap,
-            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 20 },
+            panelHeight > 0 && {
+              bottom: panelHeight + MONSTER_BOTTOM_GAP + IMAGE_SIZE + 4,
+            },
           ]}
         >
           <PetInteractMenu
@@ -1577,27 +1481,32 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {reactionLine ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.reactionBubble,
-            { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
-            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 28 },
-          ]}
-        >
-          <ThemedText
-            style={[styles.reactionBubbleText, { color: theme.text }]}
-          >
-            {reactionLine}
-          </ThemedText>
-        </View>
-      ) : null}
-
       {/* ── Tap reaction hearts ── */}
       {tapHearts.map((heart) => (
         <TapReactionHeart key={heart.id} x={heart.x} y={heart.y} />
       ))}
+
+      {/* ── Care-moment bursts, radiating from the monster's middle ── */}
+      {bursts.length > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.burstLayer,
+            panelHeight > 0 && {
+              bottom: panelHeight + MONSTER_BOTTOM_GAP + IMAGE_SIZE * 0.5,
+            },
+          ]}
+        >
+          {bursts.map((b) => (
+            <BurstParticles
+              key={b.id}
+              monster={monster}
+              kind={b.kind}
+              reduceMotion={reduceMotion}
+            />
+          ))}
+        </View>
+      ) : null}
 
       {/* ── Bottom panel ── */}
       {/* Collapsing slides the panel down until only the handle row peeks
@@ -1708,10 +1617,7 @@ export default function HomeScreen() {
 
           <View style={styles.moodSection}>
             <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
-              {moodCfg.label}
-            </ThemedText>
-            <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
-              {moodCfg.message}
+              {moodLabel}
             </ThemedText>
           </View>
 
@@ -1825,25 +1731,48 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 8,
   },
-  reactionBubble: {
+  burstLayer: {
     position: "absolute",
-    bottom: "52%",
-    alignSelf: "center",
-    borderRadius: 16,
+    bottom: "40%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 6,
+  },
+  voiceCaptionWrap: {
+    position: "absolute",
+    bottom: "22%",
+    left: 24,
+    right: 24,
+    alignItems: "center",
+    zIndex: 7,
+  },
+  voiceBubble: {
+    maxWidth: 320,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    zIndex: 9,
+    paddingVertical: 7,
   },
-  reactionBubbleText: {
+  voiceText: {
     fontSize: 14,
+    lineHeight: 18,
     fontWeight: "600",
     textAlign: "center",
   },
-  monsterImage: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    aspectRatio: 1,
+  dareChip: {
+    marginTop: 6,
+    maxWidth: 320,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  dareText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    textAlign: "center",
   },
   bottomPanel: {
     position: "absolute",
@@ -1922,11 +1851,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.4,
-  },
-  moodMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.85,
   },
   ctaButton: {
     borderRadius: 16,
