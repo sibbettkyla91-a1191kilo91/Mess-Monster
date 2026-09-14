@@ -39,6 +39,15 @@ function storesHydrated(): boolean {
 
 let purchaseInFlight = false;
 
+// Two purchases inside the same millisecond would otherwise share an id and
+// the second would settle against the first one's receipts as a silent
+// no-op while still reporting success.
+let purchaseSeq = 0;
+function nextPurchaseId(itemId: string): string {
+  purchaseSeq += 1;
+  return `${Date.now()}:${purchaseSeq}:${itemId}`;
+}
+
 function applyOnePurchase(purchase: UnsettledPurchase): void {
   const store = useStoreStore.getState();
   store.grantPurchase(purchase);
@@ -92,7 +101,7 @@ export function executePaidShopPurchase(item: StoreItem): boolean {
       usePlayerStore.getState().selectedMonster,
     );
     const purchase: UnsettledPurchase = {
-      id: `${Date.now()}:${item.id}`,
+      id: nextPurchaseId(item.id),
       itemId: item.id,
       price: item.price,
       autoConsume: false,
@@ -104,6 +113,14 @@ export function executePaidShopPurchase(item: StoreItem): boolean {
     // Re-check live ownership here, not from a render closure. A second
     // tap after a non-repeatable grant must not create a new charge.
     if (!item.repeatable && store.isOwned(item.id, monsterId)) {
+      return false;
+    }
+
+    // Affordability is also re-checked from live state. The grant lands
+    // before the charge (crash-safety, see above), and chargePurchase
+    // refuses silently when the balance is short — so a stale "can afford"
+    // from the screen would otherwise hand out the item for free.
+    if (player.totalPoints - player.spentPoints < item.price) {
       return false;
     }
 

@@ -83,6 +83,49 @@ describe("Feed", () => {
     expect(usePetStore.getState().byMonster.nilly.health).toBe(50);
     expect(usePetStore.getState().byMonster.nilly.happiness).toBe(50);
   });
+
+  it("refuses a second tap once the last unit is gone, with no second +8/+8", () => {
+    useStoreStore.getState().buyItem(cookie);
+    expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    expect(executeFeed(cookie.id, "nilly")).toBe(false);
+
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[cookie.id].quantity).toBe(0);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(
+      50 + FEED_HEALTH_BOOST,
+    );
+    expect(usePetStore.getState().byMonster.nilly.happiness).toBe(
+      50 + FEED_HAPPINESS_BOOST,
+    );
+  });
+
+  it("feeds two snacks in the same millisecond as two separate feeds", () => {
+    useStoreStore.getState().buyItem(cookie);
+    useStoreStore.getState().buyItem(cookie);
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    try {
+      expect(executeFeed(cookie.id, "nilly")).toBe(true);
+      expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[cookie.id].quantity).toBe(0);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(
+      50 + 2 * FEED_HEALTH_BOOST,
+    );
+    expect(Object.keys(usePetStore.getState().appliedFeeds)).toHaveLength(2);
+  });
+
+  it("refuses to feed a toy or an unknown item", () => {
+    useStoreStore.getState().buyItem(yarn);
+    expect(executeFeed(yarn.id, "nilly")).toBe(false);
+    expect(executeFeed("food-not-in-catalog", "nilly")).toBe(false);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(50);
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[yarn.id].quantity).toBe(1);
+  });
 });
 
 describe("Play", () => {

@@ -31,10 +31,19 @@ function storesHydrated(): boolean {
 
 let feedInFlight = false;
 
+// Same-millisecond feeds must not share an id, or the second one would
+// settle against the first one's receipts and silently do nothing.
+let feedSeq = 0;
+function nextFeedId(itemId: string): string {
+  feedSeq += 1;
+  return `${Date.now()}:${feedSeq}:feed:${itemId}`;
+}
+
 function applyOneFeed(feed: UnsettledFeed): void {
   const storeReceipt = useStoreStore.getState().appliedFeeds[feed.id];
   const petReceipt = usePetStore.getState().appliedFeeds[feed.id];
-  const itemId = feed.itemId || storeReceipt?.itemId || petReceipt?.itemId || "";
+  const itemId =
+    feed.itemId || storeReceipt?.itemId || petReceipt?.itemId || "";
   const monsterId =
     feed.monsterId || storeReceipt?.monsterId || petReceipt?.monsterId;
   if (!monsterId) return;
@@ -104,7 +113,7 @@ export function executeFeed(itemId: string, monster?: MonsterId): boolean {
     if (!useStoreStore.getState().isOwned(itemId, monsterId)) return false;
 
     const feed: UnsettledFeed = {
-      id: `${Date.now()}:feed:${itemId}`,
+      id: nextFeedId(itemId),
       itemId,
       monsterId,
     };

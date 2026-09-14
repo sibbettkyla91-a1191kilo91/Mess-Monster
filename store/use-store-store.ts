@@ -366,7 +366,18 @@ export const useStoreStore = create<StoreStore>()(
             return { unsettledPurchases: unsettled };
           }
           const catalogItem = STORE_ITEMS.find((i) => i.id === purchase.itemId);
-          if (!catalogItem) return { unsettledPurchases: unsettled };
+          if (!catalogItem) {
+            // Nothing to hand out for an item the catalog no longer knows.
+            // Still write the receipt so a durable charge for it does not
+            // re-enter recovery on every cold start.
+            return {
+              unsettledPurchases: unsettled,
+              appliedPurchases: {
+                ...receipts,
+                [purchase.id]: { ...receipts[purchase.id], granted: true },
+              },
+            };
+          }
           const bag = s.byMonster[id].owned;
           const existing = bag[purchase.itemId];
           const alreadyOwned =
