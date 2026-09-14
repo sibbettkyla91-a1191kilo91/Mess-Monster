@@ -25,9 +25,11 @@ import { getDecorSlot } from "@/store/decor-slots";
 import { useIsPremium } from "@/store/premium";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
+import { currentTimeOfDay, LastAction, pickLine } from "@/store/monster-voice";
 import {
   deriveMood,
   PET_HAPPINESS_BOOST,
+  PetMood,
   usePetStore,
 } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
@@ -87,58 +89,23 @@ const THEMES = {
   },
 } as const;
 
-// ─── Mood config ─────────────────────────────────────────────────────────
+// ─── Mood labels ─────────────────────────────────────────────────────────
+// Just the word. What the monster has to say about its day comes from the
+// talk-back line under the sprite (store/monster-voice.ts), never a verdict.
 
-const MOOD_CONFIG = {
-  nilly: {
-    thriving: {
-      label: "Thriving",
-      message:
-        "Nilly is absolutely thriving! She loves how clean everything is.",
-    },
-    happy: {
-      label: "Happy",
-      message: "Nilly is happy and content. Keep up the good work!",
-    },
-    neutral: {
-      label: "Neutral",
-      message: "Nilly could use some attention. Maybe tackle a quick task?",
-    },
-    sad: {
-      label: "Sad",
-      message: "Nilly is feeling neglected… she misses seeing you clean.",
-    },
-    sick: {
-      label: "Sad",
-      message:
-        "Nilly is really struggling. Even a small task will help her feel better.",
-    },
-  },
-  luna: {
-    thriving: {
-      label: "Thriving",
-      message:
-        "Luna is radiant. The realm is spotless and her power is at its peak.",
-    },
-    happy: {
-      label: "Happy",
-      message: "Luna is pleased. The chaos is under control — for now.",
-    },
-    neutral: {
-      label: "Neutral",
-      message: "Luna stirs uneasily. The mess grows in the shadows.",
-    },
-    sad: {
-      label: "Sad",
-      message: "Luna fades. Neglect weakens her magic — she needs you.",
-    },
-    sick: {
-      label: "Sad",
-      message:
-        "Luna's magic dims. A little cleaning is all it takes to bring her back.",
-    },
-  },
-} as const;
+const MOOD_LABELS: Record<PetMood, string> = {
+  thriving: "Thriving",
+  happy: "Happy",
+  neutral: "Neutral",
+  sad: "Sad",
+  sick: "Sad",
+};
+
+// How long one talk-back line stays up while nothing happens.
+const VOICE_IDLE_MS = 15_000;
+// Room reserved under the sprite for the talk-back caption.
+const VOICE_CAPTION_SPACE = 44;
+const MONSTER_BOTTOM_GAP = 16 + VOICE_CAPTION_SPACE;
 
 const HABITAT_IMAGES = {
   nilly: require("../../assets/images/nilly-habitat.jpg"),
@@ -922,19 +889,6 @@ const premiumStyles = StyleSheet.create({
 
 // ─── HomeScreen ───────────────────────────────────────────────────────
 
-const REACTIONS = {
-  nilly: {
-    pet: "Hehe — that tickles!",
-    feed: "Yum! Thank you.",
-    play: "This is so fun!",
-  },
-  luna: {
-    pet: "…fine. That was nice.",
-    feed: "An acceptable offering.",
-    play: "I suppose this is entertaining.",
-  },
-} as const;
-
 export default function HomeScreen() {
   const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const health = usePetStore((s) => s.byMonster[selectedMonster].health);
@@ -1021,8 +975,10 @@ export default function HomeScreen() {
   const addHappiness = usePetStore((s) => s.addHappiness);
   const [menuOpen, setMenuOpen] = useState(false);
   const [picker, setPicker] = useState<"feed" | "play" | null>(null);
-  const [reactionLine, setReactionLine] = useState<string | null>(null);
-  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Talk-back: the line under the sprite. Local state only — the monster
+  // "speaking" never touches a persisted store.
+  const [voiceLine, setVoiceLine] = useState<string | null>(null);
+  const lastVoiceRef = useRef<string | null>(null);
 
   const foods = useMemo(() => {
     const list: {
@@ -1058,15 +1014,6 @@ export default function HomeScreen() {
     return list;
   }, [owned]);
 
-  const showReaction = (line: string) => {
-    if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
-    setReactionLine(line);
-    reactionTimerRef.current = setTimeout(() => {
-      setReactionLine(null);
-      reactionTimerRef.current = null;
-    }, 2200);
-  };
-
   const closeMenu = () => {
     setMenuOpen(false);
     setPicker(null);
@@ -1083,11 +1030,50 @@ export default function HomeScreen() {
 
   const monster = selectedMonster === "luna" ? "luna" : "nilly";
   const theme = THEMES[monster];
-  // Display sick as sad to player (internal state stays sick for effects)
-  const displayMood = mood === "sick" ? "sad" : mood;
-  const moodCfg = MOOD_CONFIG[monster][displayMood];
+  const moodLabel = MOOD_LABELS[mood];
 
   const displayName = monsterName || (monster === "nilly" ? "Nilly" : "Luna");
+
+  // ── Talk-back ──────────────────────────────────────────────────────────────
+  // Called from care handlers after the store write has landed: the monster
+  // answers what just happened, then idle rotation picks up again from there.
+  const speak = (lastAction: LastAction) => {
+    const line = pickLine(
+      monster,
+      {
+        mood,
+        timeOfDay: currentTimeOfDay(),
+        lastAction,
+        stage: evolutionStage,
+      },
+      lastVoiceRef.current,
+    );
+    lastVoiceRef.current = line;
+    setVoiceLine(line);
+  };
+
+  // One idle timer. It restarts whenever the line changes, so a care line
+  // gets its full turn before the next idle line replaces it. The first line
+  // appears as soon as the room is drawn for the right monster.
+  useEffect(() => {
+    if (!playerHydrated) return;
+    const delay = voiceLine === null ? 0 : VOICE_IDLE_MS;
+    const t = setTimeout(() => {
+      const line = pickLine(
+        monster,
+        {
+          mood,
+          timeOfDay: currentTimeOfDay(),
+          lastAction: null,
+          stage: evolutionStage,
+        },
+        lastVoiceRef.current,
+      );
+      lastVoiceRef.current = line;
+      setVoiceLine(line);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [voiceLine, playerHydrated, monster, mood, evolutionStage]);
 
   // ── Stat panel toggle ───────────────────────────────────────────────────────
   const handleStatPanelToggle = () => {
@@ -1141,7 +1127,7 @@ export default function HomeScreen() {
     // reads as "broken", worst of all on a sad monster being comforted.
     const withinDailyAllowance = recordTapReaction();
     playTapReaction(withinDailyAllowance);
-    showReaction(REACTIONS[monster].pet);
+    speak("pet");
     closeMenu();
   };
 
@@ -1159,7 +1145,7 @@ export default function HomeScreen() {
     if (!hydrated) return;
     if (!executeFeed(itemId, monster)) return;
     playTapReaction(false);
-    showReaction(REACTIONS[monster].feed);
+    speak("feed");
     closeMenu();
   };
 
@@ -1167,7 +1153,7 @@ export default function HomeScreen() {
     if (!hydrated) return;
     if (!executePlay(itemId, monster)) return;
     playTapReaction(false);
-    showReaction(REACTIONS[monster].play);
+    speak("play");
     closeMenu();
   };
 
@@ -1181,7 +1167,6 @@ export default function HomeScreen() {
     return () => {
       heartTimers.forEach(clearTimeout);
       heartTimers.clear();
-      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
     };
   }, []);
 
@@ -1262,16 +1247,46 @@ export default function HomeScreen() {
         onPress={handleMonsterPress}
         style={[
           styles.monsterImageWrapper,
-          panelHeight > 0 && { bottom: panelHeight + 16 },
+          panelHeight > 0 && { bottom: panelHeight + MONSTER_BOTTOM_GAP },
         ]}
       />
+
+      {/* ── Talk-back caption, tucked between the sprite and the panel ── */}
+      {voiceLine ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.voiceCaptionWrap,
+            panelHeight > 0 && { bottom: panelHeight + 10 },
+          ]}
+        >
+          <View
+            style={[
+              styles.voiceBubble,
+              {
+                backgroundColor: theme.cardBg + "E6",
+                borderColor: theme.cardBorder,
+              },
+            ]}
+          >
+            <ThemedText
+              style={[styles.voiceText, { color: theme.text }]}
+              accessibilityLiveRegion="polite"
+            >
+              {voiceLine}
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
 
       {menuOpen ? (
         <View
           pointerEvents="box-none"
           style={[
             styles.interactMenuWrap,
-            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 20 },
+            panelHeight > 0 && {
+              bottom: panelHeight + MONSTER_BOTTOM_GAP + IMAGE_SIZE + 4,
+            },
           ]}
         >
           <PetInteractMenu
@@ -1295,23 +1310,6 @@ export default function HomeScreen() {
             onGoToShop={handleGoToShop}
             onClose={closeMenu}
           />
-        </View>
-      ) : null}
-
-      {reactionLine ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.reactionBubble,
-            { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
-            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 28 },
-          ]}
-        >
-          <ThemedText
-            style={[styles.reactionBubbleText, { color: theme.text }]}
-          >
-            {reactionLine}
-          </ThemedText>
         </View>
       ) : null}
 
@@ -1429,10 +1427,7 @@ export default function HomeScreen() {
 
           <View style={styles.moodSection}>
             <ThemedText style={[styles.moodLabel, { color: theme.accent }]}>
-              {moodCfg.label}
-            </ThemedText>
-            <ThemedText style={[styles.moodMessage, { color: theme.text }]}>
-              {moodCfg.message}
+              {moodLabel}
             </ThemedText>
           </View>
 
@@ -1546,18 +1541,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 8,
   },
-  reactionBubble: {
+  voiceCaptionWrap: {
     position: "absolute",
-    bottom: "52%",
-    alignSelf: "center",
-    borderRadius: 16,
+    bottom: "22%",
+    left: 24,
+    right: 24,
+    alignItems: "center",
+    zIndex: 7,
+  },
+  voiceBubble: {
+    maxWidth: 320,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    zIndex: 9,
+    paddingVertical: 7,
   },
-  reactionBubbleText: {
+  voiceText: {
     fontSize: 14,
+    lineHeight: 18,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -1638,11 +1639,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.4,
-  },
-  moodMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.85,
   },
   ctaButton: {
     borderRadius: 16,
