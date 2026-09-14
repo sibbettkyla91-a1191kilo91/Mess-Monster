@@ -15,46 +15,44 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
+import { LUNA_PALETTE, NILLY_PALETTE } from "@/monster-theme";
 import { randomMonsterName } from "@/store/name-randomizer";
 import { usePlayerStore } from "@/store/use-player-store";
 
 const { width: W } = Dimensions.get("window");
 const TOTAL_SLIDES = 3;
 
-// ─── How-it-works content ────────────────────────────────────────────────────
-
 const HOW_STEPS = [
   {
-    emoji: "🧹",
-    title: "Log a cleaning task",
-    body: "Pick from presets whenever you tidy up. Every task earns you points.",
+    mark: "01",
+    title: "Log the work you already did",
+    body: "A dish, a load of laundry, five minutes on the floor. Points follow.",
   },
   {
-    emoji: "⭐",
-    title: "Spend in the store",
-    body: "Buy snacks, toys, and potions to keep your monster happy and fed.",
+    mark: "02",
+    title: "Spend them on your monster",
+    body: "Food, toys, a scarf. The shop is for them — not a gold star for you.",
   },
   {
-    emoji: "🌱",
-    title: "Keep your space going",
-    body: "Clean consistently and your monster thrives. Miss a day? No shame — just keep going.",
+    mark: "03",
+    title: "They grow as the house does",
+    body: "Miss a day? Nothing breaks. Pick it up when you can.",
   },
 ];
-
-// ─── Slide 0 — Welcome ───────────────────────────────────────────────────────
 
 function WelcomeSlide({ onNext }: { onNext: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[s.slide, { width: W, paddingTop: insets.top + 8 }]}>
       <View style={s.slideBody}>
+        <Text style={s.eyebrow}>A creature-care companion</Text>
         <Text style={s.appTitle}>Mess{"\n"}Monster</Text>
         <Text style={s.tagline}>
-          Your mess is your{"\n"}monster&apos;s fuel.
+          Take care of your space.{"\n"}Your monster grows with you.
         </Text>
         <Text style={s.caption}>
-          A tiny creature lives in your phone.{"\n"}
-          The cleaner your space, the happier it gets.
+          Two companions. One house. No charts, no lectures — just a creature
+          that notices when the room gets easier.
         </Text>
       </View>
 
@@ -62,13 +60,11 @@ function WelcomeSlide({ onNext }: { onNext: () => void }) {
         style={({ pressed }) => [s.btn, { opacity: pressed ? 0.72 : 1 }]}
         onPress={onNext}
       >
-        <Text style={s.btnText}>Let&apos;s go →</Text>
+        <Text style={s.btnText}>Continue</Text>
       </Pressable>
     </View>
   );
 }
-
-// ─── Slide 1 — How it works ──────────────────────────────────────────────────
 
 function HowSlide({ onNext }: { onNext: () => void }) {
   const insets = useSafeAreaInsets();
@@ -78,9 +74,9 @@ function HowSlide({ onNext }: { onNext: () => void }) {
         <Text style={s.slideHeading}>How it works</Text>
 
         <View style={how.list}>
-          {HOW_STEPS.map((step, i) => (
-            <View key={i} style={how.row}>
-              <Text style={how.emoji}>{step.emoji}</Text>
+          {HOW_STEPS.map((step) => (
+            <View key={step.mark} style={how.row}>
+              <Text style={how.mark}>{step.mark}</Text>
               <View style={how.text}>
                 <Text style={how.title}>{step.title}</Text>
                 <Text style={how.desc}>{step.body}</Text>
@@ -91,7 +87,7 @@ function HowSlide({ onNext }: { onNext: () => void }) {
 
         <Text style={s.note}>
           Low pressure. Zero shame.{"\n"}
-          Pick back up whenever you&apos;re ready. 🫶
+          Come back whenever you&apos;re ready.
         </Text>
       </View>
 
@@ -99,13 +95,11 @@ function HowSlide({ onNext }: { onNext: () => void }) {
         style={({ pressed }) => [s.btn, { opacity: pressed ? 0.72 : 1 }]}
         onPress={onNext}
       >
-        <Text style={s.btnText}>Got it →</Text>
+        <Text style={s.btnText}>Choose a companion</Text>
       </Pressable>
     </View>
   );
 }
-
-// ─── Slide 2 — Choose your monster ───────────────────────────────────────────
 
 function ChooseSlide({
   onChoose,
@@ -125,10 +119,9 @@ function ChooseSlide({
   return (
     <View style={[s.slide, { width: W, paddingTop: insets.top + 8 }]}>
       <View style={s.slideBody}>
-        <Text style={s.slideHeading}>Choose your{"\n"}monster</Text>
+        <Text style={s.slideHeading}>Who lives{"\n"}with you?</Text>
 
         <View style={pick.row}>
-          {/* ── Nilly ── */}
           <Pressable
             style={({ pressed }) => [
               pick.card,
@@ -145,13 +138,12 @@ function ChooseSlide({
               style={pick.img}
               resizeMode="contain"
             />
-            <Text style={[pick.name, { color: "#1a5c3a" }]}>Nilly</Text>
-            <Text style={[pick.tagline, { color: "#52b788" }]}>
-              kawaii & clean
+            <Text style={[pick.name, { color: NILLY_PALETTE.ink }]}>Nilly</Text>
+            <Text style={[pick.tagline, { color: NILLY_PALETTE.text }]}>
+              Warm. Sunlit. Soft.
             </Text>
           </Pressable>
 
-          {/* ── Luna ── */}
           <Pressable
             style={({ pressed }) => [
               pick.card,
@@ -168,17 +160,16 @@ function ChooseSlide({
               style={pick.img}
               resizeMode="contain"
             />
-            <Text style={[pick.name, { color: "#cc2222" }]}>Luna</Text>
-            <Text style={[pick.tagline, { color: "#a78bfa" }]}>
-              dark & witchy
+            <Text style={[pick.name, { color: LUNA_PALETTE.ink }]}>Luna</Text>
+            <Text style={[pick.tagline, { color: LUNA_PALETTE.particle }]}>
+              Night-sided. Witchy.
             </Text>
           </Pressable>
         </View>
 
-        {/* ── Name input — appears after monster is selected ── */}
         {selected !== null && (
           <View style={ni.container}>
-            <Text style={ni.label}>Name your monster</Text>
+            <Text style={ni.label}>Their name</Text>
             <View style={ni.row}>
               <TextInput
                 value={nameVal}
@@ -197,7 +188,7 @@ function ChooseSlide({
                 onPress={() => setNameVal(randomMonsterName(selected))}
                 accessibilityLabel="Random name"
               >
-                <Text style={ni.diceText}>🎲</Text>
+                <Text style={ni.diceText}>↻</Text>
               </Pressable>
             </View>
           </View>
@@ -211,14 +202,12 @@ function ChooseSlide({
             onChoose(selected, nameVal.trim() || randomMonsterName(selected))
           }
         >
-          <Text style={s.btnText}>Let&apos;s go →</Text>
+          <Text style={s.btnText}>Begin</Text>
         </Pressable>
       )}
     </View>
   );
 }
-
-// ─── Progress dots ───────────────────────────────────────────────────────────
 
 function ProgressDots({ total, active }: { total: number; active: number }) {
   return (
@@ -229,8 +218,6 @@ function ProgressDots({ total, active }: { total: number; active: number }) {
     </View>
   );
 }
-
-// ─── Root screen ─────────────────────────────────────────────────────────────
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -293,13 +280,12 @@ export default function OnboardingScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0d0118",
+    backgroundColor: "#0c0a12",
   },
 
-  // Each slide fills the width; content is top-aligned with flex
   slide: {
     flex: 1,
-    backgroundColor: "#0d0118",
+    backgroundColor: "#0c0a12",
     paddingHorizontal: 28,
     paddingBottom: 24,
     justifyContent: "space-between",
@@ -309,107 +295,106 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Slide 0 – hero type
+  eyebrow: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+    color: "rgba(232,184,109,0.75)",
+    marginBottom: 18,
+  },
   appTitle: {
-    fontSize: 72,
-    fontWeight: "900",
-    color: "#ffffff",
-    letterSpacing: -1,
-    lineHeight: 76,
-    marginBottom: 24,
+    fontSize: 64,
+    fontWeight: "800",
+    color: "#f4efe6",
+    letterSpacing: -1.4,
+    lineHeight: 68,
+    marginBottom: 20,
   },
   tagline: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.9)",
-    lineHeight: 34,
-    marginBottom: 18,
+    fontSize: 22,
+    fontWeight: "600",
+    color: "rgba(244,239,230,0.88)",
+    lineHeight: 30,
+    marginBottom: 16,
   },
   caption: {
     fontSize: 16,
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(244,239,230,0.52)",
     lineHeight: 24,
   },
 
-  // Slide 1 & 2 – section heading
   slideHeading: {
-    fontSize: 38,
+    fontSize: 34,
     fontWeight: "800",
-    color: "#ffffff",
-    letterSpacing: 0.2,
-    lineHeight: 46,
-    marginBottom: 32,
+    color: "#f4efe6",
+    letterSpacing: -0.4,
+    lineHeight: 40,
+    marginBottom: 28,
   },
 
-  // Shared note / disclaimer
   note: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(244,239,230,0.42)",
     lineHeight: 21,
     textAlign: "center",
     marginTop: 28,
-    fontStyle: "italic",
   },
 
-  // CTA button — white pill at the bottom of every slide
   btn: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f4efe6",
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 24,
   },
   btnText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#0d0118",
-    letterSpacing: 0.3,
+    color: "#0c0a12",
+    letterSpacing: 0.2,
   },
 
-  // Dots bar
   dotsArea: {
     paddingBottom: Platform.OS === "ios" ? 36 : 24,
     alignItems: "center",
   },
 });
 
-// ─── How-it-works styles ─────────────────────────────────────────────────────
-
 const how = StyleSheet.create({
   list: {
-    gap: 20,
+    gap: 22,
   },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 16,
   },
-  emoji: {
-    fontSize: 32,
-    lineHeight: 40,
-    width: 40,
-    textAlign: "center",
+  mark: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: "rgba(232,184,109,0.8)",
+    width: 28,
+    paddingTop: 3,
   },
   text: {
     flex: 1,
-    paddingTop: 2,
   },
   title: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#ffffff",
+    color: "#f4efe6",
     marginBottom: 4,
   },
   desc: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(244,239,230,0.52)",
     lineHeight: 20,
   },
 });
 
-// ─── Monster-pick styles ─────────────────────────────────────────────────────
-
-const CARD_W = (W - 28 * 2 - 12) / 2; // two cards with gap, respecting horizontal padding
+const CARD_W = (W - 28 * 2 - 12) / 2;
 
 const pick = StyleSheet.create({
   row: {
@@ -418,43 +403,43 @@ const pick = StyleSheet.create({
   },
   card: {
     width: CARD_W,
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 22,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    paddingBottom: 16,
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   nillyCard: {
-    backgroundColor: "#c8f7da",
+    backgroundColor: NILLY_PALETTE.accentSoft,
   },
   lunaCard: {
-    backgroundColor: "#1a0a2a",
+    backgroundColor: LUNA_PALETTE.surface,
     borderWidth: 1,
-    borderColor: "#3a1a4a",
+    borderColor: LUNA_PALETTE.line,
   },
   cardSelected: {
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.55)",
+    borderColor: "rgba(244,239,230,0.7)",
   },
   cardPressed: {
     opacity: 0.78,
   },
   img: {
-    width: CARD_W - 32,
-    height: CARD_W - 32,
-    marginBottom: 4,
+    width: CARD_W - 8,
+    height: Math.round((CARD_W - 8) * 1.35),
+    marginBottom: 2,
   },
   name: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   tagline: {
     fontSize: 12,
-    fontStyle: "italic",
+    fontWeight: "500",
   },
 });
-
-// ─── Name-input styles ────────────────────────────────────────────────────────
 
 const ni = StyleSheet.create({
   container: {
@@ -462,10 +447,10 @@ const ni = StyleSheet.create({
     gap: 8,
   },
   label: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    color: "rgba(244,239,230,0.45)",
     textTransform: "uppercase",
-    letterSpacing: 0.7,
+    letterSpacing: 1,
   },
   row: {
     flexDirection: "row",
@@ -474,32 +459,31 @@ const ni = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(244,239,230,0.06)",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 18,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#f4efe6",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(244,239,230,0.16)",
   },
   diceBtn: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(244,239,230,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(244,239,230,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
   diceText: {
-    fontSize: 22,
+    fontSize: 20,
+    color: "#f4efe6",
   },
 });
-
-// ─── Progress-dot styles ─────────────────────────────────────────────────────
 
 const dots = StyleSheet.create({
   row: {
@@ -511,10 +495,10 @@ const dots = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "rgba(244,239,230,0.22)",
   },
   activeDot: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f4efe6",
     width: 20,
     borderRadius: 4,
   },

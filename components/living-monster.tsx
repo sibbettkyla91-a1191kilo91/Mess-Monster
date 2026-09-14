@@ -46,6 +46,11 @@ type Props = {
   size: number;
   /** Glow colour for the teen/adult shadow. */
   accent: string;
+  /**
+   * Soft wash painted behind the sprite so the companion sits on the habitat
+   * rather than floating on it. Rides every idle transform. Omit for none.
+   */
+  glowColor?: string;
   accessibilityLabel: string;
   /** Short tap. */
   onPress: () => void;
@@ -95,6 +100,12 @@ const SHADOW_WIDTH = 0.5;
 const SHADOW_HEIGHT = 0.075;
 const SHADOW_BOTTOM = 0.035;
 
+// Background wash as fractions of the sprite box: a circle a little smaller
+// than the sprite, nudged down so it reads as the body's own light.
+const GLOW_SIZE = 0.86;
+const GLOW_TOP = 0.08;
+const GLOW_OPACITY = 0.9;
+
 /**
  * The monster as a living thing: sprite, worn accessories, and every idle or
  * reaction animation. Purely presentational — it reads nothing from the
@@ -108,6 +119,7 @@ export function LivingMonster({
   equipped,
   size,
   accent,
+  glowColor,
   accessibilityLabel,
   onPress,
   onLongPress,
@@ -780,7 +792,6 @@ export function LivingMonster({
         <Animated.View
           style={[
             { opacity: wrapperOpacity },
-            shadowStyle,
             {
               transform: [
                 { translateY: bobAnim },
@@ -801,7 +812,29 @@ export function LivingMonster({
             },
           ]}
         >
-          <View style={{ width: size, height: size, aspectRatio: 1 }}>
+          {/* The wash sits behind the sprite box and shares its transforms,
+              so it breathes and hops with the body. The stage shadow stays on
+              the sprite box itself so its silhouette is the monster, not the
+              wash. */}
+          {glowColor ? (
+            <View
+              pointerEvents="none"
+              testID="monster-glow"
+              style={{
+                position: "absolute",
+                top: size * GLOW_TOP,
+                left: (size * (1 - GLOW_SIZE)) / 2,
+                width: size * GLOW_SIZE,
+                height: size * GLOW_SIZE,
+                borderRadius: size,
+                backgroundColor: glowColor,
+                opacity: GLOW_OPACITY,
+              }}
+            />
+          ) : null}
+          <View
+            style={[{ width: size, height: size, aspectRatio: 1 }, shadowStyle]}
+          >
             <Image
               source={monsterSource}
               style={StyleSheet.absoluteFillObject}

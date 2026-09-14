@@ -3,33 +3,45 @@
  * Keeps things simple — no expo-router, no native-only APIs.
  */
 import React from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function WebApp() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          <Text style={styles.emoji}>🧟</Text>
+          <View style={styles.pair}>
+            <Image
+              source={require("../assets/images/luna_adult.png")}
+              style={styles.mascot}
+              resizeMode="contain"
+            />
+            <Image
+              source={require("../assets/images/nilly_adult.png")}
+              style={styles.mascot}
+              resizeMode="contain"
+            />
+          </View>
           <Text style={styles.title}>Mess Monster</Text>
-          <Text style={styles.tagline}>Your gamified cleaning companion</Text>
+          <Text style={styles.tagline}>
+            Take care of your space. Your monster grows with you.
+          </Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>How it works</Text>
           <Text style={styles.cardBody}>
-            Log real-world cleaning tasks, earn points, and spend them to care
-            for your virtual mess monster. Keep cleaning to help it thrive —
-            neglect it and watch the drama unfold. 🫧
+            Log the cleaning you already did. Points go to food, toys, and a
+            few things for the room. Miss a day? Nothing breaks. Pick it up
+            when you can.
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Get the app</Text>
+          <Text style={styles.cardTitle}>Two companions</Text>
           <Text style={styles.cardBody}>
-            Mess Monster is a mobile-first experience. Download it on Android to
-            meet Nilly, your mint-green kawaii companion (or Luna, the dark
-            witchy alternative).
+            Nilly is warm and sunlit. Luna is night-sided and a little witchy.
+            Same house, different worlds. The app is on Android.
           </Text>
         </View>
       </ScrollView>
@@ -40,7 +52,7 @@ export default function WebApp() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#E6F4FE",
+    backgroundColor: "#100e16",
   },
   scroll: {
     flexGrow: 1,
@@ -50,43 +62,50 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
+    paddingVertical: 32,
+    gap: 10,
   },
-  emoji: {
-    fontSize: 72,
+  pair: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    marginBottom: 8,
+  },
+  mascot: {
+    width: 120,
+    height: 180,
   },
   title: {
     fontSize: 40,
     fontWeight: "800",
-    color: "#2C7EDB",
+    color: "#f0e6d3",
     letterSpacing: -1,
   },
   tagline: {
-    fontSize: 18,
-    color: "#4A5568",
+    fontSize: 17,
+    color: "rgba(240,230,211,0.7)",
     textAlign: "center",
+    lineHeight: 24,
+    maxWidth: 360,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#1a1622",
     borderRadius: 16,
     padding: 20,
     width: "100%",
     maxWidth: 480,
     gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1,
+    borderColor: "rgba(240,230,211,0.1)",
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A202C",
+    color: "#f0e6d3",
   },
   cardBody: {
     fontSize: 15,
     lineHeight: 24,
-    color: "#4A5568",
+    color: "rgba(240,230,211,0.68)",
   },
 });
