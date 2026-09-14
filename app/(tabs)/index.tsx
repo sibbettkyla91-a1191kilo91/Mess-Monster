@@ -941,6 +941,10 @@ export default function HomeScreen() {
   const petHydrated = useHasHydrated(usePetStore);
   const storeHydrated = useHasHydrated(useStoreStore);
   const hydrated = playerHydrated && petHydrated && storeHydrated;
+  // The welcome-back dare reads today's task progress; until that save
+  // lands, every task looks untouched and the chip could offer one already
+  // finished this morning. Only the hello waits on it.
+  const tasksHydrated = useHasHydrated(useTasksStore);
 
   // Manual entry point for the upgrade modal — the auto-popup only shows
   // once per stage, so non-premium users need a way to reopen it anytime.
@@ -1139,7 +1143,7 @@ export default function HomeScreen() {
       return;
     }
     // The ref guards Strict Mode's double effect run in development.
-    if (!hydrated || welcomeHandledRef.current) return;
+    if (!hydrated || !tasksHydrated || welcomeHandledRef.current) return;
     welcomeHandledRef.current = true;
     consumeWelcome();
     monsterRef.current?.careMoment("welcome");
@@ -1157,7 +1161,7 @@ export default function HomeScreen() {
     // current monster/mood, and pendingWelcome flips false synchronously on
     // the first run, so a re-run cannot double the hello.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingWelcome, hydrated]);
+  }, [pendingWelcome, hydrated, tasksHydrated]);
 
   const handleDarePress = () => {
     // Navigation only. No task progress, no points, no writes of any kind.
