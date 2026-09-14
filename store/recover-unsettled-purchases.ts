@@ -1,4 +1,5 @@
-import { resolveMonsterId } from "./monster-id";
+import { MonsterId, resolveMonsterId } from "./monster-id";
+import { levelForXp } from "./progression";
 import { StoreItem } from "./store-items";
 import {
   assignLegacyInventoryToSelectedMonster,
@@ -38,6 +39,19 @@ function storesHydrated(): boolean {
 }
 
 let purchaseInFlight = false;
+
+/**
+ * True when `monster`'s shop sells this item and its progression level
+ * (derived from that monster's lifetime points) has reached the unlock.
+ * Legacy items with no `monster` field belong to no shop and cannot be
+ * bought — they stay usable from the bag, just not re-purchasable.
+ */
+export function isItemUnlockedFor(item: StoreItem, monster: MonsterId): boolean {
+  if (item.monster !== monster) return false;
+  if (!item.unlock) return true;
+  const xp = usePetStore.getState().byMonster[monster]?.totalPointsEarned ?? 0;
+  return levelForXp(xp) >= item.unlock.level;
+}
 
 // Two purchases inside the same millisecond would otherwise share an id and
 // the second would settle against the first one's receipts as a silent
@@ -109,6 +123,13 @@ export function executePaidShopPurchase(item: StoreItem): boolean {
     };
     const store = useStoreStore.getState();
     const player = usePlayerStore.getState();
+
+    // Shop eligibility, from live state rather than a render closure: the
+    // item must be sold in this monster's shop and its level must be reached.
+    // Recovery never re-checks these — a grant that already landed stays.
+    if (!isItemUnlockedFor(item, monsterId)) {
+      return false;
+    }
 
     // Re-check live ownership here, not from a render closure. A second
     // tap after a non-repeatable grant must not create a new charge.

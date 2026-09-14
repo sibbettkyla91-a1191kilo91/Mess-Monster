@@ -1,9 +1,10 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 import CollectionScreen from "@/app/(tabs)/collection";
-import { STORE_ITEMS } from "@/store/store-items";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
+
+import { legacyItem } from "../fixtures/legacy-catalog";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -23,8 +24,9 @@ async function flushHydration() {
   await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
-const bow = STORE_ITEMS.find((i) => i.id === "acc-bow")!;
-const shades = STORE_ITEMS.find((i) => i.id === "acc-sunglasses")!;
+// Owned under the retired catalog: proves legacy accessories stay wearable.
+const bow = legacyItem("acc-bow");
+const shades = legacyItem("acc-sunglasses");
 
 describe("Collection accessories", () => {
   beforeEach(() => {

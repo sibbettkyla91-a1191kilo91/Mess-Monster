@@ -8,6 +8,16 @@ import { PRESET_TASKS } from "@/store/preset-tasks";
 import { STORE_ITEMS } from "@/store/store-items";
 import { TaskProgress } from "@/store/use-tasks-store";
 
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/utils/daily-nudge", () => ({
+  rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
+}));
+
 const TASK = PRESET_TASKS.find((t) => t.id === "wash-dishes")!;
 const waiting: TaskProgress = {
   state: "waiting",
@@ -26,13 +36,13 @@ describe("pickFreeGiftItem", () => {
 
 describe("finishPhotoTaskWait", () => {
   it("records the gift without writing inventory", () => {
-    const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+    const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
     const outcome = REWARD_TABLE.find((r) => r.outcome.tier === "free_item")!
       .outcome;
     const next = finishPhotoTaskWait(TASK, waiting, outcome, cookie);
 
     expect(next.state).toBe("reward_ready");
-    expect(next.rewardInfo?.freeItemId).toBe("food-cookie");
+    expect(next.rewardInfo?.freeItemId).toBe("nilly-food-granola-honey-bar");
     expect(next.rewardInfo?.freeItemName).toBe(describeFreeGift(cookie));
     expect(next.rewardInfo?.finalPoints).toBe(TASK.pointValue);
   });

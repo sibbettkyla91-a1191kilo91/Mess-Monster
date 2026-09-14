@@ -208,13 +208,13 @@ describe("same-version records with holes", () => {
           byMonster: {
             nilly: {
               owned: {
-                "food-cookie": {
-                  item: { id: "food-cookie", name: "Old Cookie", price: 1 },
+                "nilly-food-granola-honey-bar": {
+                  item: { id: "nilly-food-granola-honey-bar", name: "Old Cookie", price: 1 },
                   quantity: -3,
                   purchasedAt: "yesterday",
                 },
-                "toy-yarn": {
-                  item: { id: "toy-yarn", name: "Yarn" },
+                "nilly-toy-tie-dye-yarn-ball": {
+                  item: { id: "nilly-toy-tie-dye-yarn-ball", name: "Yarn" },
                   quantity: 1.7,
                 },
                 "decor-plant": {
@@ -233,21 +233,21 @@ describe("same-version records with holes", () => {
               },
               placed: {
                 "decor-plant": true,
-                "toy-yarn": true,
+                "nilly-toy-tie-dye-yarn-ball": true,
                 "acc-bow": true,
                 ghost: true,
               },
-              equipped: { head: "acc-bow", tail: "toy-yarn", face: 7 },
+              equipped: { head: "acc-bow", tail: "nilly-toy-tie-dye-yarn-ball", face: 7 },
             },
           },
           unsettledPurchases: [
-            { id: "p1", itemId: "food-cookie", price: 10, autoConsume: false },
+            { id: "p1", itemId: "nilly-food-granola-honey-bar", price: 10, autoConsume: false },
             { id: "p2", price: 10 },
             "nonsense",
           ],
           unsettledFeeds: [
-            { id: "f1", itemId: "food-cookie", monsterId: "luna" },
-            { id: "f2", itemId: "food-cookie", monsterId: "dracula" },
+            { id: "f1", itemId: "nilly-food-granola-honey-bar", monsterId: "luna" },
+            { id: "f2", itemId: "nilly-food-granola-honey-bar", monsterId: "dracula" },
           ],
         },
         version: 4,
@@ -257,26 +257,26 @@ describe("same-version records with holes", () => {
     expect(useStoreStore.persist.hasHydrated()).toBe(true);
     const s = useStoreStore.getState();
     const nilly = s.byMonster.nilly;
-    expect(nilly.owned["food-cookie"].quantity).toBe(0);
-    expect(nilly.owned["food-cookie"].item.name).not.toBe("Old Cookie");
-    expect(Number.isFinite(nilly.owned["food-cookie"].purchasedAt)).toBe(true);
-    expect(nilly.owned["toy-yarn"].quantity).toBe(1);
+    expect(nilly.owned["nilly-food-granola-honey-bar"].quantity).toBe(0);
+    expect(nilly.owned["nilly-food-granola-honey-bar"].item.name).not.toBe("Old Cookie");
+    expect(Number.isFinite(nilly.owned["nilly-food-granola-honey-bar"].purchasedAt)).toBe(true);
+    expect(nilly.owned["nilly-toy-tie-dye-yarn-ball"].quantity).toBe(1);
     // Catalog snapshot restored — the Collection filters on it.
-    expect(nilly.owned["toy-yarn"].item.category).toBe("toys");
+    expect(nilly.owned["nilly-toy-tie-dye-yarn-ball"].item.category).toBe("toys");
     expect(nilly.owned.junk).toBeUndefined();
     // An id the catalog no longer sells keeps its snapshot.
     expect(nilly.owned["retired-item"].item.name).toBe("Retired");
-    expect(nilly.placed).toEqual({ "decor-plant": true, "toy-yarn": true });
+    expect(nilly.placed).toEqual({ "decor-plant": true, "nilly-toy-tie-dye-yarn-ball": true });
     expect(nilly.equipped).toEqual({});
     expect(s.byMonster.luna.owned).toEqual({});
     expect(s.unsettledPurchases).toEqual([
-      { id: "p1", itemId: "food-cookie", price: 10, autoConsume: false },
+      { id: "p1", itemId: "nilly-food-granola-honey-bar", price: 10, autoConsume: false },
     ]);
     expect(s.unsettledFeeds).toEqual([
-      { id: "f1", itemId: "food-cookie", monsterId: "luna" },
+      { id: "f1", itemId: "nilly-food-granola-honey-bar", monsterId: "luna" },
     ]);
     // Flat mirrors track the sanitized slice.
-    expect(s.owned["toy-yarn"].quantity).toBe(1);
+    expect(s.owned["nilly-toy-tie-dye-yarn-ball"].quantity).toBe(1);
   });
 
   it("player: keeps the balance finite and non-negative and the monster a real id", async () => {

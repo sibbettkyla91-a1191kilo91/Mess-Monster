@@ -27,7 +27,7 @@ import {
   recordOr,
   safeMigrate,
 } from "./safe-persist";
-import { STORE_ITEMS, StoreItem } from "./store-items";
+import { getItemType, getStoreItem, StoreItem } from "./store-items";
 import { usePlayerStore } from "./use-player-store";
 
 export type UnsettledPurchase = {
@@ -168,11 +168,17 @@ export function migrateStoreState(persistedState: any, version: number): any {
   if (version < 2 && migrated.owned) {
     const owned: Record<string, OwnedEntry> = {};
     for (const [id, entry] of Object.entries<any>(migrated.owned)) {
-      const catalogItem = STORE_ITEMS.find((i) => i.id === id);
-      if (catalogItem?.category === "toys") {
+      // The v1 toys are no longer in the catalog; their snapshot category
+      // still says "toys", which is all this needs.
+      const catalogItem = getStoreItem(id);
+      const isToy =
+        catalogItem !== undefined
+          ? catalogItem.itemType === "toy"
+          : isRecord(entry?.item) && getItemType(entry.item) === "toy";
+      if (isToy) {
         owned[id] = {
           ...entry,
-          item: catalogItem,
+          item: catalogItem ?? { ...entry.item, repeatable: false },
           quantity: entry.quantity === 0 ? 1 : entry.quantity,
         };
       } else {
@@ -215,7 +221,7 @@ export function migrateStoreState(persistedState: any, version: number): any {
  */
 function pickOwnedEntry(itemId: string, source: unknown): OwnedEntry | null {
   const src = recordOr(source);
-  const catalogItem = STORE_ITEMS.find((i) => i.id === itemId);
+  const catalogItem = getStoreItem(itemId);
   const snapshot = recordOr(src.item);
   const item =
     catalogItem ??
@@ -514,7 +520,7 @@ export const useStoreStore = create<StoreStore>()(
           if (receipts[purchase.id]?.granted) {
             return { unsettledPurchases: unsettled };
           }
-          const catalogItem = STORE_ITEMS.find((i) => i.id === purchase.itemId);
+          const catalogItem = getStoreItem(purchase.itemId);
           if (!catalogItem) {
             // Nothing to hand out for an item the catalog no longer knows.
             // Still write the receipt so a durable charge for it does not
@@ -589,7 +595,7 @@ export const useStoreStore = create<StoreStore>()(
         set((s) => {
           const receipts = s.appliedRewardGrants ?? {};
           if (receipts[grantId]?.freeItem) return {};
-          const catalogItem = STORE_ITEMS.find((i) => i.id === itemId);
+          const catalogItem = getStoreItem(itemId);
           const nextReceipts = {
             ...receipts,
             [grantId]: { ...receipts[grantId], freeItem: true as const },

@@ -17,8 +17,8 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
-const yarn = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
+const yarn = STORE_ITEMS.find((i) => i.id === "nilly-toy-tie-dye-yarn-ball")!;
 
 beforeEach(() => {
   usePlayerStore.setState({ selectedMonster: "nilly" });
@@ -36,6 +36,7 @@ beforeEach(() => {
         pendingEvolution: null,
         pendingPremiumGate: null,
         premiumGateShownFor: null,
+        claimedMilestones: [],
       },
       luna: {
         health: 100,
@@ -49,6 +50,7 @@ beforeEach(() => {
         pendingEvolution: null,
         pendingPremiumGate: null,
         premiumGateShownFor: null,
+        claimedMilestones: [],
       },
     },
     health: 100,
@@ -99,21 +101,21 @@ describe("migrate shared pet save", () => {
     const out = migrateStoreState(
       {
         owned: {
-          "food-cookie": {
+          "nilly-food-granola-honey-bar": {
             item: cookie,
             quantity: 2,
             purchasedAt: 1_700_000_000_000,
           },
         },
-        placed: { "toy-yarn": true },
-        equipped: { head: "acc-bow" },
+        placed: { "nilly-toy-tie-dye-yarn-ball": true },
+        equipped: { head: "nilly-accessory-friendship-bracelet" },
       },
       3,
     );
 
-    expect(out.byMonster.nilly.owned["food-cookie"].quantity).toBe(2);
-    expect(out.byMonster.nilly.placed["toy-yarn"]).toBe(true);
-    expect(out.byMonster.nilly.equipped.head).toBe("acc-bow");
+    expect(out.byMonster.nilly.owned["nilly-food-granola-honey-bar"].quantity).toBe(2);
+    expect(out.byMonster.nilly.placed["nilly-toy-tie-dye-yarn-ball"]).toBe(true);
+    expect(out.byMonster.nilly.equipped.head).toBe("nilly-accessory-friendship-bracelet");
     expect(out.byMonster.luna.owned).toEqual({});
     expect(out.byMonster.luna.placed).toEqual({});
     expect(out.byMonster.luna.equipped).toEqual({});

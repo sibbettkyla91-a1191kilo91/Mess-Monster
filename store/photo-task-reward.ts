@@ -2,18 +2,38 @@ import {
   FREE_ITEM_MAX_PRICE,
   RewardOutcome,
 } from "@/constants/task-timers";
+import { resolveMonsterId } from "./monster-id";
 import { PresetTask } from "./preset-tasks";
-import { STORE_ITEMS, StoreItem } from "./store-items";
+import { levelForXp } from "./progression";
+import { itemsForMonster, StoreItem } from "./store-items";
+import { usePetStore } from "./use-pet-store";
+import { usePlayerStore } from "./use-player-store";
 import type { TaskProgress } from "./use-tasks-store";
 
+/**
+ * The gift pool for the selected monster: cheap consumables from ITS shop
+ * that its progression has already unlocked. A Luna player never receives
+ * Nilly's granola; a level-1 player never receives a level-4 snack.
+ */
+export function giftPoolForSelectedMonster(): StoreItem[] {
+  const monster = resolveMonsterId(usePlayerStore.getState().selectedMonster);
+  const level = levelForXp(
+    usePetStore.getState().byMonster[monster]?.totalPointsEarned ?? 0,
+  );
+  return itemsForMonster(monster).filter(
+    (i) => !i.unlock || i.unlock.level <= level,
+  );
+}
+
 export function pickFreeGiftItem(
-  items: StoreItem[] = STORE_ITEMS,
+  items: StoreItem[] = giftPoolForSelectedMonster(),
+  rng: () => number = Math.random,
 ): StoreItem | undefined {
   const affordable = items.filter(
     (i) => i.price <= FREE_ITEM_MAX_PRICE && i.repeatable,
   );
   if (affordable.length === 0) return undefined;
-  return affordable[Math.floor(Math.random() * affordable.length)];
+  return affordable[Math.floor(rng() * affordable.length)];
 }
 
 export function describeFreeGift(item: StoreItem): string {

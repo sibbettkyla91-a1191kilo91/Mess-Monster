@@ -2,8 +2,9 @@ import {
   isAccessorySlotLocked,
   LUNA_HEAD_SLOT_LOCKED,
 } from "@/store/accessory-config";
-import { STORE_ITEMS } from "@/store/store-items";
 import { migrateStoreState, useStoreStore } from "@/store/use-store-store";
+
+import { legacyItem } from "../fixtures/legacy-catalog";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -11,10 +12,13 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
-const bow = STORE_ITEMS.find((i) => i.id === "acc-bow")!;
-const crown = STORE_ITEMS.find((i) => i.id === "acc-crown")!;
-const shades = STORE_ITEMS.find((i) => i.id === "acc-sunglasses")!;
-const scarf = STORE_ITEMS.find((i) => i.id === "acc-scarf")!;
+// Retired accessories keep their slot defs so legacy saves can still wear
+// them; they also give this suite two head items and a face item, which the
+// current catalog does not have for one monster.
+const bow = legacyItem("acc-bow");
+const crown = legacyItem("acc-crown");
+const shades = legacyItem("acc-sunglasses");
+const scarf = legacyItem("acc-scarf");
 
 beforeEach(() => {
   useStoreStore.setState({ owned: {}, placed: {}, equipped: {} });

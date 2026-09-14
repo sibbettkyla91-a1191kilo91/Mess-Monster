@@ -9,7 +9,12 @@ import {
   PetState,
   TaskCategory,
 } from "./types";
-import { MonsterId, PET_SLICE_KEYS, resolveMonsterId } from "./monster-id";
+import {
+  MONSTER_IDS,
+  MonsterId,
+  PET_SLICE_KEYS,
+  resolveMonsterId,
+} from "./monster-id";
 import { isPlayerPremium } from "./premium";
 import {
   arrayOr,
@@ -101,6 +106,7 @@ export function createDefaultPetSlice(now = Date.now()): PetSlice {
     pendingEvolution: null,
     pendingPremiumGate: null,
     premiumGateShownFor: null,
+    claimedMilestones: [],
   };
 }
 
@@ -144,6 +150,14 @@ function pickPetSlice(source: unknown): PetSlice {
     pendingEvolution: oneOfOrNull(src.pendingEvolution, STAGE_ORDER),
     pendingPremiumGate: oneOfOrNull(src.pendingPremiumGate, STAGE_ORDER),
     premiumGateShownFor: oneOfOrNull(src.premiumGateShownFor, STAGE_ORDER),
+    claimedMilestones: [
+      ...new Set(
+        arrayOr(src.claimedMilestones).filter(
+          (m): m is number =>
+            typeof m === "number" && Number.isInteger(m) && m > 0,
+        ),
+      ),
+    ],
   };
 }
 
@@ -158,7 +172,19 @@ function partializePet(s: PetStore) {
     appliedRewardGrants: s.appliedRewardGrants,
     appliedPurchases: s.appliedPurchases,
     appliedFeeds: s.appliedFeeds,
+    unsettledMilestones: s.unsettledMilestones,
   };
+}
+
+function pickUnsettledMilestone(source: unknown): UnsettledMilestone | null {
+  if (!isRecord(source)) return null;
+  const monster = oneOfOrNull(source.monster, MONSTER_IDS);
+  const level = source.level;
+  if (!monster || typeof level !== "number" || !Number.isInteger(level)) {
+    return null;
+  }
+  if (typeof source.id !== "string") return null;
+  return { id: source.id, monster, level };
 }
 
 /**
@@ -192,6 +218,9 @@ export function sanitizePetPersisted(persisted: unknown): PersistedPetState {
       src.appliedPurchases,
     ) as PetStore["appliedPurchases"],
     appliedFeeds: recordOfRecords(src.appliedFeeds) as PetStore["appliedFeeds"],
+    unsettledMilestones: arrayOr(src.unsettledMilestones)
+      .map(pickUnsettledMilestone)
+      .filter((m): m is UnsettledMilestone => m !== null),
   };
 }
 
@@ -355,6 +384,18 @@ export type PetFeedReceipt = {
   monsterId: MonsterId;
 };
 
+/**
+ * Durable intent that a progression milestone's payout (player points and/or
+ * a store item) is still owed. Written in the same set() that marks the
+ * level claimed, so a crash between "claimed" and "paid" is finished by
+ * store/progression-milestones.ts on the next start.
+ */
+export type UnsettledMilestone = {
+  id: string;
+  monster: MonsterId;
+  level: number;
+};
+
 interface PetStore extends PetState {
   byMonster: Record<MonsterId, PetSlice>;
   /** Old single-blob save waiting to land on the selected monster. */
@@ -362,6 +403,7 @@ interface PetStore extends PetState {
   appliedRewardGrants: Record<string, PetGrantReceipt>;
   appliedPurchases: Record<string, PetPurchaseReceipt>;
   appliedFeeds: Record<string, PetFeedReceipt>;
+  unsettledMilestones: UnsettledMilestone[];
   care: () => void;
   addHappiness: (amount: number) => void;
   applyDecay: () => void;
@@ -383,6 +425,14 @@ interface PetStore extends PetState {
   applyRewardGrantCared: (grantId: string) => void;
   applyRewardGrantStreakMilestone: (grantId: string, hit: number) => void;
   applyPurchaseCared: (purchaseId: string) => void;
+  /**
+   * Mark a progression level's payout as claimed for one monster and record
+   * the intent to pay it. Returns false if it was already claimed — the
+   * caller must then hand out nothing new (recovery still finishes any
+   * intent left in unsettledMilestones).
+   */
+  reserveMilestone: (milestone: UnsettledMilestone) => boolean;
+  clearUnsettledMilestone: (id: string) => void;
 }
 
 function computeTrackEarnedUpdate(
@@ -494,6 +544,7 @@ export const usePetStore = create<PetStore>()(
       appliedRewardGrants: {},
       appliedPurchases: {},
       appliedFeeds: {},
+      unsettledMilestones: [],
 
       care: () => {
         const monster = activeMonsterId();
@@ -732,6 +783,35 @@ export const usePetStore = create<PetStore>()(
           const { monsterName } = usePlayerStore.getState();
           void rescheduleDailyNudges(monsterName, true);
         }
+      },
+
+      reserveMilestone: (milestone) => {
+        let reserved = false;
+        set((s) => {
+          const slice = s.byMonster[milestone.monster];
+          const pending = s.unsettledMilestones ?? [];
+          if (slice.claimedMilestones.includes(milestone.level)) {
+            return {};
+          }
+          reserved = true;
+          return {
+            ...writeSlice(s, milestone.monster, {
+              claimedMilestones: [...slice.claimedMilestones, milestone.level],
+            }),
+            unsettledMilestones: pending.some((m) => m.id === milestone.id)
+              ? pending
+              : [...pending, milestone],
+          };
+        });
+        return reserved;
+      },
+
+      clearUnsettledMilestone: (id) => {
+        set((s) => ({
+          unsettledMilestones: (s.unsettledMilestones ?? []).filter(
+            (m) => m.id !== id,
+          ),
+        }));
       },
 
       applyDecay: () => {

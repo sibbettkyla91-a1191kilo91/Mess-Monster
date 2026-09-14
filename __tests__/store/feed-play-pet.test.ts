@@ -20,10 +20,10 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
-const boba = STORE_ITEMS.find((i) => i.id === "food-boba")!;
-const yarn = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
-const ball = STORE_ITEMS.find((i) => i.id === "toy-ball")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
+const boba = STORE_ITEMS.find((i) => i.id === "nilly-food-herbal-sun-tea")!;
+const yarn = STORE_ITEMS.find((i) => i.id === "nilly-toy-tie-dye-yarn-ball")!;
+const ball = STORE_ITEMS.find((i) => i.id === "nilly-toy-mushroom-plushie")!;
 
 async function flushHydration() {
   for (let i = 0; i < 10; i++) await Promise.resolve();

@@ -8,24 +8,28 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 const repeatableItem: StoreItem = {
-  id: "food-cookie",
-  name: "Cookie",
-  emoji: "🍪",
+  id: "nilly-food-granola-honey-bar",
+  monster: "nilly",
+  name: "Granola & Honey Bar",
+  emoji: "🍯",
   category: "food",
-  description: "Sweet and crunchy.",
+  itemType: "food",
+  description: "Oats, honey, a little crunch.",
   price: 15,
-  moodBoost: 3,
+  assetKey: "nilly-food-granola-honey-bar",
   repeatable: true,
 };
 
 const oneTimeItem: StoreItem = {
-  id: "acc-crown",
-  name: "Mini Crown",
-  emoji: "👑",
-  category: "accessories",
-  description: "Royalty status unlocked.",
-  price: 100,
-  moodBoost: 3,
+  id: "nilly-accessory-daisy-chain-crown",
+  monster: "nilly",
+  name: "Daisy Chain Crown",
+  emoji: "🌼",
+  category: "toys",
+  itemType: "accessory",
+  description: "Field royalty.",
+  price: 95,
+  assetKey: "nilly-accessory-daisy-chain-crown",
   repeatable: false,
 };
 

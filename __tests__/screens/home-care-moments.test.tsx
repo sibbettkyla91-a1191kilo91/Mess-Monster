@@ -45,10 +45,10 @@ jest.mock("@/utils/daily-nudge", () => ({
 
 jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
-const boba = STORE_ITEMS.find((i) => i.id === "food-boba")!;
-const yarn = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
-const ball = STORE_ITEMS.find((i) => i.id === "toy-ball")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
+const boba = STORE_ITEMS.find((i) => i.id === "nilly-food-herbal-sun-tea")!;
+const yarn = STORE_ITEMS.find((i) => i.id === "nilly-toy-tie-dye-yarn-ball")!;
+const ball = STORE_ITEMS.find((i) => i.id === "nilly-toy-mushroom-plushie")!;
 
 const reduceMotionMock = AccessibilityInfo.isReduceMotionEnabled as jest.Mock;
 
@@ -146,7 +146,7 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(boba);
     });
 
-    feed(screen, "Nilly", "Boba Tea");
+    feed(screen, "Nilly", "Herbal Sun Tea");
 
     // The snack flies in and the burst is on screen…
     expect(screen.getByTestId("care-prop-feed")).toBeTruthy();
@@ -155,8 +155,8 @@ describe("care moments", () => {
     expect(Haptics.impactAsync).toHaveBeenCalledWith("medium");
     // …and the numbers are already final.
     const bag = useStoreStore.getState().owned;
-    expect(bag["food-boba"].quantity).toBe(0);
-    expect(bag["food-cookie"].quantity).toBe(1);
+    expect(bag["nilly-food-herbal-sun-tea"].quantity).toBe(0);
+    expect(bag["nilly-food-granola-honey-bar"].quantity).toBe(1);
     expect(usePetStore.getState().health).toBe(58);
     expect(usePetStore.getState().happiness).toBe(58);
 
@@ -164,8 +164,8 @@ describe("care moments", () => {
     act(() => {
       jest.advanceTimersByTime(300);
     });
-    feed(screen, "Nilly", "Cookie");
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(0);
+    feed(screen, "Nilly", "Granola & Honey Bar");
+    expect(useStoreStore.getState().owned["nilly-food-granola-honey-bar"].quantity).toBe(0);
     expect(usePetStore.getState().health).toBe(66);
     expect(usePetStore.getState().happiness).toBe(66);
 
@@ -183,15 +183,15 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(ball);
     });
 
-    play(screen, "Nilly", "Yarn Ball");
+    play(screen, "Nilly", "Tie-Dye Yarn Ball");
 
     expect(screen.getByTestId("care-prop-play")).toBeTruthy();
     expect(screen.getByText(yarn.emoji)).toBeTruthy();
     expect(screen.getByTestId("burst-play", HIDDEN)).toBeTruthy();
     expect(Haptics.impactAsync).toHaveBeenCalledWith("medium");
     const bag = useStoreStore.getState().owned;
-    expect(bag["toy-yarn"].quantity).toBe(1);
-    expect(bag["toy-ball"].quantity).toBe(1);
+    expect(bag["nilly-toy-tie-dye-yarn-ball"].quantity).toBe(1);
+    expect(bag["nilly-toy-mushroom-plushie"].quantity).toBe(1);
     expect(usePetStore.getState().happiness).toBe(58);
     expect(usePetStore.getState().health).toBe(53);
 
@@ -251,9 +251,9 @@ describe("care moments", () => {
       VOICE_LINES.nilly.feed.find((l) => screen.queryByText(l)),
     ).toBeUndefined();
     // The menu stays open: the player can pick a real snack instead.
-    expect(screen.getByLabelText("Feed Cookie")).toBeTruthy();
+    expect(screen.getByLabelText("Feed Granola & Honey Bar")).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText("Feed Cookie"));
+    fireEvent.press(screen.getByLabelText("Feed Granola & Honey Bar"));
     expect(usePetStore.getState().health).toBe(58);
     expect(screen.getByTestId("care-prop-feed")).toBeTruthy();
   });
@@ -265,11 +265,11 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(cookie, "nilly");
     });
 
-    feed(screen, "Luna", "Cookie");
+    feed(screen, "Luna", "Granola & Honey Bar");
 
     const store = useStoreStore.getState();
-    expect(store.byMonster.luna.owned["food-cookie"].quantity).toBe(0);
-    expect(store.byMonster.nilly.owned["food-cookie"].quantity).toBe(1);
+    expect(store.byMonster.luna.owned["nilly-food-granola-honey-bar"].quantity).toBe(0);
+    expect(store.byMonster.nilly.owned["nilly-food-granola-honey-bar"].quantity).toBe(1);
     const pet = usePetStore.getState();
     expect(pet.byMonster.luna.health).toBe(58);
     expect(pet.byMonster.luna.happiness).toBe(58);
@@ -284,8 +284,8 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(yarn);
     });
 
-    feed(screen, "Nilly", "Cookie");
-    play(screen, "Nilly", "Yarn Ball");
+    feed(screen, "Nilly", "Granola & Honey Bar");
+    play(screen, "Nilly", "Tie-Dye Yarn Ball");
     hold(screen, "Nilly");
 
     const pet = usePetStore.getState();
@@ -349,7 +349,7 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(cookie);
     });
 
-    feed(screen, "Nilly", "Cookie");
+    feed(screen, "Nilly", "Granola & Honey Bar");
     hold(screen, "Nilly");
     expect(jest.getTimerCount()).toBeGreaterThan(0);
 
@@ -370,10 +370,10 @@ describe("care moments", () => {
       useStoreStore.getState().buyItem(cookie);
     });
 
-    feed(screen, "Nilly", "Cookie");
+    feed(screen, "Nilly", "Granola & Honey Bar");
 
     expect(screen.queryByTestId("care-prop-feed")).toBeNull();
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(0);
+    expect(useStoreStore.getState().owned["nilly-food-granola-honey-bar"].quantity).toBe(0);
     expect(usePetStore.getState().health).toBe(58);
     expect(usePetStore.getState().happiness).toBe(58);
   });

@@ -415,7 +415,7 @@ describe("free-item exclusion", () => {
 const FREE_ITEM_OUTCOME = REWARD_TABLE.find(
   (r) => r.outcome.tier === "free_item",
 )!.outcome;
-const COOKIE = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+const COOKIE = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
 
 describe("free gift at claim, not at timer complete", () => {
   it("does not add inventory when the timer finishes, even if it finishes twice", () => {

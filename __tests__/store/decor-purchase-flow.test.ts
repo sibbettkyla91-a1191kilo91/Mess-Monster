@@ -17,7 +17,7 @@ beforeEach(() => {
   useStoreStore.setState({ owned: {}, placed: {} });
 });
 
-const decorItem = STORE_ITEMS.find((i) => i.id === "decor-plant")!;
+const decorItem = STORE_ITEMS.find((i) => i.id === "nilly-plant-sunflower")!;
 
 describe("decor purchase → collection → placement flow", () => {
   it("a bought decor item appears in the Collection screen's list", () => {
@@ -31,7 +31,7 @@ describe("decor purchase → collection → placement flow", () => {
       .filter((e) => !e.item.repeatable);
 
     expect(collectionItems).toHaveLength(1);
-    expect(collectionItems[0].item.id).toBe("decor-plant");
+    expect(collectionItems[0].item.id).toBe("nilly-plant-sunflower");
   });
 
   it("the bought item is immediately placeable and DecorLayer sees it", () => {
@@ -46,9 +46,9 @@ describe("decor purchase → collection → placement flow", () => {
     const placedIds = Object.keys(placed).filter(
       (id) => (owned[id]?.quantity ?? 0) > 0,
     );
-    expect(placedIds).toEqual(["decor-plant"]);
-    expect(getDecorSlot("decor-plant", "luna")).not.toBeNull();
-    expect(getDecorSlot("decor-plant", "nilly")).not.toBeNull();
+    expect(placedIds).toEqual(["nilly-plant-sunflower"]);
+    expect(getDecorSlot("nilly-plant-sunflower", "luna")).not.toBeNull();
+    expect(getDecorSlot("nilly-plant-sunflower", "nilly")).not.toBeNull();
 
     // Toggle back off
     useStoreStore.getState().togglePlaced(decorItem.id);

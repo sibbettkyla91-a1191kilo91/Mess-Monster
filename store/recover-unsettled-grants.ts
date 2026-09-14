@@ -1,4 +1,5 @@
 import { localDayString } from "@/utils/local-day";
+import { settleMilestonesForSelected } from "./progression-milestones";
 import { assignLegacyPetToSelectedMonster, usePetStore } from "./use-pet-store";
 import { usePlayerStore } from "./use-player-store";
 import {
@@ -80,6 +81,11 @@ function applyOneGrant(grant: UnsettledRewardGrant): void {
   }
   // 8. drop the intent once every effect has a durable receipt
   useTasksStore.getState().clearUnsettledGrant(grant.id);
+  // 9. progression: the tracked points above may have crossed a level. The
+  //    milestone payout has its own intent + receipts (see
+  //    progression-milestones.ts), so it is not part of this grant's
+  //    receipt set and re-running it is a no-op.
+  settleMilestonesForSelected();
 }
 
 /**

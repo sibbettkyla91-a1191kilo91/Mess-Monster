@@ -26,7 +26,7 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
 
 async function flushHydration() {
   for (let i = 0; i < 10; i++) await Promise.resolve();

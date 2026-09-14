@@ -30,6 +30,7 @@ import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { LUNA_PALETTE, MonsterPalette, NILLY_PALETTE } from "@/monster-theme";
 import { getDecorSlot } from "@/store/decor-slots";
+import { getItemArt } from "@/store/item-art";
 import { useIsPremium } from "@/store/premium";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
@@ -41,6 +42,7 @@ import {
   usePetStore,
 } from "@/store/use-pet-store";
 import { PresetTask } from "@/store/preset-tasks";
+import { getItemType } from "@/store/store-items";
 import { usePlayerStore } from "@/store/use-player-store";
 import { pickTinyDare, useSessionStore } from "@/store/use-session-store";
 import { useStoreStore } from "@/store/use-store-store";
@@ -450,6 +452,9 @@ function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
         const slot = getDecorSlot(id, monster);
         if (!slot) return null;
         const sizePx = Math.round(slot.size * SCREEN_WIDTH);
+        // Registered item art first, then any slot-specific image, then the
+        // catalog emoji — the same fallback chain as every other renderer.
+        const art = getItemArt(owned[id].item.assetKey) ?? slot.image;
         return (
           <View
             key={id}
@@ -463,9 +468,9 @@ function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
               justifyContent: "center",
             }}
           >
-            {slot.image ? (
+            {art ? (
               <Image
-                source={slot.image}
+                source={art}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="contain"
               />
@@ -1022,14 +1027,16 @@ export default function HomeScreen() {
       id: string;
       name: string;
       emoji: string;
+      assetKey?: string;
       quantity: number;
     }[] = [];
     for (const entry of Object.values(owned)) {
-      if (entry.item.category === "food" && entry.quantity > 0) {
+      if (getItemType(entry.item) === "food" && entry.quantity > 0) {
         list.push({
           id: entry.item.id,
           name: entry.item.name,
           emoji: entry.item.emoji,
+          assetKey: entry.item.assetKey,
           quantity: entry.quantity,
         });
       }
@@ -1038,13 +1045,20 @@ export default function HomeScreen() {
   }, [owned]);
 
   const toys = useMemo(() => {
-    const list: { id: string; name: string; emoji: string }[] = [];
+    const list: {
+      id: string;
+      name: string;
+      emoji: string;
+      assetKey?: string;
+    }[] = [];
     for (const entry of Object.values(owned)) {
-      if (entry.item.category === "toys" && entry.quantity > 0) {
+      // itemType, not shelf: accessories share the Toys shelf but are worn.
+      if (getItemType(entry.item) === "toy" && entry.quantity > 0) {
         list.push({
           id: entry.item.id,
           name: entry.item.name,
           emoji: entry.item.emoji,
+          assetKey: entry.item.assetKey,
         });
       }
     }

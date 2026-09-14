@@ -30,6 +30,42 @@ interface DecorSlotDef {
 }
 
 const DECOR_SLOTS: Record<string, DecorSlotDef> = {
+  // ── Current catalog (store/store-items.ts) ──────────────────────────────
+  // Each monster's room uses the same layout: one wall piece up high, one
+  // hanging up top, one lamp/light in the upper right, one rug on the floor;
+  // plants on the shelves and floor at the sides; toys near the rug's edge.
+  // Ids are already per monster, so no overrides are needed.
+
+  // Nilly — plants
+  "nilly-plant-sunflower": { base: { x: 0.11, y: 0.52, size: 0.17 } },
+  "nilly-plant-pothos": { base: { x: 0.84, y: 0.3, size: 0.18 } },
+  "nilly-plant-wildflower-bouquet": { base: { x: 0.17, y: 0.2, size: 0.15 } },
+  "nilly-plant-succulent-trio": { base: { x: 0.87, y: 0.55, size: 0.15 } },
+  // Nilly — decor
+  "nilly-decor-macrame-wall-hanging": { base: { x: 0.5, y: 0.09, size: 0.3 } },
+  "nilly-decor-tie-dye-tapestry": { base: { x: 0.32, y: 0.14, size: 0.24 } },
+  "nilly-decor-mushroom-lamp": { base: { x: 0.68, y: 0.21, size: 0.13 } },
+  "nilly-decor-woven-rug": { base: { x: 0.5, y: 0.62, size: 0.38 } },
+  // Nilly — toys (floor, either side of the rug)
+  "nilly-toy-tie-dye-yarn-ball": { base: { x: 0.8, y: 0.7, size: 0.1 } },
+  "nilly-toy-mushroom-plushie": { base: { x: 0.2, y: 0.7, size: 0.15 } },
+
+  // Luna — plants
+  "luna-plant-black-rose": { base: { x: 0.11, y: 0.52, size: 0.17 } },
+  "luna-plant-trailing-ivy": { base: { x: 0.84, y: 0.3, size: 0.18 } },
+  "luna-plant-venus-flytrap": { base: { x: 0.87, y: 0.55, size: 0.15 } },
+  "luna-plant-nightshade-sprig": { base: { x: 0.17, y: 0.2, size: 0.14 } },
+  // Luna — decor
+  "luna-decor-spiderweb-curtain": { base: { x: 0.5, y: 0.09, size: 0.34 } },
+  "luna-decor-tarot-card-display": { base: { x: 0.32, y: 0.14, size: 0.2 } },
+  "luna-decor-candle-cluster": { base: { x: 0.68, y: 0.21, size: 0.13 } },
+  "luna-decor-potion-bottle-set": { base: { x: 0.5, y: 0.62, size: 0.3 } },
+  // Luna — toys
+  "luna-toy-raven-feather": { base: { x: 0.8, y: 0.7, size: 0.11 } },
+  "luna-toy-tarot-deck-charm": { base: { x: 0.2, y: 0.7, size: 0.12 } },
+
+  // ── Retired catalog ─────────────────────────────────────────────────────
+  // No longer sold; kept so a legacy save's placed items still render.
   "decor-fairy-lights": { base: { x: 0.5, y: 0.09, size: 0.5 } },
   "decor-poster": { base: { x: 0.17, y: 0.2, size: 0.16 } },
   "decor-aquarium": { base: { x: 0.84, y: 0.3, size: 0.18 } },
