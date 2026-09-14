@@ -1,7 +1,10 @@
 import { localDayString } from "@/utils/local-day";
-import { usePetStore } from "./use-pet-store";
+import { assignLegacyPetToSelectedMonster, usePetStore } from "./use-pet-store";
 import { usePlayerStore } from "./use-player-store";
-import { useStoreStore } from "./use-store-store";
+import {
+  assignLegacyInventoryToSelectedMonster,
+  useStoreStore,
+} from "./use-store-store";
 import { UnsettledRewardGrant, useTasksStore } from "./use-tasks-store";
 
 const STREAK_MILESTONE_BONUS = 50;
@@ -87,6 +90,8 @@ function applyOneGrant(grant: UnsettledRewardGrant): void {
  */
 export function recoverUnsettledGrants(): void {
   if (!storesHydrated()) return;
+  assignLegacyPetToSelectedMonster();
+  assignLegacyInventoryToSelectedMonster();
   const grants = useTasksStore.getState().unsettledGrants;
   for (const grant of grants) {
     applyOneGrant(grant);

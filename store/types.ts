@@ -19,7 +19,8 @@ export interface CleaningTask {
   completedAt: number; // unix ms
 }
 
-export interface PetState {
+/** One monster's health, mood, and evolution. Nilly and Luna each have their own. */
+export interface PetSlice {
   health: number; // 0–100
   happiness: number; // 0–100
   lastCaredAt: number; // unix ms — last care action
@@ -28,11 +29,14 @@ export interface PetState {
   totalPointsEarned: number; // lifetime cleaning points, never decremented
   adultVariant: AdultVariant; // determined at adult evolution, stored permanently
   categoryCompletions: Partial<Record<TaskCategory, number>>; // lifetime task completions by category
-  claimedStreakMilestones: number[];
-  pendingMilestoneBanner: number | null;
   pendingEvolution: EvolutionStage | null; // set when evolution triggers; cleared after UI shows it
   pendingPremiumGate: EvolutionStage | null; // set when premium gate blocks evolution
   premiumGateShownFor: EvolutionStage | null; // tracks which stage gate was already shown (prevent repeat)
+}
+
+export interface PetState extends PetSlice {
+  claimedStreakMilestones: number[];
+  pendingMilestoneBanner: number | null;
 }
 
 export interface PlayerProfile {

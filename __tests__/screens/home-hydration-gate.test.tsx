@@ -141,8 +141,8 @@ describe("Home hydration gate", () => {
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(false);
     // The default fallback monster must never appear.
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
-    expect(screen.queryByLabelText("Pet Luna")).toBeNull();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
+    expect(screen.queryByLabelText("Care for Luna")).toBeNull();
     // No sprite art mounted at all — not merely hidden.
     expect(imageSources(screen)).toHaveLength(0);
   });
@@ -166,15 +166,15 @@ describe("Home hydration gate", () => {
     });
 
     // Before: neither monster nor habitat exists at all.
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
     expect(habitatSources(screen)).toHaveLength(0);
 
     await completeHydration();
 
     // After: the very first monster/habitat to mount is Luna's.
     expect(usePlayerStore.persist.hasHydrated()).toBe(true);
-    expect(screen.getByLabelText("Pet Luna")).toBeTruthy();
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
+    expect(screen.getByLabelText("Care for Luna")).toBeTruthy();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
     expect(habitatSources(screen)).toEqual([LUNA_HABITAT]);
     expect(imageSources(screen)).toContain(LUNA_TEEN);
     expect(imageSources(screen)).not.toContain(NILLY_TEEN);
@@ -185,7 +185,7 @@ describe("Home hydration gate", () => {
     const screen = render(<HomeScreen />);
     await completeHydration();
 
-    expect(screen.getByLabelText("Pet Luna")).toBeTruthy();
+    expect(screen.getByLabelText("Care for Luna")).toBeTruthy();
     expect(habitatSources(screen)).toHaveLength(1);
 
     // Unrelated Home state: collapsing the stat panel must not disturb the
@@ -197,8 +197,8 @@ describe("Home hydration gate", () => {
       usePetStore.setState({ happiness: 80 });
     });
 
-    expect(screen.getByLabelText("Pet Luna")).toBeTruthy();
+    expect(screen.getByLabelText("Care for Luna")).toBeTruthy();
     expect(habitatSources(screen)).toEqual([LUNA_HABITAT]);
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
   });
 });

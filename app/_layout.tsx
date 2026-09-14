@@ -13,6 +13,7 @@ import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePetStore } from "@/store/use-pet-store";
 import { useTasksStore } from "@/store/use-tasks-store";
+import { subscribeUnsettledFeedRecovery } from "@/store/recover-unsettled-feeds";
 import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
 import { subscribeUnsettledPurchaseRecovery } from "@/store/recover-unsettled-purchases";
 import { initCrashReporting, wrapRoot } from "@/utils/crash-reporting";
@@ -63,6 +64,7 @@ function RootLayout() {
   // leftover intent once all three stores have actually rehydrated.
   useEffect(() => subscribeUnsettledGrantRecovery(), []);
   useEffect(() => subscribeUnsettledPurchaseRecovery(), []);
+  useEffect(() => subscribeUnsettledFeedRecovery(), []);
 
   return (
     <AppErrorBoundary>

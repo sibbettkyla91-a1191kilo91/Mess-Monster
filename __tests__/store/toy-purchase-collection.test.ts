@@ -27,15 +27,11 @@ const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
 /**
  * The store-store writes handleBuy performs for a paid purchase, including
  * its repeatable/non-repeatable branch. Returns whether the purchase took
- * the consumable path (auto-use + care() mood boost).
+ * food now stays in the bag instead of auto-using.
  */
 function buyLikeStoreScreen(item: StoreItem): { autoConsumed: boolean } {
   const store = useStoreStore.getState();
   store.buyItem(item);
-  if (item.repeatable) {
-    store.useItem(item.id);
-    return { autoConsumed: true }; // handleBuy also calls care() here
-  }
   return { autoConsumed: false };
 }
 
@@ -93,11 +89,11 @@ describe("toy purchase behaves like decor", () => {
 });
 
 describe("food purchases are unaffected", () => {
-  it("food still auto-consumes at purchase and takes the mood-boost path", () => {
+  it("food stays in the bag at purchase and is not auto-consumed", () => {
     const { autoConsumed } = buyLikeStoreScreen(cookie);
 
-    expect(autoConsumed).toBe(true);
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(0);
+    expect(autoConsumed).toBe(false);
+    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(1);
   });
 
   it("food never appears in Collection, even at quantity > 0 (gift path)", () => {
