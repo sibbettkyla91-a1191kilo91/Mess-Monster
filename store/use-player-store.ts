@@ -8,6 +8,7 @@ import {
   localYesterdayString,
 } from "@/utils/local-day";
 
+import { MonsterId, resolveMonsterId } from "./monster-id";
 import { PlayerProfile } from "./types";
 
 // Exported for tests.
@@ -24,6 +25,18 @@ export function migratePlayerState(persistedState: any, version: number): any {
   };
   migrated.appliedRewardGrants = persistedState?.appliedRewardGrants ?? {};
   migrated.appliedPurchases = persistedState?.appliedPurchases ?? {};
+  if (!migrated.tapReactions) {
+    const date = migrated.lastTapReactionDate ?? "";
+    const count = migrated.tapReactionCount ?? 0;
+    const target = resolveMonsterId(migrated.selectedMonster);
+    migrated.tapReactions = {
+      nilly: { date: "", count: 0 },
+      luna: { date: "", count: 0 },
+      [target]: { date, count },
+    };
+    migrated.lastTapReactionDate = date;
+    migrated.tapReactionCount = count;
+  }
   // v3 -> v4: availablePointsValue was a persisted cache of
   // totalPoints - spentPoints that could desync from its inputs.
   // It is now always derived on read; strip the stale copy.
@@ -44,9 +57,12 @@ function todayISO() {
   return localDayString();
 }
 
+export type TapReactionSlice = { date: string; count: number };
+
 interface PlayerStore extends PlayerProfile {
-  lastTapReactionDate: string; // ISO date of last tap reaction
-  tapReactionCount: number; // taps used today (resets daily)
+  lastTapReactionDate: string; // ISO date of last tap reaction (active monster)
+  tapReactionCount: number; // taps used today (resets daily, active monster)
+  tapReactions: Record<MonsterId, TapReactionSlice>;
   notifPermissionAsked: boolean; // asked once ever, at the first reward claim
   statPanelCollapsed: boolean; // Home stat panel shrunk to its peek handle
   appliedRewardGrants: Record<string, PlayerGrantReceipt>;
@@ -70,6 +86,7 @@ interface PlayerStore extends PlayerProfile {
     itemId: string,
     price: number,
     autoConsume: boolean,
+    monsterId?: MonsterId,
   ) => void;
 }
 
@@ -84,6 +101,7 @@ export type PlayerPurchaseReceipt = {
   itemId: string;
   price: number;
   autoConsume: boolean;
+  monsterId?: MonsterId;
 };
 
 export const usePlayerStore = create<PlayerStore>()(
@@ -100,6 +118,10 @@ export const usePlayerStore = create<PlayerStore>()(
       hasCompletedOnboarding: false,
       lastTapReactionDate: "",
       tapReactionCount: 0,
+      tapReactions: {
+        nilly: { date: "", count: 0 },
+        luna: { date: "", count: 0 },
+      },
       notifPermissionAsked: false,
       // New key on existing installs is filled by the hydration merge (same
       // version) or the migrate defaults (older versions) — no version bump.
@@ -135,7 +157,15 @@ export const usePlayerStore = create<PlayerStore>()(
         });
       },
 
-      selectMonster: (monster) => set({ selectedMonster: monster }),
+      selectMonster: (monster) =>
+        set((s) => {
+          const tap = s.tapReactions?.[monster] ?? { date: "", count: 0 };
+          return {
+            selectedMonster: monster,
+            lastTapReactionDate: tap.date,
+            tapReactionCount: tap.count,
+          };
+        }),
       setMonsterName: (name) => set({ monsterName: name }),
       // Writer for the one premium flag. Readers go through store/premium.ts.
       setPremium: (value) => set({ isPremium: value }),
@@ -144,11 +174,21 @@ export const usePlayerStore = create<PlayerStore>()(
         const today = todayISO();
         const state = get();
         const TAP_LIMIT = 5;
+        const monster = resolveMonsterId(state.selectedMonster);
+        const reactions = state.tapReactions ?? {
+          nilly: { date: "", count: 0 },
+          luna: { date: "", count: 0 },
+        };
+        const current = reactions[monster] ?? { date: "", count: 0 };
 
         // Check if we're still on the same day
-        if (state.lastTapReactionDate !== today) {
+        if (current.date !== today) {
           // New day, reset counter
           set({
+            tapReactions: {
+              ...reactions,
+              [monster]: { date: today, count: 1 },
+            },
             lastTapReactionDate: today,
             tapReactionCount: 1,
           });
@@ -156,14 +196,20 @@ export const usePlayerStore = create<PlayerStore>()(
         }
 
         // Same day — check if we've hit the limit
-        if (state.tapReactionCount >= TAP_LIMIT) {
+        if (current.count >= TAP_LIMIT) {
           return false; // Limit reached, no tap recorded
         }
 
         // Increment counter and return success
-        set((s) => ({
-          tapReactionCount: s.tapReactionCount + 1,
-        }));
+        const next = current.count + 1;
+        set({
+          tapReactions: {
+            ...reactions,
+            [monster]: { date: current.date, count: next },
+          },
+          lastTapReactionDate: current.date,
+          tapReactionCount: next,
+        });
         return true;
       },
 
@@ -225,7 +271,7 @@ export const usePlayerStore = create<PlayerStore>()(
         });
       },
 
-      chargePurchase: (purchaseId, itemId, price, autoConsume) => {
+      chargePurchase: (purchaseId, itemId, price, autoConsume, monsterId) => {
         set((s) => {
           const receipts = s.appliedPurchases ?? {};
           if (receipts[purchaseId]?.charged) return {};
@@ -239,6 +285,7 @@ export const usePlayerStore = create<PlayerStore>()(
                 itemId,
                 price,
                 autoConsume,
+                monsterId: resolveMonsterId(monsterId ?? s.selectedMonster),
               },
             },
           };
@@ -247,9 +294,56 @@ export const usePlayerStore = create<PlayerStore>()(
     }),
     {
       name: "mm-player",
-      version: 5,
+      version: 6,
       migrate: migratePlayerState,
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),
 );
+
+const innerPlayerSetState = usePlayerStore.setState.bind(usePlayerStore);
+usePlayerStore.setState = ((
+  partial: Parameters<typeof usePlayerStore.setState>[0],
+  replace?: boolean,
+) => {
+  if (replace === true) {
+    innerPlayerSetState(partial as PlayerStore, true);
+    return;
+  }
+  const project = (s: PlayerStore, patch: Partial<PlayerStore>) => {
+    if (
+      patch.tapReactionCount === undefined &&
+      patch.lastTapReactionDate === undefined
+    ) {
+      return patch;
+    }
+    const monster = resolveMonsterId(
+      patch.selectedMonster ?? s.selectedMonster,
+    );
+    const reactions = patch.tapReactions ??
+      s.tapReactions ?? {
+        nilly: { date: "", count: 0 },
+        luna: { date: "", count: 0 },
+      };
+    const current = reactions[monster] ?? { date: "", count: 0 };
+    return {
+      ...patch,
+      tapReactions: {
+        ...reactions,
+        [monster]: {
+          date: patch.lastTapReactionDate ?? current.date,
+          count: patch.tapReactionCount ?? current.count,
+        },
+      },
+    };
+  };
+  if (typeof partial === "function") {
+    innerPlayerSetState((s) => {
+      const next = partial(s);
+      if (!next) return next;
+      return project(s, next);
+    });
+  } else {
+    innerPlayerSetState((s) => project(s, partial));
+  }
+}) as typeof usePlayerStore.setState;

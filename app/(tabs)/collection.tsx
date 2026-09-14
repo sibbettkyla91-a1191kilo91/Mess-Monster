@@ -31,13 +31,13 @@ const SLOT_LABEL: Record<AccessorySlot, string> = {
 };
 
 export default function CollectionScreen() {
-  const owned = useStoreStore((s) => s.owned);
-  const placed = useStoreStore((s) => s.placed);
-  const equipped = useStoreStore((s) => s.equipped);
+  const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
+  const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
+  const placed = useStoreStore((s) => s.byMonster[selectedMonster].placed);
+  const equipped = useStoreStore((s) => s.byMonster[selectedMonster].equipped);
   const togglePlaced = useStoreStore((s) => s.togglePlaced);
   const equipAccessory = useStoreStore((s) => s.equipAccessory);
   const unequipSlot = useStoreStore((s) => s.unequipSlot);
-  const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const storeHydrated = useHasHydrated(useStoreStore);
   const playerHydrated = useHasHydrated(usePlayerStore);
   const hydrated = storeHydrated && playerHydrated;

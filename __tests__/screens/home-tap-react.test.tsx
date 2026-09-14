@@ -124,6 +124,7 @@ describe("tap-to-react across mood states", () => {
       // The Health StatBar icon is also "❤️" — count the delta, not the total.
       const heartsBefore = screen.getAllByText("❤️").length;
 
+      fireEvent.press(screen.getByLabelText("Care for Nilly"));
       fireEvent.press(screen.getByLabelText("Pet Nilly"));
 
       // Haptic fired (the bounce animation starts on the same code path,
@@ -155,10 +156,11 @@ describe("tap-to-react across mood states", () => {
 
     // Reported sequence: taps spent while the monster was in other moods…
     act(() => forceMood(60, 60)); // happy
-    const monster = screen.getByLabelText("Pet Nilly");
+    const monster = screen.getByLabelText("Care for Nilly");
     let hearts = screen.getAllByText("❤️").length;
     for (let i = 0; i < 5; i++) {
       fireEvent.press(monster);
+      fireEvent.press(screen.getByLabelText("Pet Nilly"));
       hearts += 1;
       await waitForHeartCount(screen, hearts);
     }
@@ -173,6 +175,7 @@ describe("tap-to-react across mood states", () => {
     const heartsBefore = screen.getAllByText("❤️").length;
 
     fireEvent.press(monster);
+    fireEvent.press(screen.getByLabelText("Pet Nilly"));
 
     // The reaction still fires: haptic and a new heart.
     expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);

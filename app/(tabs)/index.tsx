@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AccessoryLayer } from "@/components/accessory-layer";
+import { PetInteractMenu } from "@/components/pet-interact-menu";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
@@ -22,8 +23,13 @@ import { resolveAccessoryStage } from "@/store/accessory-config";
 import { getDecorSlot } from "@/store/decor-slots";
 import { getMonsterSprite } from "@/store/monster-sprites";
 import { useIsPremium } from "@/store/premium";
+import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
-import { deriveMood, usePetStore } from "@/store/use-pet-store";
+import {
+  deriveMood,
+  PET_HAPPINESS_BOOST,
+  usePetStore,
+} from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
@@ -448,8 +454,8 @@ function FloatingParticle({ def, color }: { def: ParticleDef; color: string }) {
 // sprite art when available, otherwise its catalog emoji.
 
 function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
-  const owned = useStoreStore((s) => s.owned);
-  const placed = useStoreStore((s) => s.placed);
+  const owned = useStoreStore((s) => s.byMonster[monster].owned);
+  const placed = useStoreStore((s) => s.byMonster[monster].placed);
 
   const placedIds = Object.keys(placed).filter(
     (id) => (owned[id]?.quantity ?? 0) > 0,
@@ -916,23 +922,45 @@ const premiumStyles = StyleSheet.create({
 
 // ─── HomeScreen ───────────────────────────────────────────────────────
 
+const REACTIONS = {
+  nilly: {
+    pet: "Hehe — that tickles!",
+    feed: "Yum! Thank you.",
+    play: "This is so fun!",
+  },
+  luna: {
+    pet: "…fine. That was nice.",
+    feed: "An acceptable offering.",
+    play: "I suppose this is entertaining.",
+  },
+} as const;
+
 export default function HomeScreen() {
-  const health = usePetStore((s) => s.health);
-  const happiness = usePetStore((s) => s.happiness);
-  const evolutionStage = usePetStore((s) => s.evolutionStage);
-  const adultVariant = usePetStore((s) => s.adultVariant);
+  const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
+  const health = usePetStore((s) => s.byMonster[selectedMonster].health);
+  const happiness = usePetStore((s) => s.byMonster[selectedMonster].happiness);
+  const evolutionStage = usePetStore(
+    (s) => s.byMonster[selectedMonster].evolutionStage,
+  );
+  const adultVariant = usePetStore(
+    (s) => s.byMonster[selectedMonster].adultVariant,
+  );
   const pendingMilestoneBanner = usePetStore((s) => s.pendingMilestoneBanner);
-  const pendingEvolution = usePetStore((s) => s.pendingEvolution);
-  const pendingPremiumGate = usePetStore((s) => s.pendingPremiumGate);
+  const pendingEvolution = usePetStore(
+    (s) => s.byMonster[selectedMonster].pendingEvolution,
+  );
+  const pendingPremiumGate = usePetStore(
+    (s) => s.byMonster[selectedMonster].pendingPremiumGate,
+  );
   const clearMilestoneBanner = usePetStore((s) => s.clearMilestoneBanner);
   const clearPendingEvolution = usePetStore((s) => s.clearPendingEvolution);
   const clearPremiumGate = usePetStore((s) => s.clearPremiumGate);
 
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
   const streak = usePlayerStore((s) => s.streak);
-  const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const monsterName = usePlayerStore((s) => s.monsterName);
-  const equipped = useStoreStore((s) => s.equipped);
+  const equipped = useStoreStore((s) => s.byMonster[selectedMonster].equipped);
+  const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
   const isPremium = useIsPremium();
   const statPanelCollapsed = usePlayerStore((s) => s.statPanelCollapsed);
   const toggleStatPanel = usePlayerStore((s) => s.toggleStatPanel);
@@ -944,7 +972,8 @@ export default function HomeScreen() {
   // ready. playerHydrated additionally gates the render — see below.
   const playerHydrated = useHasHydrated(usePlayerStore);
   const petHydrated = useHasHydrated(usePetStore);
-  const hydrated = playerHydrated && petHydrated;
+  const storeHydrated = useHasHydrated(useStoreStore);
+  const hydrated = playerHydrated && petHydrated && storeHydrated;
 
   // Manual entry point for the upgrade modal — the auto-popup only shows
   // once per stage, so non-premium users need a way to reopen it anytime.
@@ -990,6 +1019,58 @@ export default function HomeScreen() {
   const heartTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const recordTapReaction = usePlayerStore((s) => s.recordTapReaction);
   const addHappiness = usePetStore((s) => s.addHappiness);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [picker, setPicker] = useState<"feed" | "play" | null>(null);
+  const [reactionLine, setReactionLine] = useState<string | null>(null);
+  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const foods = useMemo(() => {
+    const list: {
+      id: string;
+      name: string;
+      emoji: string;
+      quantity: number;
+    }[] = [];
+    for (const entry of Object.values(owned)) {
+      if (entry.item.category === "food" && entry.quantity > 0) {
+        list.push({
+          id: entry.item.id,
+          name: entry.item.name,
+          emoji: entry.item.emoji,
+          quantity: entry.quantity,
+        });
+      }
+    }
+    return list;
+  }, [owned]);
+
+  const toys = useMemo(() => {
+    const list: { id: string; name: string; emoji: string }[] = [];
+    for (const entry of Object.values(owned)) {
+      if (entry.item.category === "toys" && entry.quantity > 0) {
+        list.push({
+          id: entry.item.id,
+          name: entry.item.name,
+          emoji: entry.item.emoji,
+        });
+      }
+    }
+    return list;
+  }, [owned]);
+
+  const showReaction = (line: string) => {
+    if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+    setReactionLine(line);
+    reactionTimerRef.current = setTimeout(() => {
+      setReactionLine(null);
+      reactionTimerRef.current = null;
+    }, 2200);
+  };
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setPicker(null);
+  };
 
   // Count tasks completed today (local calendar day)
   const todayLocal = localDayString();
@@ -1016,19 +1097,9 @@ export default function HomeScreen() {
     toggleStatPanel();
   };
 
-  // ── Tap-to-react handler ────────────────────────────────────────────────────
-  const handlePetTap = () => {
-    if (!hydrated) return;
-    // The daily allowance caps only the happiness grant (anti-farming) —
-    // never the reaction. The monster always acknowledges affection with
-    // the bounce, haptic, and heart: a capped tap silently doing nothing
-    // reads as "broken", worst of all on a sad monster being comforted.
-    const withinDailyAllowance = recordTapReaction();
-
-    // Trigger haptic feedback
+  const playTapReaction = (grantHappiness: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Trigger bounce animation
     Animated.sequence([
       Animated.timing(tapScaleAnim, {
         toValue: 1.12,
@@ -1042,10 +1113,8 @@ export default function HomeScreen() {
       }),
     ]).start();
 
-    // Boost happiness (no points — tapping is affection, not cleaning)
-    if (withinDailyAllowance) addHappiness(3);
+    if (grantHappiness) addHappiness(PET_HAPPINESS_BOOST);
 
-    // Create heart animation at center of pet
     heartSeqRef.current += 1;
     const heartId = `heart-${heartSeqRef.current}`;
     setTapHearts((prev) => [
@@ -1057,12 +1126,65 @@ export default function HomeScreen() {
       },
     ]);
 
-    // Remove heart after animation completes
     const heartTimer = setTimeout(() => {
       heartTimersRef.current.delete(heartTimer);
       setTapHearts((prev) => prev.filter((h) => h.id !== heartId));
     }, 1200);
     heartTimersRef.current.add(heartTimer);
+  };
+
+  const handleMonsterPress = () => {
+    if (!hydrated) return;
+    if (menuOpen) {
+      closeMenu();
+      return;
+    }
+    setMenuOpen(true);
+    setPicker(null);
+  };
+
+  // ── Pet from the care menu — exact previous tap mechanic ───────────────────
+  const handlePetTap = () => {
+    if (!hydrated) return;
+    // The daily allowance caps only the happiness grant (anti-farming) —
+    // never the reaction. The monster always acknowledges affection with
+    // the bounce, haptic, and heart: a capped tap silently doing nothing
+    // reads as "broken", worst of all on a sad monster being comforted.
+    const withinDailyAllowance = recordTapReaction();
+    playTapReaction(withinDailyAllowance);
+    showReaction(REACTIONS[monster].pet);
+    closeMenu();
+  };
+
+  const handleAskFeed = () => {
+    if (!hydrated) return;
+    setPicker("feed");
+  };
+
+  const handleAskPlay = () => {
+    if (!hydrated) return;
+    setPicker("play");
+  };
+
+  const handleChooseFeed = (itemId: string) => {
+    if (!hydrated) return;
+    if (!executeFeed(itemId, monster)) return;
+    playTapReaction(false);
+    showReaction(REACTIONS[monster].feed);
+    closeMenu();
+  };
+
+  const handleChoosePlay = (itemId: string) => {
+    if (!hydrated) return;
+    if (!executePlay(itemId, monster)) return;
+    playTapReaction(false);
+    showReaction(REACTIONS[monster].play);
+    closeMenu();
+  };
+
+  const handleGoToShop = () => {
+    closeMenu();
+    router.navigate("/(tabs)/store");
   };
 
   // ── Bob ────────────────────────────────────────────────────────────────────
@@ -1075,6 +1197,7 @@ export default function HomeScreen() {
       tapScaleAnim.setValue(1);
       heartTimers.forEach(clearTimeout);
       heartTimers.clear();
+      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
     };
   }, [tapScaleAnim]);
 
@@ -1370,14 +1493,23 @@ export default function HomeScreen() {
           the direct parent in RN, so it must sit on the container's child —
           on the inner Animated.View it would anchor to the zero-height
           Pressable and render offscreen. */}
+      {menuOpen ? (
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={closeMenu}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss care menu"
+        />
+      ) : null}
+
       <Pressable
-        onPress={handlePetTap}
+        onPress={handleMonsterPress}
         style={[
           styles.monsterImageWrapper,
           panelHeight > 0 && { bottom: panelHeight + 16 },
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Pet ${displayName}`}
+        accessibilityLabel={`Care for ${displayName}`}
       >
         <Animated.View
           style={[
@@ -1412,6 +1544,55 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
       </Pressable>
+
+      {menuOpen ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.interactMenuWrap,
+            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 20 },
+          ]}
+        >
+          <PetInteractMenu
+            displayName={displayName}
+            accent={theme.accent}
+            accentInk="#ffffff"
+            cardBg={theme.cardBg}
+            text={theme.text}
+            muted={theme.text}
+            border={theme.cardBorder}
+            foods={foods}
+            toys={toys}
+            picker={picker}
+            reactionLine={null}
+            onPet={handlePetTap}
+            onAskFeed={handleAskFeed}
+            onAskPlay={handleAskPlay}
+            onChooseItem={
+              picker === "play" ? handleChoosePlay : handleChooseFeed
+            }
+            onGoToShop={handleGoToShop}
+            onClose={closeMenu}
+          />
+        </View>
+      ) : null}
+
+      {reactionLine ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.reactionBubble,
+            { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+            panelHeight > 0 && { bottom: panelHeight + IMAGE_SIZE + 28 },
+          ]}
+        >
+          <ThemedText
+            style={[styles.reactionBubbleText, { color: theme.text }]}
+          >
+            {reactionLine}
+          </ThemedText>
+        </View>
+      ) : null}
 
       {/* ── Tap reaction hearts ── */}
       {tapHearts.map((heart) => (
@@ -1635,6 +1816,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
+  },
+  interactMenuWrap: {
+    position: "absolute",
+    bottom: "52%",
+    left: 16,
+    right: 16,
+    alignItems: "center",
+    zIndex: 8,
+  },
+  reactionBubble: {
+    position: "absolute",
+    bottom: "52%",
+    alignSelf: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 9,
+  },
+  reactionBubbleText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   monsterImage: {
     width: IMAGE_SIZE,

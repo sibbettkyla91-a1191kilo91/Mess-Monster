@@ -50,6 +50,7 @@ function resetStores() {
     totalPoints: 100,
     spentPoints: 0,
     appliedPurchases: {},
+    selectedMonster: "nilly",
   });
   usePetStore.setState({
     health: 50,
@@ -100,24 +101,25 @@ describe("paid collectible persist orders", () => {
   });
 });
 
-describe("paid food consume and care", () => {
-  it("consumes inventory and applies care exactly once across two recoveries", () => {
+describe("paid food stays in the bag", () => {
+  it("grants food without consuming or caring, and recovery does not change that", () => {
     expect(executePaidShopPurchase(cookie)).toBe(true);
-    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
     expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
-    expect(usePetStore.getState().health).toBe(65);
-    expect(usePetStore.getState().happiness).toBe(70);
+    expect(usePetStore.getState().health).toBe(50);
+    expect(usePetStore.getState().happiness).toBe(50);
 
     recoverUnsettledPurchases();
     recoverUnsettledPurchases();
 
-    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
     expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
-    expect(usePetStore.getState().health).toBe(65);
-    expect(usePetStore.getState().happiness).toBe(70);
+    expect(usePetStore.getState().health).toBe(50);
+    expect(usePetStore.getState().happiness).toBe(50);
+    expect(usePetStore.getState().appliedPurchases[Object.keys(usePlayerStore.getState().appliedPurchases)[0]]?.cared).toBeUndefined();
   });
 
-  it("finishes consume and care after grant+charge persisted without them", () => {
+  it("leaves leftover food in the bag after grant+charge without consume", () => {
     const tx = purchase(cookie, "food-mid");
     useStoreStore.getState().grantPurchase(tx);
     usePlayerStore
@@ -130,30 +132,27 @@ describe("paid food consume and care", () => {
     recoverUnsettledPurchases();
     recoverUnsettledPurchases();
 
-    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
     expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
-    expect(usePetStore.getState().health).toBe(65);
-    expect(usePetStore.getState().happiness).toBe(70);
-    expect(usePetStore.getState().appliedPurchases["food-mid"]?.cared).toBe(true);
+    expect(usePetStore.getState().health).toBe(50);
+    expect(usePetStore.getState().happiness).toBe(50);
+    expect(usePetStore.getState().appliedPurchases["food-mid"]?.cared).toBeUndefined();
   });
 });
 
 describe("gifted food", () => {
-  it("consumes a gifted unit without charging, and recovery does not invent a charge", () => {
+  it("stashes a gifted unit without charging or caring", () => {
     useStoreStore.getState().buyItem(cookie);
     expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
-
-    useStoreStore.getState().useItem(cookie.id);
-    usePetStore.getState().care();
-
     expect(usePlayerStore.getState().spentPoints).toBe(0);
-    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
-    expect(usePetStore.getState().health).toBe(65);
+    expect(usePetStore.getState().health).toBe(50);
 
     recoverUnsettledPurchases();
 
     expect(usePlayerStore.getState().spentPoints).toBe(0);
     expect(usePlayerStore.getState().appliedPurchases).toEqual({});
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
+    expect(usePetStore.getState().health).toBe(50);
     expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
   });
 });
@@ -194,7 +193,7 @@ describe("non-repeatable ownership", () => {
   });
 });
 
-describe("paid food care after consume", () => {
+describe("old autoConsume food mid-recovery", () => {
   const seedPaidFoodConsumed = (id: string, keepUnsettled: boolean) => {
     const tx = purchase(cookie, id);
     useStoreStore.getState().grantPurchase(tx);
@@ -208,7 +207,7 @@ describe("paid food care after consume", () => {
     return tx;
   };
 
-  it("finishes care exactly once when grant, charge, and consume persisted", () => {
+  it("does not apply the old purchase-care boost when the snack was already consumed", () => {
     seedPaidFoodConsumed("food-care-unsettled", true);
 
     expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
@@ -220,15 +219,13 @@ describe("paid food care after consume", () => {
 
     expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
     expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
-    expect(usePetStore.getState().health).toBe(65);
-    expect(usePetStore.getState().happiness).toBe(70);
-    expect(usePetStore.getState().appliedPurchases["food-care-unsettled"]?.cared).toBe(
-      true,
-    );
+    expect(usePetStore.getState().health).toBe(50);
+    expect(usePetStore.getState().happiness).toBe(50);
+    expect(usePetStore.getState().appliedPurchases["food-care-unsettled"]?.cared).toBeUndefined();
     expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
   });
 
-  it("still finishes care after store-side clear persisted before pet care", () => {
+  it("does not invent care after store-side clear persisted before pet care", () => {
     seedPaidFoodConsumed("food-care-cleared", false);
 
     expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
@@ -247,11 +244,9 @@ describe("paid food care after consume", () => {
 
     expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(0);
     expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
-    expect(usePetStore.getState().health).toBe(65);
-    expect(usePetStore.getState().happiness).toBe(70);
-    expect(usePetStore.getState().appliedPurchases["food-care-cleared"]?.cared).toBe(
-      true,
-    );
+    expect(usePetStore.getState().health).toBe(50);
+    expect(usePetStore.getState().happiness).toBe(50);
+    expect(usePetStore.getState().appliedPurchases["food-care-cleared"]?.cared).toBeUndefined();
     expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
   });
 });

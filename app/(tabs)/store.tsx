@@ -32,10 +32,9 @@ const fontRounded = Platform.select({
 
 export default function StoreScreen() {
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
-  const care = usePetStore((s) => s.care);
+  const selectedMonster = usePlayerStore((s) => s.selectedMonster) ?? "nilly";
   const isOwned = useStoreStore((s) => s.isOwned);
-  const consumeItem = useStoreStore((s) => s.useItem);
-  const owned = useStoreStore((s) => s.owned);
+  const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
   // handleBuy writes to all three persisted stores; a purchase made before
   // AsyncStorage rehydration completes gets clobbered when the hydration
   // merge lands, so the shop stays closed until every store is hydrated.
@@ -96,15 +95,6 @@ export default function StoreScreen() {
         return;
       }
 
-      // Repeatable items: use a gifted unit from inventory first (free items
-      // won from photo rewards) before charging any points.
-      if (item.repeatable && (owned[item.id]?.quantity ?? 0) > 0) {
-        consumeItem(item.id);
-        care();
-        showFeedback(`\ud83c\udf81 ${item.name} used from your gifts!`);
-        return;
-      }
-
       // Check if player can afford it
       if (availablePoints < item.price) {
         showFeedback("\ud83d\ude05 Not enough points!");
@@ -114,30 +104,20 @@ export default function StoreScreen() {
       // Grant the item before charging: if the app is killed between the
       // two writes, the player keeps the item rather than losing points
       // with nothing to show for it. Recovery never retroactively charges.
+      // Food goes into this monster's bag and is used later from Home.
       const bought = executePaidShopPurchase(item);
       if (!bought) {
         showFeedback("\u274c Something went wrong");
         return;
       }
 
-      // For food (the only repeatable category), auto-use is part of the
-      // paid purchase transaction. Toys, accessories, and decor stay in
-      // the collection.
       if (item.repeatable) {
-        showFeedback(`\ud83c\udf89 ${item.name} used! +${item.moodBoost} mood`);
+        showFeedback(`\ud83d\uded2 ${item.name} added to the bag!`);
       } else {
         showFeedback(`\ud83d\udecd\ufe0f ${item.name} added to collection!`);
       }
     },
-    [
-      hydrated,
-      availablePoints,
-      isOwned,
-      consumeItem,
-      care,
-      showFeedback,
-      owned,
-    ],
+    [hydrated, availablePoints, isOwned, showFeedback],
   );
 
   const filteredItems = STORE_ITEMS.filter(
@@ -239,11 +219,11 @@ export default function StoreScreen() {
         >
           {filteredItems.map((item) => {
             const ownedForever = !item.repeatable && isOwned(item.id);
-            const giftCount = item.repeatable
+            const bagCount = item.repeatable
               ? (owned[item.id]?.quantity ?? 0)
               : 0;
             const canAfford = availablePoints >= item.price;
-            const canPress = canAfford || giftCount > 0;
+            const canPress = canAfford;
 
             return (
               <View
@@ -275,7 +255,7 @@ export default function StoreScreen() {
                 </Text>
 
                 <View style={styles.itemFooter}>
-                  {giftCount > 0 && (
+                  {bagCount > 0 && (
                     <View
                       style={[
                         styles.giftBadge,
@@ -283,7 +263,7 @@ export default function StoreScreen() {
                       ]}
                     >
                       <Text style={[styles.giftText, { color: onSoft }]}>
-                        {giftCount} gift{giftCount > 1 ? "s" : ""} ready
+                        {bagCount} in the bag
                       </Text>
                     </View>
                   )}
@@ -314,11 +294,7 @@ export default function StoreScreen() {
                       disabled={!canPress}
                       accessibilityRole="button"
                       accessibilityState={{ disabled: !canPress }}
-                      accessibilityLabel={
-                        giftCount > 0
-                          ? "Use a gift, free"
-                          : `${item.repeatable ? "Use" : "Buy"} ${item.price} points`
-                      }
+                      accessibilityLabel={`Buy ${item.name}, ${item.price} points`}
                     >
                       <Text
                         style={[
@@ -329,9 +305,7 @@ export default function StoreScreen() {
                           },
                         ]}
                       >
-                        {giftCount > 0
-                          ? "Use a gift · free"
-                          : `${item.repeatable ? "Use" : "Buy"} · ${item.price} pts`}
+                        {`Buy · ${item.price} pts`}
                       </Text>
                     </Pressable>
                   )}

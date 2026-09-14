@@ -117,8 +117,8 @@ describe("Home hydration gate — persisted Nilly", () => {
     });
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(false);
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
-    expect(screen.queryByLabelText("Pet Luna")).toBeNull();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
+    expect(screen.queryByLabelText("Care for Luna")).toBeNull();
     expect(habitatSources(screen)).toHaveLength(0);
     expect(imageSources(screen)).toHaveLength(0);
   });
@@ -129,7 +129,7 @@ describe("Home hydration gate — persisted Nilly", () => {
       await flushHydration();
     });
 
-    expect(screen.queryByLabelText("Pet Nilly")).toBeNull();
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
 
     const resolvers = resolverHolder();
     await act(async () => {
@@ -139,8 +139,8 @@ describe("Home hydration gate — persisted Nilly", () => {
     });
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(true);
-    expect(screen.getByLabelText("Pet Nilly")).toBeTruthy();
-    expect(screen.queryByLabelText("Pet Luna")).toBeNull();
+    expect(screen.getByLabelText("Care for Nilly")).toBeTruthy();
+    expect(screen.queryByLabelText("Care for Luna")).toBeNull();
     expect(habitatSources(screen)).toEqual([NILLY_HABITAT]);
     expect(imageSources(screen)).toContain(NILLY_TEEN);
     expect(imageSources(screen)).not.toContain(LUNA_TEEN);
