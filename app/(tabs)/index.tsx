@@ -6,7 +6,6 @@ import {
   Dimensions,
   Image,
   ImageBackground,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,14 +13,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AccessoryLayer } from "@/components/accessory-layer";
+import {
+  LivingMonster,
+  LivingMonsterHandle,
+} from "@/components/living-monster";
 import { PetInteractMenu } from "@/components/pet-interact-menu";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
-import { resolveAccessoryStage } from "@/store/accessory-config";
 import { getDecorSlot } from "@/store/decor-slots";
-import { getMonsterSprite } from "@/store/monster-sprites";
 import { useIsPremium } from "@/store/premium";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
@@ -1012,7 +1012,7 @@ export default function HomeScreen() {
   const [tapHearts, setTapHearts] = useState<
     { id: string; x: number; y: number }[]
   >([]);
-  const tapScaleAnim = useRef(new Animated.Value(1)).current;
+  const monsterRef = useRef<LivingMonsterHandle>(null);
   // Monotonic id so two taps in the same millisecond can't collide, and
   // pending heart-removal timers so unmount doesn't leak them.
   const heartSeqRef = useRef(0);
@@ -1100,18 +1100,7 @@ export default function HomeScreen() {
   const playTapReaction = (grantHappiness: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    Animated.sequence([
-      Animated.timing(tapScaleAnim, {
-        toValue: 1.12,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(tapScaleAnim, {
-        toValue: 1.0,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    monsterRef.current?.bounce();
 
     if (grantHappiness) addHappiness(PET_HAPPINESS_BOOST);
 
@@ -1187,178 +1176,14 @@ export default function HomeScreen() {
     router.navigate("/(tabs)/store");
   };
 
-  // ── Bob ────────────────────────────────────────────────────────────────────
-  const bobAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const heartTimers = heartTimersRef.current;
     return () => {
-      // PERFORMANCE: Reset animation values on cleanup to prevent leaks
-      tapScaleAnim.setValue(1);
       heartTimers.forEach(clearTimeout);
       heartTimers.clear();
       if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
     };
-  }, [tapScaleAnim]);
-
-  useEffect(() => {
-    const isSad = mood === "sad" || mood === "sick";
-    const bobSpeed = mood === "thriving" ? 900 : isSad ? 2600 : 1700;
-    const bobAmt = isSad ? 6 : -12;
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobAnim, {
-          toValue: bobAmt,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bobAnim, {
-          toValue: 0,
-          duration: bobSpeed / 2,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup to prevent animation state leaks
-      bobAnim.setValue(0);
-    };
-  }, [mood, bobAnim]);
-
-  // ── Wiggle ──────────────────────────────────────────────────────────
-  const wiggleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let active = true;
-    let tid: ReturnType<typeof setTimeout>;
-
-    const schedule = () => {
-      if (!active) return;
-      tid = setTimeout(
-        () => {
-          if (!active) return;
-          Animated.sequence([
-            Animated.timing(wiggleAnim, {
-              toValue: -9,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: 9,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: -5,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.timing(wiggleAnim, {
-              toValue: 0,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-          ]).start(() => schedule());
-        },
-        4000 + Math.random() * 4000,
-      );
-    };
-
-    schedule();
-    return () => {
-      active = false;
-      clearTimeout(tid);
-      // PERFORMANCE: Reset animation value on cleanup
-      wiggleAnim.setValue(0);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Thriving scale-pulse ────────────────────────────────��──────────────────
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (mood !== "thriving") {
-      scaleAnim.setValue(1);
-      return;
-    }
-    let active = true;
-    let tid: ReturnType<typeof setTimeout>;
-
-    const schedule = () => {
-      if (!active) return;
-      tid = setTimeout(
-        () => {
-          if (!active) return;
-          Animated.sequence([
-            Animated.timing(scaleAnim, {
-              toValue: 1.08,
-              duration: 240,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.0,
-              duration: 240,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.05,
-              duration: 180,
-              useNativeDriver: true,
-            }),
-            Animated.timing(scaleAnim, {
-              toValue: 1.0,
-              duration: 180,
-              useNativeDriver: true,
-            }),
-          ]).start(() => schedule());
-        },
-        5000 + Math.random() * 5000,
-      );
-    };
-
-    schedule();
-    return () => {
-      active = false;
-      clearTimeout(tid);
-      // PERFORMANCE: Reset animation value on cleanup
-      scaleAnim.setValue(1);
-    };
-  }, [mood, scaleAnim]);
-
-  // ── Evolution glow pulse (adult / ascended) ────────────────────────────────
-  const evoScaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const isAdult = evolutionStage === "adult" || evolutionStage === "ascended";
-    if (!isAdult) {
-      evoScaleAnim.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(evoScaleAnim, {
-          toValue: 1.04,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(evoScaleAnim, {
-          toValue: 1.0,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup
-      evoScaleAnim.setValue(1);
-    };
-  }, [evolutionStage, evoScaleAnim]);
 
   // ── Milestone banner auto-dismiss ─────────────────────────────────────────
   useEffect(() => {
@@ -1366,80 +1191,6 @@ export default function HomeScreen() {
     const t = setTimeout(clearMilestoneBanner, 3000);
     return () => clearTimeout(t);
   }, [pendingMilestoneBanner, clearMilestoneBanner]);
-
-  // ── Sick wobble ─────────────────────────────────────────────────────────
-  const sickWobbleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (mood !== "sick") {
-      sickWobbleAnim.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sickWobbleAnim, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sickWobbleAnim, {
-          toValue: -1,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-      // PERFORMANCE: Reset animation value on cleanup
-      sickWobbleAnim.setValue(0);
-    };
-  }, [mood, sickWobbleAnim]);
-
-  const wiggleRot = wiggleAnim.interpolate({
-    inputRange: [-9, 0, 9],
-    outputRange: ["-4.5deg", "0deg", "4.5deg"],
-  });
-  const sickWobbleRot = sickWobbleAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ["-8deg", "0deg", "8deg"],
-  });
-
-  // Egg stage: slightly faded to convey "not yet hatched"
-  // Sick mood: also faded to convey distress
-  const wrapperOpacity = Math.min(
-    evolutionStage === "egg" ? 0.75 : 1,
-    mood === "neutral" || mood === "sick" ? 0.75 : 1,
-  );
-
-  // Stage-based shadow intensity
-  const isAdult = evolutionStage === "adult" || evolutionStage === "ascended";
-  const shadowStyle = isAdult
-    ? {
-        shadowColor: theme.accent,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.75,
-        shadowRadius: 30,
-        elevation: Platform.OS === "android" ? 0 : 14,
-      }
-    : evolutionStage === "teen"
-      ? {
-          shadowColor: theme.accent,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.45,
-          shadowRadius: 18,
-          elevation: Platform.OS === "android" ? 0 : 8,
-        }
-      : null;
-
-  const monsterSource = getMonsterSprite(
-    monster,
-    evolutionStage,
-    adultVariant,
-    mood,
-  );
-  const wearStage = resolveAccessoryStage(evolutionStage);
 
   // Until the player store rehydrates, selectedMonster still reads its default,
   // so a Luna player would get Nilly's room, sprite, and palette for a frame
@@ -1489,10 +1240,6 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Monster ── */}
-      {/* Positioning lives on the Pressable: position "absolute" anchors to
-          the direct parent in RN, so it must sit on the container's child —
-          on the inner Animated.View it would anchor to the zero-height
-          Pressable and render offscreen. */}
       {menuOpen ? (
         <Pressable
           style={StyleSheet.absoluteFillObject}
@@ -1502,48 +1249,22 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      <Pressable
+      <LivingMonster
+        ref={monsterRef}
+        monster={monster}
+        stage={evolutionStage}
+        adultVariant={adultVariant}
+        mood={mood}
+        equipped={equipped}
+        size={IMAGE_SIZE}
+        accent={theme.accent}
+        accessibilityLabel={`Care for ${displayName}`}
         onPress={handleMonsterPress}
         style={[
           styles.monsterImageWrapper,
           panelHeight > 0 && { bottom: panelHeight + 16 },
         ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Care for ${displayName}`}
-      >
-        <Animated.View
-          style={[
-            { opacity: wrapperOpacity },
-            shadowStyle,
-            {
-              transform: [
-                { translateY: bobAnim },
-                { scale: scaleAnim },
-                { scale: evoScaleAnim },
-                { scale: tapScaleAnim },
-                { rotateZ: wiggleRot },
-                { rotateZ: sickWobbleRot },
-              ],
-            },
-          ]}
-        >
-          <View style={styles.monsterImage}>
-            <Image
-              source={monsterSource}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="contain"
-            />
-            {wearStage && (
-              <AccessoryLayer
-                monster={monster}
-                stage={wearStage}
-                equipped={equipped}
-                size={IMAGE_SIZE}
-              />
-            )}
-          </View>
-        </Animated.View>
-      </Pressable>
+      />
 
       {menuOpen ? (
         <View
@@ -1839,11 +1560,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
-  },
-  monsterImage: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    aspectRatio: 1,
   },
   bottomPanel: {
     position: "absolute",
