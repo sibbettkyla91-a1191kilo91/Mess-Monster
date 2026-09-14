@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ClaimMomentCard } from "@/components/claim-moment-card";
 import { PhotoRewardModal } from "@/components/photo-reward-modal";
 import { TaskTimer } from "@/components/task-timer";
 import {
@@ -28,6 +29,11 @@ import {
   requestNudgePermission,
   rescheduleDailyNudges,
 } from "@/utils/daily-nudge";
+import {
+  beforeClaim,
+  buildClaimMoment,
+  ClaimMoment,
+} from "@/store/claim-moment";
 import { PresetTask } from "@/store/preset-tasks";
 import { finishPhotoTaskWait } from "@/store/photo-task-reward";
 import { recoverUnsettledGrants } from "@/store/recover-unsettled-grants";
@@ -92,11 +98,15 @@ export default function TasksScreen() {
   const claimTaskReward = useTasksStore((s) => s.claimTaskReward);
   const claimPendingReward = useTasksStore((s) => s.claimPendingReward);
 
-  const [celebration, setCelebration] = useState<string | null>(null);
+  // The claim moment is derived from store reads after the grant lands and
+  // held in local state only; the receipts already own the reward.
+  const [celebration, setCelebration] = useState<ClaimMoment | null>(null);
+  const lastVoiceRef = useRef<string | null>(null);
   const [rewardModal, setRewardModal] = useState<{
     reward: RewardOutcome;
     basePoints: number;
     freeItemName?: string;
+    moment: ClaimMoment;
   } | null>(null);
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraBusyRef = useRef(false);
@@ -136,10 +146,25 @@ export default function TasksScreen() {
     return taskProgress[taskId] ?? { state: "idle", hasPhoto: false };
   };
 
-  const showCelebration = useCallback((message: string) => {
+  const showCelebration = useCallback((moment: ClaimMoment) => {
     if (celebTimerRef.current) clearTimeout(celebTimerRef.current);
-    setCelebration(message);
-    celebTimerRef.current = setTimeout(() => setCelebration(null), 2500);
+    setCelebration(moment);
+    celebTimerRef.current = setTimeout(
+      () => setCelebration(null),
+      moment.leveledUp ? 6000 : 4000,
+    );
+  }, []);
+
+  /** Read level before, run the grant, read after — one moment to show. */
+  const settleAndDescribe = useCallback((pointsGained: number) => {
+    const before = beforeClaim();
+    // Reservation already persisted the unsettled grant. Apply (or resume)
+    // points / tracking / history / activity / care / milestones through
+    // the same idempotent recovery path used after a crash.
+    recoverUnsettledGrants();
+    const moment = buildClaimMoment(before, pointsGained, lastVoiceRef.current);
+    lastVoiceRef.current = moment.voiceLine;
+    return moment;
   }, []);
 
   // Step 1: User taps a task → moves to pending_photo state
@@ -274,18 +299,15 @@ export default function TasksScreen() {
       // Strong success haptic feedback for reward claim
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Reservation already persisted the unsettled grant. Apply (or resume)
-      // points / tracking / history / activity / care through the same
-      // idempotent recovery path used after a crash.
-      recoverUnsettledGrants();
+      const moment = settleAndDescribe(finalPoints);
 
       // Photo-verified tasks get the full celebration modal; others get the
-      // lightweight pill.
+      // lightweight card under the header.
       const { outcome, basePoints, freeItemName } = progress.rewardInfo!;
       if (progress.hasPhoto && outcome) {
-        setRewardModal({ reward: outcome, basePoints, freeItemName });
+        setRewardModal({ reward: outcome, basePoints, freeItemName, moment });
       } else {
-        showCelebration(`✨ +${finalPoints} pts claimed!`);
+        showCelebration(moment);
       }
 
       // First reward claim is the moment we ask about gentle reminders —
@@ -300,6 +322,7 @@ export default function TasksScreen() {
     [
       hydrated,
       claimTaskReward,
+      settleAndDescribe,
       showCelebration,
       notifPermissionAsked,
       markNotifPermissionAsked,
@@ -319,13 +342,13 @@ export default function TasksScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const { finalPoints } = claimedReward.rewardInfo;
-      recoverUnsettledGrants();
+      const moment = settleAndDescribe(finalPoints);
 
       const { outcome, basePoints, freeItemName } = claimedReward.rewardInfo;
       if (claimedReward.hasPhoto && outcome) {
-        setRewardModal({ reward: outcome, basePoints, freeItemName });
+        setRewardModal({ reward: outcome, basePoints, freeItemName, moment });
       } else {
-        showCelebration(`✨ +${finalPoints} pts claimed!`);
+        showCelebration(moment);
       }
 
       if (!notifPermissionAsked) {
@@ -338,6 +361,7 @@ export default function TasksScreen() {
     [
       hydrated,
       claimPendingReward,
+      settleAndDescribe,
       showCelebration,
       notifPermissionAsked,
       markNotifPermissionAsked,
@@ -350,6 +374,7 @@ export default function TasksScreen() {
   ).length;
 
   const isLuna = monster === "luna";
+  const displayName = monsterName || (isLuna ? "Luna" : "Nilly");
   const photoPrompt = isLuna
     ? "Seal it with a photo?"
     : "Photo for a better treat?";
@@ -390,16 +415,14 @@ export default function TasksScreen() {
           <Text style={[styles.count, { color: inkMuted }]}>
             {completedCount}/{dailyRoll.length} claimed
           </Text>
-          {celebration && (
-            <View
-              style={[styles.celebrationPill, { backgroundColor: accentSoft }]}
-            >
-              <Text style={[styles.celebrationText, { color: onSoft }]}>
-                {celebration}
-              </Text>
-            </View>
-          )}
         </View>
+        {celebration && (
+          <ClaimMomentCard
+            moment={celebration}
+            displayName={displayName}
+            reduceMotion={reduceMotion}
+          />
+        )}
       </View>
 
       {/* Task list — held behind a brief loading moment on cold start so a
@@ -756,6 +779,9 @@ export default function TasksScreen() {
           reward={rewardModal.reward}
           basePoints={rewardModal.basePoints}
           freeItemName={rewardModal.freeItemName}
+          moment={rewardModal.moment}
+          displayName={displayName}
+          reduceMotion={reduceMotion}
           onDismiss={() => setRewardModal(null)}
         />
       )}
@@ -777,13 +803,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.2,
   },
-  celebrationPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    flexShrink: 1,
-  },
-  celebrationText: { fontWeight: "700", fontSize: 13 },
   list: { gap: 12, paddingBottom: 40 },
   loadingWrap: {
     flex: 1,

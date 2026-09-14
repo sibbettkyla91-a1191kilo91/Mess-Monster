@@ -1,7 +1,9 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import { ClaimMomentCard } from "@/components/claim-moment-card";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { RewardOutcome } from "@/constants/task-timers";
+import { ClaimMoment } from "@/store/claim-moment";
 
 interface PhotoRewardModalProps {
   /** The reward outcome to display */
@@ -10,6 +12,10 @@ interface PhotoRewardModalProps {
   basePoints: number;
   /** Name of the free item (if applicable) */
   freeItemName?: string;
+  /** Level/XP tick and the monster's line for this claim (presentation only) */
+  moment?: ClaimMoment;
+  displayName?: string;
+  reduceMotion?: boolean;
   /** Called when the user dismisses the modal */
   onDismiss: () => void;
 }
@@ -18,6 +24,9 @@ export function PhotoRewardModal({
   reward,
   basePoints,
   freeItemName,
+  moment,
+  displayName,
+  reduceMotion,
   onDismiss,
 }: PhotoRewardModalProps) {
   const {
@@ -72,6 +81,15 @@ export function PhotoRewardModal({
               Along with it: {freeItemName}
             </Text>
           </View>
+        )}
+
+        {moment && (
+          <ClaimMomentCard
+            moment={moment}
+            displayName={displayName ?? "Your monster"}
+            reduceMotion={reduceMotion}
+            embedded
+          />
         )}
 
         <TouchableOpacity

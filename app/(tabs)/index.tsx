@@ -32,6 +32,7 @@ import { LUNA_PALETTE, MonsterPalette, NILLY_PALETTE } from "@/monster-theme";
 import { getDecorSlot } from "@/store/decor-slots";
 import { getItemArt } from "@/store/item-art";
 import { useIsPremium } from "@/store/premium";
+import { xpToNextLevel } from "@/store/progression";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
 import { currentTimeOfDay, LastAction, pickLine } from "@/store/monster-voice";
@@ -920,6 +921,12 @@ export default function HomeScreen() {
   const adultVariant = usePetStore(
     (s) => s.byMonster[selectedMonster].adultVariant,
   );
+  // Progression level: derived from this monster's lifetime points, read as
+  // a primitive so the selector never returns a fresh object.
+  const totalPointsEarned = usePetStore(
+    (s) => s.byMonster[selectedMonster].totalPointsEarned,
+  );
+  const levelProgress = xpToNextLevel(totalPointsEarned);
   const pendingMilestoneBanner = usePetStore((s) => s.pendingMilestoneBanner);
   const pendingEvolution = usePetStore(
     (s) => s.byMonster[selectedMonster].pendingEvolution,
@@ -1601,6 +1608,19 @@ export default function HomeScreen() {
                 {STAGE_LABELS[evolutionStage]}
               </ThemedText>
             </View>
+            <View
+              style={[styles.levelPill, { borderColor: theme.accent + "66" }]}
+              accessibilityRole="text"
+              accessibilityLabel={
+                levelProgress.atMax
+                  ? `Level ${levelProgress.level}, top level`
+                  : `Level ${levelProgress.level}, ${levelProgress.remaining} points to next level`
+              }
+            >
+              <ThemedText style={[styles.levelLabel, { color: theme.accent }]}>
+                Lv {levelProgress.level}
+              </ThemedText>
+            </View>
             {!isPremium && (
               <Pressable
                 style={({ pressed }) => [
@@ -1853,6 +1873,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  levelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  levelLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    fontVariant: ["tabular-nums"],
   },
   unlockButton: {
     marginLeft: "auto",
