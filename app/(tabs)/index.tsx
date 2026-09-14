@@ -39,7 +39,9 @@ import {
   PetMood,
   usePetStore,
 } from "@/store/use-pet-store";
+import { PresetTask } from "@/store/preset-tasks";
 import { usePlayerStore } from "@/store/use-player-store";
+import { pickTinyDare, useSessionStore } from "@/store/use-session-store";
 import { useStoreStore } from "@/store/use-store-store";
 import { useTasksStore } from "@/store/use-tasks-store";
 import { localDayString } from "@/utils/local-day";
@@ -113,6 +115,10 @@ const VOICE_IDLE_MS = 15_000;
 // Room reserved under the sprite for the talk-back caption.
 const VOICE_CAPTION_SPACE = 44;
 const MONSTER_BOTTOM_GAP = 16 + VOICE_CAPTION_SPACE;
+// Welcome-back "tiny dare" chip: how long it stays, and how far the monster
+// lifts (a transform, not layout) to make room for it under the caption.
+const DARE_CHIP_MS = 20_000;
+const DARE_CHIP_LIFT = 38;
 
 const HABITAT_IMAGES = {
   nilly: require("../../assets/images/nilly-habitat.jpg"),
@@ -942,6 +948,18 @@ export default function HomeScreen() {
 
   const tasks = useTasksStore((s) => s.tasks);
   const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
+  // Raw state references (never derived arrays) for the welcome-back dare.
+  const dailyRoll = useTasksStore((s) => s.dailyRoll);
+  const taskProgress = useTasksStore((s) => s.taskProgress);
+
+  // Welcome-back: set by the root layout when the active monster's last
+  // session was 4+ hours ago (cold start or foreground return). Consumed here
+  // so the hello happens once per return. In-memory only.
+  const pendingWelcome = useSessionStore((s) => s.pendingWelcome);
+  const consumeWelcome = useSessionStore((s) => s.consumeWelcome);
+  const [dare, setDare] = useState<PresetTask | null>(null);
+  const dareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dareLiftAnim = useRef(new Animated.Value(0)).current;
 
   const [panelHeight, setPanelHeight] = useState(0);
   const insets = useSafeAreaInsets();
@@ -1087,6 +1105,67 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, [voiceLine, playerHydrated, monster, mood, evolutionStage]);
 
+  // ── Welcome-back ───────────────────────────────────────────────────────────
+  const dismissDare = () => {
+    if (dareTimerRef.current) {
+      clearTimeout(dareTimerRef.current);
+      dareTimerRef.current = null;
+    }
+    setDare(null);
+  };
+
+  useEffect(() => {
+    Animated.timing(dareLiftAnim, {
+      toValue: dare ? -DARE_CHIP_LIFT : 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [dare, dareLiftAnim]);
+
+  useEffect(
+    () => () => {
+      if (dareTimerRef.current) clearTimeout(dareTimerRef.current);
+    },
+    [],
+  );
+
+  // Show the hello exactly once per return: perk-up, burst, a welcome line,
+  // and — if today's roll has an untouched task — the tiny dare chip. Store
+  // reads only; consumeWelcome is the in-memory flag flip.
+  const welcomeHandledRef = useRef(false);
+  useEffect(() => {
+    if (!pendingWelcome) {
+      welcomeHandledRef.current = false;
+      return;
+    }
+    // The ref guards Strict Mode's double effect run in development.
+    if (!hydrated || welcomeHandledRef.current) return;
+    welcomeHandledRef.current = true;
+    consumeWelcome();
+    monsterRef.current?.careMoment("welcome");
+    addBurst("welcome");
+    speak("welcome");
+    const task = pickTinyDare(dailyRoll, taskProgress);
+    if (!task) return;
+    if (dareTimerRef.current) clearTimeout(dareTimerRef.current);
+    setDare(task);
+    dareTimerRef.current = setTimeout(() => {
+      dareTimerRef.current = null;
+      setDare(null);
+    }, DARE_CHIP_MS);
+    // Intentionally keyed on the flag alone: the helpers close over the
+    // current monster/mood, and pendingWelcome flips false synchronously on
+    // the first run, so a re-run cannot double the hello.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingWelcome, hydrated]);
+
+  const handleDarePress = () => {
+    // Navigation only. No task progress, no points, no writes of any kind.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    dismissDare();
+    router.navigate("/(tabs)/explore");
+  };
+
   // ── Stat panel toggle ───────────────────────────────────────────────────────
   const handleStatPanelToggle = () => {
     // Persisted write — same pre-hydration clobber guard as pet taps.
@@ -1152,6 +1231,7 @@ export default function HomeScreen() {
   // the bounce, haptic, and heart: a capped pet silently doing nothing
   // reads as "broken", worst of all on a sad monster being comforted.
   const petMonster = () => {
+    dismissDare();
     const withinDailyAllowance = recordTapReaction();
     playTapReaction(withinDailyAllowance);
     // Everything from here is presentation, after the write above.
@@ -1194,6 +1274,7 @@ export default function HomeScreen() {
     // Look the emoji up before the consume: the last unit leaves the bag.
     const emoji = owned[itemId]?.item.emoji;
     if (!executeFeed(itemId, monster)) return;
+    dismissDare();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     monsterRef.current?.careMoment("feed", emoji);
     addBurst("feed");
@@ -1205,6 +1286,7 @@ export default function HomeScreen() {
     if (!hydrated) return;
     const emoji = owned[itemId]?.item.emoji;
     if (!executePlay(itemId, monster)) return;
+    dismissDare();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     monsterRef.current?.careMoment("play", emoji);
     addBurst("play");
@@ -1301,6 +1383,7 @@ export default function HomeScreen() {
         accessibilityLabel={`Care for ${displayName}`}
         onPress={handleMonsterPress}
         onLongPress={handleMonsterHold}
+        lift={dareLiftAnim}
         style={[
           styles.monsterImageWrapper,
           panelHeight > 0 && { bottom: panelHeight + MONSTER_BOTTOM_GAP },
@@ -1308,30 +1391,55 @@ export default function HomeScreen() {
       />
 
       {/* ── Talk-back caption, tucked between the sprite and the panel ── */}
-      {voiceLine ? (
+      {voiceLine || dare ? (
         <View
-          pointerEvents="none"
+          pointerEvents="box-none"
           style={[
             styles.voiceCaptionWrap,
             panelHeight > 0 && { bottom: panelHeight + 10 },
           ]}
         >
-          <View
-            style={[
-              styles.voiceBubble,
-              {
-                backgroundColor: theme.cardBg + "E6",
-                borderColor: theme.cardBorder,
-              },
-            ]}
-          >
-            <ThemedText
-              style={[styles.voiceText, { color: theme.text }]}
-              accessibilityLiveRegion="polite"
+          {voiceLine ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.voiceBubble,
+                {
+                  backgroundColor: theme.cardBg + "E6",
+                  borderColor: theme.cardBorder,
+                },
+              ]}
             >
-              {voiceLine}
-            </ThemedText>
-          </View>
+              <ThemedText
+                style={[styles.voiceText, { color: theme.text }]}
+                accessibilityLiveRegion="polite"
+              >
+                {voiceLine}
+              </ThemedText>
+            </View>
+          ) : null}
+          {/* Welcome-back tiny dare: an offer, never a demand. Tapping only
+              opens the tasks tab. */}
+          {dare && !menuOpen ? (
+            <Pressable
+              onPress={handleDarePress}
+              style={({ pressed }) => [
+                styles.dareChip,
+                {
+                  backgroundColor: theme.accent + "26",
+                  borderColor: theme.accent + "66",
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Tiny dare: ${dare.label}, ${dare.pointValue} points, only if you feel like it`}
+            >
+              <ThemedText style={[styles.dareText, { color: theme.text }]}>
+                Tiny dare: {dare.label} · {dare.pointValue} pts — only if you
+                feel like it
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -1645,6 +1753,20 @@ const styles = StyleSheet.create({
   voiceText: {
     fontSize: 14,
     lineHeight: 18,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  dareChip: {
+    marginTop: 6,
+    maxWidth: 320,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  dareText: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "600",
     textAlign: "center",
   },

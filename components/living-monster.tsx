@@ -53,6 +53,11 @@ type Props = {
   onLongPress?: () => void;
   /** Positions the monster on screen; the Pressable owns layout. */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Extra vertical offset driven by the parent (native-driver transform, so
+   * Home can make room below the sprite without a layout jump).
+   */
+  lift?: Animated.Value;
   ref?: Ref<LivingMonsterHandle>;
 };
 
@@ -107,6 +112,7 @@ export function LivingMonster({
   onPress,
   onLongPress,
   style,
+  lift,
   ref,
 }: Props) {
   // OS "reduce motion": every continuous loop below stays parked. Short,
@@ -694,13 +700,13 @@ export function LivingMonster({
   // Ground shadow follows the body's height: higher off the floor means a
   // smaller, fainter ellipse. Bob and hop both lift the body, so they share
   // one driver.
-  const lift = Animated.add(bobAnim, Animated.add(hopAnim, careHopAnim));
-  const shadowScale = lift.interpolate({
+  const bodyLift = Animated.add(bobAnim, Animated.add(hopAnim, careHopAnim));
+  const shadowScale = bodyLift.interpolate({
     inputRange: [-PERK_HEIGHT - 12, 0, 6],
     outputRange: [0.72, 1, 1.05],
     extrapolate: "clamp",
   });
-  const shadowOpacity = lift.interpolate({
+  const shadowOpacity = bodyLift.interpolate({
     inputRange: [-PERK_HEIGHT - 12, 0, 6],
     outputRange: [0.14, 0.3, 0.34],
     extrapolate: "clamp",
@@ -752,74 +758,87 @@ export function LivingMonster({
       accessibilityHint="Tap for the care menu. Press and hold to pet."
     >
       <Animated.View
-        pointerEvents="none"
-        testID="monster-ground-shadow"
-        style={{
-          position: "absolute",
-          bottom: size * SHADOW_BOTTOM,
-          width: size * SHADOW_WIDTH,
-          height: size * SHADOW_HEIGHT,
-          borderRadius: 999,
-          backgroundColor: "#000",
-          opacity: shadowOpacity,
-          transform: [{ scaleX: shadowScale }, { scaleY: shadowScale }],
-        }}
-      />
-      <Animated.View
         style={[
-          { opacity: wrapperOpacity },
-          shadowStyle,
-          {
-            transform: [
-              { translateY: bobAnim },
-              { translateY: hopAnim },
-              { translateY: careHopAnim },
-              { scale: breathAnim },
-              { scale: scaleAnim },
-              { scale: evoScaleAnim },
-              { scale: tapScaleAnim },
-              { scale: leanScale },
-              { scaleX: squishX },
-              { scaleY: squishY },
-              { rotateZ: wiggleRot },
-              { rotateZ: sickWobbleRot },
-              { rotateZ: glanceRot },
-              { rotateZ: leanRot },
-            ],
-          },
+          styles.liftWrap,
+          lift ? { transform: [{ translateY: lift }] } : null,
         ]}
       >
-        <View style={{ width: size, height: size, aspectRatio: 1 }}>
-          <Image
-            source={monsterSource}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="contain"
-          />
-          {wearStage && (
-            <AccessoryLayer
-              monster={monster}
-              stage={wearStage}
-              equipped={equipped}
-              size={size}
-            />
-          )}
-        </View>
-      </Animated.View>
-      {prop ? (
-        <Animated.Text
+        <Animated.View
           pointerEvents="none"
-          testID={`care-prop-${prop.kind}`}
+          testID="monster-ground-shadow"
           style={{
             position: "absolute",
-            bottom: size * (prop.kind === "feed" ? 0.42 : 0.06),
-            fontSize: Math.round(size * 0.2),
-            opacity: propOpacity,
-            transform: [{ translateY: propY }, { scale: propScale }],
+            bottom: size * SHADOW_BOTTOM,
+            width: size * SHADOW_WIDTH,
+            height: size * SHADOW_HEIGHT,
+            borderRadius: 999,
+            backgroundColor: "#000",
+            opacity: shadowOpacity,
+            transform: [{ scaleX: shadowScale }, { scaleY: shadowScale }],
           }}
+        />
+        <Animated.View
+          style={[
+            { opacity: wrapperOpacity },
+            shadowStyle,
+            {
+              transform: [
+                { translateY: bobAnim },
+                { translateY: hopAnim },
+                { translateY: careHopAnim },
+                { scale: breathAnim },
+                { scale: scaleAnim },
+                { scale: evoScaleAnim },
+                { scale: tapScaleAnim },
+                { scale: leanScale },
+                { scaleX: squishX },
+                { scaleY: squishY },
+                { rotateZ: wiggleRot },
+                { rotateZ: sickWobbleRot },
+                { rotateZ: glanceRot },
+                { rotateZ: leanRot },
+              ],
+            },
+          ]}
         >
-          {prop.char}
-        </Animated.Text>
-      ) : null}
+          <View style={{ width: size, height: size, aspectRatio: 1 }}>
+            <Image
+              source={monsterSource}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="contain"
+            />
+            {wearStage && (
+              <AccessoryLayer
+                monster={monster}
+                stage={wearStage}
+                equipped={equipped}
+                size={size}
+              />
+            )}
+          </View>
+        </Animated.View>
+        {prop ? (
+          <Animated.Text
+            pointerEvents="none"
+            testID={`care-prop-${prop.kind}`}
+            style={{
+              position: "absolute",
+              bottom: size * (prop.kind === "feed" ? 0.42 : 0.06),
+              fontSize: Math.round(size * 0.2),
+              opacity: propOpacity,
+              transform: [{ translateY: propY }, { scale: propScale }],
+            }}
+          >
+            {prop.char}
+          </Animated.Text>
+        ) : null}
+      </Animated.View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  liftWrap: {
+    alignItems: "center",
+  },
+});
