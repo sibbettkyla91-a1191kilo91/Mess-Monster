@@ -1118,17 +1118,31 @@ export default function HomeScreen() {
     setPicker(null);
   };
 
-  // ── Pet from the care menu — exact previous tap mechanic ───────────────────
-  const handlePetTap = () => {
-    if (!hydrated) return;
-    // The daily allowance caps only the happiness grant (anti-farming) —
-    // never the reaction. The monster always acknowledges affection with
-    // the bounce, haptic, and heart: a capped tap silently doing nothing
-    // reads as "broken", worst of all on a sad monster being comforted.
+  // ── Pet — the one pet mechanic, reached two ways ───────────────────────────
+  // The daily allowance caps only the happiness grant (anti-farming) —
+  // never the reaction. The monster always acknowledges affection with
+  // the bounce, haptic, and heart: a capped pet silently doing nothing
+  // reads as "broken", worst of all on a sad monster being comforted.
+  const petMonster = () => {
     const withinDailyAllowance = recordTapReaction();
     playTapReaction(withinDailyAllowance);
     speak("pet");
+  };
+
+  // From the care menu's Pet button.
+  const handlePetTap = () => {
+    if (!hydrated) return;
+    petMonster();
     closeMenu();
+  };
+
+  // From pressing and holding the monster itself. One hold = one pet; the
+  // Pressable never also fires onPress for the same touch, so the menu
+  // stays closed. An open menu just closes.
+  const handleMonsterHold = () => {
+    if (!hydrated) return;
+    if (menuOpen) closeMenu();
+    petMonster();
   };
 
   const handleAskFeed = () => {
@@ -1245,6 +1259,7 @@ export default function HomeScreen() {
         accent={theme.accent}
         accessibilityLabel={`Care for ${displayName}`}
         onPress={handleMonsterPress}
+        onLongPress={handleMonsterHold}
         style={[
           styles.monsterImageWrapper,
           panelHeight > 0 && { bottom: panelHeight + MONSTER_BOTTOM_GAP },

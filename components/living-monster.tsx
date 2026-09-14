@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics";
 import { Ref, useEffect, useImperativeHandle, useRef } from "react";
 import {
   Animated,
@@ -37,11 +38,30 @@ type Props = {
   /** Glow colour for the teen/adult shadow. */
   accent: string;
   accessibilityLabel: string;
+  /** Short tap. */
   onPress: () => void;
+  /** Press-and-hold, fired once per hold after HOLD_DELAY_MS. */
+  onLongPress?: () => void;
   /** Positions the monster on screen; the Pressable owns layout. */
   style?: StyleProp<ViewStyle>;
   ref?: Ref<LivingMonsterHandle>;
 };
+
+// Touch feel. A tap acknowledges instantly with a squish; a hold leans the
+// monster in and, once it counts as a hold, ticks softly under the finger.
+export const HOLD_DELAY_MS = 350;
+const HOLD_TICK_MS = 180;
+const HOLD_TICK_MAX_MS = 1400;
+
+/**
+ * Selection feedback is the lightest tick the OS offers. Some test mocks of
+ * expo-haptics only provide impactAsync, so check before calling.
+ */
+function hapticTick() {
+  if (typeof Haptics.selectionAsync === "function") {
+    void Haptics.selectionAsync();
+  }
+}
 
 // Idle-life timing. Everything here is presentation only: transforms and
 // opacity on the native driver, no layout, no store writes.
@@ -76,12 +96,84 @@ export function LivingMonster({
   accent,
   accessibilityLabel,
   onPress,
+  onLongPress,
   style,
   ref,
 }: Props) {
   // OS "reduce motion": every continuous loop below stays parked. Short,
   // player-triggered reactions (the tap bounce) still run.
   const reduceMotion = useReduceMotion();
+
+  // ── Touch: squish on tap, lean while held ──────────────────────────────
+  const squishAnim = useRef(new Animated.Value(0)).current;
+  const leanAnim = useRef(new Animated.Value(0)).current;
+  const holdTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopHoldTicks = () => {
+    if (holdTickRef.current) {
+      clearInterval(holdTickRef.current);
+      holdTickRef.current = null;
+    }
+    if (holdStopRef.current) {
+      clearTimeout(holdStopRef.current);
+      holdStopRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopHoldTicks();
+      squishAnim.setValue(0);
+      leanAnim.setValue(0);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePress = () => {
+    hapticTick();
+    Animated.sequence([
+      Animated.timing(squishAnim, {
+        toValue: 1,
+        duration: 70,
+        useNativeDriver: true,
+      }),
+      Animated.timing(squishAnim, {
+        toValue: 0,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  const handlePressIn = () => {
+    Animated.timing(leanAnim, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    stopHoldTicks();
+    Animated.spring(leanAnim, {
+      toValue: 0,
+      tension: 80,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleLongPress = () => {
+    // Soft ticks under the finger for as long as the hold lasts (bounded),
+    // purely for feel. The pet itself fires exactly once, right here.
+    stopHoldTicks();
+    hapticTick();
+    holdTickRef.current = setInterval(hapticTick, HOLD_TICK_MS);
+    holdStopRef.current = setTimeout(stopHoldTicks, HOLD_TICK_MAX_MS);
+    onLongPress?.();
+  };
 
   // ── Tap bounce ─────────────────────────────────────────────────────────
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
@@ -442,6 +534,22 @@ export function LivingMonster({
     inputRange: [-1, 0, 1],
     outputRange: [`-${GLANCE_DEG}deg`, "0deg", `${GLANCE_DEG}deg`],
   });
+  const squishX = squishAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.05],
+  });
+  const squishY = squishAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.93],
+  });
+  const leanRot = leanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "-4deg"],
+  });
+  const leanScale = leanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.04],
+  });
 
   // Ground shadow follows the body's height: higher off the floor means a
   // smaller, fainter ellipse. Bob and hop both lift the body, so they share
@@ -493,10 +601,15 @@ export function LivingMonster({
   // render offscreen.
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onLongPress={handleLongPress}
+      delayLongPress={HOLD_DELAY_MS}
       style={style}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint="Tap for the care menu. Press and hold to pet."
     >
       <Animated.View
         pointerEvents="none"
@@ -524,9 +637,13 @@ export function LivingMonster({
               { scale: scaleAnim },
               { scale: evoScaleAnim },
               { scale: tapScaleAnim },
+              { scale: leanScale },
+              { scaleX: squishX },
+              { scaleY: squishY },
               { rotateZ: wiggleRot },
               { rotateZ: sickWobbleRot },
               { rotateZ: glanceRot },
+              { rotateZ: leanRot },
             ],
           },
         ]}
