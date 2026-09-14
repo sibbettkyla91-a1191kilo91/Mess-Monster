@@ -43,7 +43,7 @@ const STAGE_LABELS: Record<EvolutionStage, string> = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HABITAT_WIDTH = SCREEN_WIDTH;
-const IMAGE_SIZE = Math.round(HABITAT_WIDTH * 0.64);
+const IMAGE_SIZE = Math.round(HABITAT_WIDTH * 0.72);
 
 // Visible sliver of the bottom panel when collapsed: the panel's top padding
 // (16) plus the toggle handle row (20), with a hair of the gap below so the

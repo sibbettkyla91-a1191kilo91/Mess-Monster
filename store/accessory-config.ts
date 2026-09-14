@@ -102,10 +102,10 @@ const NILLY_ANCHORS: Record<AccessoryStage, Record<AccessorySlot, SlotAnchor>> =
       neck: { x: 0.5, y: 0.56, scale: 0.38, rotation: 0, zIndex: 1 },
     },
     adult: {
-      // Canonical adult art is a tall full-body crop (horns, tuft, sunflower).
-      head: { x: 0.5, y: 0.2, scale: 0.34, rotation: 0, zIndex: 2 },
-      face: { x: 0.5, y: 0.38, scale: 0.28, rotation: 0, zIndex: 3 },
-      neck: { x: 0.5, y: 0.56, scale: 0.34, rotation: 0, zIndex: 1 },
+      // New adult bust: horns at the top, crystal in the left hand.
+      head: { x: 0.5, y: 0.14, scale: 0.3, rotation: 0, zIndex: 2 },
+      face: { x: 0.5, y: 0.4, scale: 0.24, rotation: 0, zIndex: 3 },
+      neck: { x: 0.5, y: 0.62, scale: 0.3, rotation: 0, zIndex: 1 },
     },
   };
 
