@@ -162,7 +162,8 @@ describe("Home talk-back caption", () => {
     expect(usePetStore.getState()).toBe(pet);
     expect(usePlayerStore.getState()).toBe(player);
     expect(useStoreStore.getState()).toBe(store);
-    expect(screen.getByText("Happy")).toBeTruthy();
+    // Nilly's one-word label for the happy band.
+    expect(screen.getByText("Easy")).toBeTruthy();
   });
 
   it("dropped the old verdict sentences from the bottom panel", async () => {
@@ -175,7 +176,8 @@ describe("Home talk-back caption", () => {
       usePetStore.setState({ health: 25, happiness: 25 }); // sad band
     });
 
-    expect(screen.getByText("Sad")).toBeTruthy();
+    // Nilly's one-word label for the sad band: still just a word, no verdict.
+    expect(screen.getByText("Quiet")).toBeTruthy();
     expect(screen.queryByText(/misses seeing you clean/)).toBeNull();
     expect(screen.queryByText(/neglect/i)).toBeNull();
     expect(screen.queryByText(/mess grows/)).toBeNull();
