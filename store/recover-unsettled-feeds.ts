@@ -11,9 +11,14 @@ import { usePlayerStore } from "./use-player-store";
 /**
  * Feed writes two persisted stores: the snack leaves the bag (store) and
  * that monster's health/happiness go up (pet). Intent + receipts recover
- * a crash between those writes. Stats are applied first so a crash after
- * the bump still leaves the player with the care; recovery then consumes
- * the snack. Repeated recovery is a no-op.
+ * a crash between those writes. itemId and monsterId are written onto both
+ * store and pet receipts from the first write so a lost unsettled list can
+ * still consume. Stats are applied first so a crash after the bump still
+ * leaves the player with the care; recovery then consumes the snack.
+ *
+ * One successful Feed = one consume + one +8/+8. If consume cannot finish
+ * because the item is unknown, the feed is still settled so stats cannot
+ * apply a second time. Repeated recovery is a no-op.
  */
 
 function storesHydrated(): boolean {
@@ -27,46 +32,53 @@ function storesHydrated(): boolean {
 let feedInFlight = false;
 
 function applyOneFeed(feed: UnsettledFeed): void {
-  useStoreStore.getState().beginFeed(feed);
-  usePetStore.getState().applyFeed(feed.id, feed.monsterId);
-  useStoreStore.getState().consumeFeed(feed.id, feed.itemId, feed.monsterId);
-  useStoreStore.getState().clearUnsettledFeed(feed.id);
+  const storeReceipt = useStoreStore.getState().appliedFeeds[feed.id];
+  const petReceipt = usePetStore.getState().appliedFeeds[feed.id];
+  const itemId = feed.itemId || storeReceipt?.itemId || petReceipt?.itemId || "";
+  const monsterId =
+    feed.monsterId || storeReceipt?.monsterId || petReceipt?.monsterId;
+  if (!monsterId) return;
+
+  const resolved: UnsettledFeed = { id: feed.id, itemId, monsterId };
+  useStoreStore.getState().beginFeed(resolved);
+  // Unknown item: never grant +8/+8. Settle consume so this feed cannot replay.
+  if (itemId) {
+    usePetStore.getState().applyFeed(resolved.id, monsterId, itemId);
+    useStoreStore.getState().consumeFeed(resolved.id, itemId, monsterId);
+  } else {
+    useStoreStore.getState().consumeFeed(resolved.id, "", monsterId);
+  }
+  useStoreStore.getState().clearUnsettledFeed(resolved.id);
 }
 
 function feedsToRecover(): UnsettledFeed[] {
   const store = useStoreStore.getState();
   const pet = usePetStore.getState();
-  const byId = new Map<string, UnsettledFeed>();
+  const ids = new Set<string>();
 
-  for (const feed of store.unsettledFeeds ?? []) {
-    byId.set(feed.id, feed);
+  for (const feed of store.unsettledFeeds ?? []) ids.add(feed.id);
+  for (const id of Object.keys(store.appliedFeeds ?? {})) ids.add(id);
+  for (const id of Object.keys(pet.appliedFeeds ?? {})) ids.add(id);
+
+  const unsettledById = new Map(
+    (store.unsettledFeeds ?? []).map((feed) => [feed.id, feed]),
+  );
+
+  const out: UnsettledFeed[] = [];
+  for (const id of ids) {
+    const intent = unsettledById.get(id);
+    const storeReceipt = store.appliedFeeds?.[id];
+    const petReceipt = pet.appliedFeeds?.[id];
+    if (storeReceipt?.consumed && petReceipt?.fed && !intent) continue;
+
+    const itemId = intent?.itemId || storeReceipt?.itemId || petReceipt?.itemId;
+    const monsterId =
+      intent?.monsterId || storeReceipt?.monsterId || petReceipt?.monsterId;
+    if (!monsterId) continue;
+
+    out.push({ id, itemId: itemId ?? "", monsterId });
   }
-
-  for (const [id, receipt] of Object.entries(store.appliedFeeds ?? {})) {
-    const fed = !!pet.appliedFeeds[id]?.fed;
-    if (receipt.consumed && fed) continue;
-    if (byId.has(id)) continue;
-    byId.set(id, {
-      id,
-      itemId: receipt.itemId,
-      monsterId: receipt.monsterId,
-    });
-  }
-
-  for (const [id, receipt] of Object.entries(pet.appliedFeeds ?? {})) {
-    const consumed = !!store.appliedFeeds[id]?.consumed;
-    if (receipt.fed && consumed) continue;
-    if (byId.has(id)) continue;
-    const itemId = store.appliedFeeds[id]?.itemId;
-    if (!itemId) continue;
-    byId.set(id, {
-      id,
-      itemId,
-      monsterId: receipt.monsterId,
-    });
-  }
-
-  return [...byId.values()];
+  return out;
 }
 
 export function recoverUnsettledFeeds(): void {

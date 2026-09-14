@@ -41,8 +41,8 @@ export type StoreGrantReceipt = {
 
 export type StoreFeedReceipt = {
   consumed?: true;
-  itemId: string;
-  monsterId: MonsterId;
+  itemId?: string;
+  monsterId?: MonsterId;
 };
 
 export interface OwnedEntry {
@@ -456,29 +456,49 @@ export const useStoreStore = create<StoreStore>()(
       },
 
       beginFeed: (feed) => {
-        set((s) => ({
-          unsettledFeeds: upsertUnsettledFeed(s.unsettledFeeds, feed),
-        }));
+        set((s) => {
+          const receipts = s.appliedFeeds ?? {};
+          const existing = receipts[feed.id];
+          const itemId = feed.itemId || existing?.itemId;
+          const monsterId = feed.monsterId || existing?.monsterId;
+          return {
+            unsettledFeeds: upsertUnsettledFeed(s.unsettledFeeds, feed),
+            appliedFeeds: {
+              ...receipts,
+              [feed.id]: {
+                ...existing,
+                ...(itemId ? { itemId } : {}),
+                ...(monsterId ? { monsterId } : {}),
+              },
+            },
+          };
+        });
       },
 
       consumeFeed: (feedId, itemId, monster) => {
         set((s) => {
           const receipts = s.appliedFeeds ?? {};
           if (receipts[feedId]?.consumed) return {};
+          const resolvedItemId = itemId || receipts[feedId]?.itemId || "";
           const bag = s.byMonster[monster].owned;
-          const entry = bag[itemId];
+          const entry = resolvedItemId ? bag[resolvedItemId] : undefined;
           const nextOwned =
             entry && entry.quantity > 0
               ? {
                   ...bag,
-                  [itemId]: { ...entry, quantity: entry.quantity - 1 },
+                  [resolvedItemId]: { ...entry, quantity: entry.quantity - 1 },
                 }
               : bag;
           return {
             ...writeInventory(s, monster, { owned: nextOwned }),
             appliedFeeds: {
               ...receipts,
-              [feedId]: { consumed: true, itemId, monsterId: monster },
+              [feedId]: {
+                ...receipts[feedId],
+                consumed: true,
+                ...(resolvedItemId ? { itemId: resolvedItemId } : {}),
+                monsterId: monster,
+              },
             },
           };
         });

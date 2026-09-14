@@ -273,6 +273,7 @@ export type PetPurchaseReceipt = {
 
 export type PetFeedReceipt = {
   fed?: true;
+  itemId?: string;
   monsterId: MonsterId;
 };
 
@@ -286,7 +287,7 @@ interface PetStore extends PetState {
   care: () => void;
   addHappiness: (amount: number) => void;
   applyDecay: () => void;
-  applyFeed: (feedId: string, monster: MonsterId) => void;
+  applyFeed: (feedId: string, monster: MonsterId, itemId: string) => void;
   applyPlay: (monster: MonsterId) => void;
   trackEarned: (amount: number, category?: TaskCategory) => void;
   recheckEvolution: () => void; // re-run evolution check (e.g., after premium unlock)
@@ -442,7 +443,7 @@ export const usePetStore = create<PetStore>()(
         );
       },
 
-      applyFeed: (feedId, monster) => {
+      applyFeed: (feedId, monster, itemId) => {
         let applied = false;
         set((s) => {
           if (s.appliedFeeds[feedId]?.fed) return {};
@@ -456,7 +457,7 @@ export const usePetStore = create<PetStore>()(
             }),
             appliedFeeds: {
               ...s.appliedFeeds,
-              [feedId]: { fed: true, monsterId: monster },
+              [feedId]: { fed: true, itemId, monsterId: monster },
             },
           };
         });
