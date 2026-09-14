@@ -183,4 +183,53 @@ describe("Pet cap", () => {
     expect(usePetStore.getState().byMonster.luna.happiness).toBe(53);
     expect(usePetStore.getState().byMonster.nilly.happiness).toBe(65);
   });
+
+  it("resets at local midnight, not before, and only for the monster being petted", () => {
+    // 23:59:50 local time; the cap is per LOCAL calendar day.
+    const lateNight = new Date(2026, 8, 14, 23, 59, 50);
+    jest.useFakeTimers({ now: lateNight });
+    try {
+      for (let i = 0; i < 5; i++) {
+        expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+      }
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(false);
+      expect(usePlayerStore.getState().tapReactions.nilly).toEqual({
+        date: "2026-09-14",
+        count: 5,
+      });
+
+      // Nine seconds later it is still the 14th: still capped.
+      jest.setSystemTime(new Date(2026, 8, 14, 23, 59, 59));
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(false);
+
+      // Past midnight: a fresh allowance for Nilly alone.
+      jest.setSystemTime(new Date(2026, 8, 15, 0, 0, 1));
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+      expect(usePlayerStore.getState().tapReactions.nilly).toEqual({
+        date: "2026-09-15",
+        count: 1,
+      });
+      expect(usePlayerStore.getState().tapReactions.luna).toEqual({
+        date: "",
+        count: 0,
+      });
+      expect(usePlayerStore.getState().tapReactionCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("is not consumed by Feed or Play", () => {
+    useStoreStore.getState().buyItem(cookie, "nilly");
+    useStoreStore.getState().buyItem(yarn, "nilly");
+    const before = usePlayerStore.getState().tapReactions.nilly;
+
+    expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    expect(executePlay(yarn.id, "nilly")).toBe(true);
+
+    expect(usePlayerStore.getState().tapReactions.nilly).toEqual(before);
+    for (let i = 0; i < 5; i++) {
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+    }
+  });
 });
