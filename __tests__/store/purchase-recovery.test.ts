@@ -251,6 +251,71 @@ describe("old autoConsume food mid-recovery", () => {
   });
 });
 
+describe("affordability is enforced inside the transaction", () => {
+  it("refuses a purchase the live balance cannot cover instead of granting it for free", () => {
+    usePlayerStore.setState({ totalPoints: plant.price - 1, spentPoints: 0 });
+
+    expect(executePaidShopPurchase(plant)).toBe(false);
+
+    expect(useStoreStore.getState().owned[plant.id]).toBeUndefined();
+    expect(usePlayerStore.getState().spentPoints).toBe(0);
+    expect(usePlayerStore.getState().appliedPurchases).toEqual({});
+    expect(useStoreStore.getState().appliedPurchases).toEqual({});
+    expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
+  });
+
+  it("lets the last affordable purchase through and blocks the one after it", () => {
+    usePlayerStore.setState({
+      totalPoints: cookie.price * 2 - 1,
+      spentPoints: 0,
+    });
+
+    expect(executePaidShopPurchase(cookie)).toBe(true);
+    expect(executePaidShopPurchase(cookie)).toBe(false);
+
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(1);
+    expect(usePlayerStore.getState().spentPoints).toBe(cookie.price);
+  });
+});
+
+describe("purchase ids", () => {
+  it("gives two same-millisecond purchases distinct ids so both actually land", () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    try {
+      expect(executePaidShopPurchase(cookie)).toBe(true);
+      expect(executePaidShopPurchase(cookie)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(useStoreStore.getState().owned[cookie.id].quantity).toBe(2);
+    expect(usePlayerStore.getState().spentPoints).toBe(cookie.price * 2);
+    expect(
+      Object.keys(usePlayerStore.getState().appliedPurchases),
+    ).toHaveLength(2);
+  });
+});
+
+describe("unknown catalog item", () => {
+  it("settles a durable charge for a retired item so recovery does not replay it every launch", () => {
+    usePlayerStore
+      .getState()
+      .chargePurchase("retired-tx", "decor-retired-lamp", 10, false);
+
+    recoverUnsettledPurchases();
+
+    expect(
+      useStoreStore.getState().appliedPurchases["retired-tx"]?.granted,
+    ).toBe(true);
+    expect(useStoreStore.getState().unsettledPurchases).toHaveLength(0);
+    expect(useStoreStore.getState().owned["decor-retired-lamp"]).toBeUndefined();
+
+    const receiptsBefore = useStoreStore.getState().appliedPurchases;
+    recoverUnsettledPurchases();
+    expect(useStoreStore.getState().appliedPurchases).toBe(receiptsBefore);
+  });
+});
+
 describe("hydration gate", () => {
   it("executePaidShopPurchase is a no-op before stores have hydrated", () => {
     const storeHydrated = jest

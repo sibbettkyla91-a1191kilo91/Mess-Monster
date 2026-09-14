@@ -41,6 +41,7 @@ import {
   TaskProgress,
   useTasksStore,
 } from "@/store/use-tasks-store";
+import { reportError } from "@/utils/crash-reporting";
 
 const CATEGORY_EMOJI: Record<TaskCategory, string> = {
   kitchen: "🍳",
@@ -109,8 +110,16 @@ export default function TasksScreen() {
     freeItemName?: string;
   } | null>(null);
   const celebTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraBusyRef = useRef(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const insets = useSafeAreaInsets();
+
+  useEffect(
+    () => () => {
+      if (celebTimerRef.current) clearTimeout(celebTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -160,39 +169,60 @@ export default function TasksScreen() {
   const handleTakePhoto = useCallback(
     async (task: PresetTask) => {
       if (!hydrated) return;
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
+      // One camera at a time: a second tap while it is opening would make
+      // the picker reject, and could otherwise start the time lock twice.
+      if (cameraBusyRef.current) return;
+      cameraBusyRef.current = true;
+      try {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Camera Permission",
+            "Camera access is needed to verify completed tasks. You can still complete without a photo.",
+            [{ text: "OK" }],
+          );
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          quality: 0.5,
+          allowsEditing: false,
+        });
+
+        if (result.canceled) return;
+
+        const photoUri = result.assets[0].uri;
+
+        // Haptic feedback for photo capture
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        // Save photo record
+        addPhoto({ taskId: task.id, photoUri, takenAt: Date.now() });
+
+        // The camera was open for a while. If the task is no longer waiting
+        // on a photo — the day rolled over and the roll reset, or the wait
+        // already started — do not restart or overwrite its time lock.
+        const live = useTasksStore.getState().taskProgress[task.id];
+        if (live?.state !== "pending_photo") return;
+
+        // Move to waiting state (time lock starts)
+        setTaskProgress(task.id, {
+          state: "waiting",
+          hasPhoto: true,
+          photoUri,
+          waitStartedAt: Date.now(),
+        });
+      } catch (error) {
+        reportError(error, { taskId: task.id }, "camera");
         Alert.alert(
-          "Camera Permission",
-          "Camera access is needed to verify completed tasks. You can still complete without a photo.",
+          "Camera",
+          "The camera couldn't open just now. You can try again or finish without a photo.",
           [{ text: "OK" }],
         );
-        return;
+      } finally {
+        cameraBusyRef.current = false;
       }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ["images"],
-        quality: 0.5,
-        allowsEditing: false,
-      });
-
-      if (result.canceled) return;
-
-      const photoUri = result.assets[0].uri;
-
-      // Haptic feedback for photo capture
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // Save photo record
-      addPhoto({ taskId: task.id, photoUri, takenAt: Date.now() });
-
-      // Move to waiting state (time lock starts)
-      setTaskProgress(task.id, {
-        state: "waiting",
-        hasPhoto: true,
-        photoUri,
-        waitStartedAt: Date.now(),
-      });
     },
     [hydrated, addPhoto, setTaskProgress],
   );

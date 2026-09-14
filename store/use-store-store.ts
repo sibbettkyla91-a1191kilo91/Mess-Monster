@@ -1,8 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
 import {
+  ACCESSORY_SLOTS,
   AccessorySlot,
   getAccessoryDef,
   isAccessorySlotLocked,
@@ -10,9 +10,23 @@ import {
 } from "./accessory-config";
 import {
   INVENTORY_SLICE_KEYS,
+  MONSTER_IDS,
   MonsterId,
   resolveMonsterId,
 } from "./monster-id";
+import {
+  arrayOr,
+  booleanOr,
+  countOr,
+  createSafeStorage,
+  finiteNumberOr,
+  guardHydrationStep,
+  isRecord,
+  oneOfOrNull,
+  recordOfRecords,
+  recordOr,
+  safeMigrate,
+} from "./safe-persist";
 import { STORE_ITEMS, StoreItem } from "./store-items";
 import { usePlayerStore } from "./use-player-store";
 
@@ -112,7 +126,11 @@ export function assignLegacyInventoryToSelectedMonster(): void {
 }
 
 function assignLegacyOncePlayerReady(): void {
-  const run = () => assignLegacyInventoryToSelectedMonster();
+  const run = () =>
+    guardHydrationStep(
+      "mm-store-owned",
+      assignLegacyInventoryToSelectedMonster,
+    );
   if (usePlayerStore.persist.hasHydrated()) {
     run();
     return;
@@ -186,6 +204,137 @@ export function migrateStoreState(persistedState: any, version: number): any {
   };
   migrated.legacySharedInventory = version < 4 ? legacy : null;
   return migrated;
+}
+
+/**
+ * One owned entry the shop, bag, and Collection can trust. The item snapshot
+ * is refreshed from the live catalog whenever the id is still sold — the
+ * Collection filters on the snapshot, and a stale one is exactly how the toy
+ * bug happened. Ids the catalog no longer knows keep their snapshot if it
+ * still looks like an item; entries with nothing usable are dropped.
+ */
+function pickOwnedEntry(itemId: string, source: unknown): OwnedEntry | null {
+  const src = recordOr(source);
+  const catalogItem = STORE_ITEMS.find((i) => i.id === itemId);
+  const snapshot = recordOr(src.item);
+  const item =
+    catalogItem ??
+    (typeof snapshot.id === "string" && typeof snapshot.name === "string"
+      ? (snapshot as unknown as StoreItem)
+      : null);
+  if (!item) return null;
+  return {
+    item,
+    quantity: countOr(src.quantity, 0),
+    purchasedAt: finiteNumberOr(src.purchasedAt, Date.now()),
+  };
+}
+
+function sanitizeInventory(source: unknown): InventorySlice {
+  const src = recordOr(source);
+  const owned: Record<string, OwnedEntry> = {};
+  for (const [itemId, entry] of Object.entries(recordOr(src.owned))) {
+    const clean = pickOwnedEntry(itemId, entry);
+    if (clean) owned[itemId] = clean;
+  }
+  const has = (itemId: unknown): itemId is string =>
+    typeof itemId === "string" && (owned[itemId]?.quantity ?? 0) > 0;
+
+  const placed: Record<string, true> = {};
+  for (const [itemId, flag] of Object.entries(recordOr(src.placed))) {
+    if (flag && has(itemId)) placed[itemId] = true;
+  }
+  const equipped: EquippedMap = {};
+  for (const [slot, itemId] of Object.entries(recordOr(src.equipped))) {
+    if ((ACCESSORY_SLOTS as string[]).includes(slot) && has(itemId)) {
+      equipped[slot as AccessorySlot] = itemId;
+    }
+  }
+  return { owned, placed, equipped };
+}
+
+function pickUnsettledPurchase(source: unknown): UnsettledPurchase | null {
+  if (!isRecord(source)) return null;
+  if (typeof source.id !== "string" || typeof source.itemId !== "string") {
+    return null;
+  }
+  const price = finiteNumberOr(source.price, -1);
+  if (price < 0) return null;
+  const monsterId = oneOfOrNull(source.monsterId, MONSTER_IDS);
+  return {
+    id: source.id,
+    itemId: source.itemId,
+    price,
+    autoConsume: booleanOr(source.autoConsume, false),
+    ...(monsterId ? { monsterId } : {}),
+  };
+}
+
+function pickUnsettledFeed(source: unknown): UnsettledFeed | null {
+  if (!isRecord(source)) return null;
+  if (typeof source.id !== "string" || typeof source.itemId !== "string") {
+    return null;
+  }
+  const monsterId = oneOfOrNull(source.monsterId, MONSTER_IDS);
+  if (!monsterId) return null;
+  return { id: source.id, itemId: source.itemId, monsterId };
+}
+
+type PersistedStoreState = ReturnType<typeof partializeStore>;
+
+function partializeStore(s: StoreStore) {
+  return {
+    byMonster: s.byMonster,
+    legacySharedInventory: s.legacySharedInventory,
+    unsettledPurchases: s.unsettledPurchases,
+    appliedPurchases: s.appliedPurchases,
+    appliedRewardGrants: s.appliedRewardGrants,
+    unsettledFeeds: s.unsettledFeeds,
+    appliedFeeds: s.appliedFeeds,
+  };
+}
+
+/**
+ * Give a persisted inventory record — same version, migrated, or damaged —
+ * a shape the store can run on. Exported for tests.
+ */
+export function sanitizeStorePersisted(
+  persisted: unknown,
+): PersistedStoreState {
+  const src = recordOr(persisted);
+  const by = recordOr(src.byMonster);
+  return {
+    byMonster: {
+      nilly: sanitizeInventory(by.nilly),
+      luna: sanitizeInventory(by.luna),
+    },
+    legacySharedInventory: isRecord(src.legacySharedInventory)
+      ? sanitizeInventory(src.legacySharedInventory)
+      : null,
+    unsettledPurchases: arrayOr(src.unsettledPurchases)
+      .map(pickUnsettledPurchase)
+      .filter((p): p is UnsettledPurchase => p !== null),
+    appliedPurchases: recordOfRecords(
+      src.appliedPurchases,
+    ) as StoreStore["appliedPurchases"],
+    appliedRewardGrants: recordOfRecords(
+      src.appliedRewardGrants,
+    ) as StoreStore["appliedRewardGrants"],
+    unsettledFeeds: arrayOr(src.unsettledFeeds)
+      .map(pickUnsettledFeed)
+      .filter((f): f is UnsettledFeed => f !== null),
+    appliedFeeds: recordOfRecords(
+      src.appliedFeeds,
+    ) as StoreStore["appliedFeeds"],
+  };
+}
+
+function mergeStoreState(persisted: unknown, current: StoreStore): StoreStore {
+  if (persisted === undefined) return current;
+  const clean = sanitizeStorePersisted(persisted);
+  // Flat fields mirror the selected monster; re-flattened after the player
+  // store hydrates (afterHydrate / the selectedMonster subscription).
+  return { ...current, ...clean, ...clean.byMonster[activeMonsterId()] };
 }
 
 function upsertUnsettled(
@@ -366,7 +515,18 @@ export const useStoreStore = create<StoreStore>()(
             return { unsettledPurchases: unsettled };
           }
           const catalogItem = STORE_ITEMS.find((i) => i.id === purchase.itemId);
-          if (!catalogItem) return { unsettledPurchases: unsettled };
+          if (!catalogItem) {
+            // Nothing to hand out for an item the catalog no longer knows.
+            // Still write the receipt so a durable charge for it does not
+            // re-enter recovery on every cold start.
+            return {
+              unsettledPurchases: unsettled,
+              appliedPurchases: {
+                ...receipts,
+                [purchase.id]: { ...receipts[purchase.id], granted: true },
+              },
+            };
+          }
           const bag = s.byMonster[id].owned;
           const existing = bag[purchase.itemId];
           const alreadyOwned =
@@ -514,26 +674,20 @@ export const useStoreStore = create<StoreStore>()(
     }),
     {
       name: "mm-store-owned",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createSafeStorage(),
       version: 4,
-      migrate: migrateStoreState,
-      partialize: (s) => ({
-        byMonster: s.byMonster,
-        legacySharedInventory: s.legacySharedInventory,
-        unsettledPurchases: s.unsettledPurchases,
-        appliedPurchases: s.appliedPurchases,
-        appliedRewardGrants: s.appliedRewardGrants,
-        unsettledFeeds: s.unsettledFeeds,
-        appliedFeeds: s.appliedFeeds,
-      }),
+      migrate: safeMigrate("mm-store-owned", migrateStoreState),
+      partialize: partializeStore,
+      merge: mergeStoreState,
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        const after = () => {
-          assignLegacyOncePlayerReady();
-          const live = useStoreStore.getState();
-          const slice = live.byMonster[activeMonsterId()];
-          useStoreStore.setState({ ...slice });
-        };
+        const after = () =>
+          guardHydrationStep("mm-store-owned", () => {
+            assignLegacyOncePlayerReady();
+            const live = useStoreStore.getState();
+            const slice = live.byMonster[activeMonsterId()];
+            useStoreStore.setState({ ...slice });
+          });
         if (typeof setImmediate !== "undefined") {
           setImmediate(after);
         } else {

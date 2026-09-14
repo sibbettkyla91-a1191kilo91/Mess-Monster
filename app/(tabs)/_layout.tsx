@@ -1,8 +1,9 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import React, { useMemo } from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import { usePlayerStore } from "@/store/use-player-store";
 
@@ -12,6 +13,10 @@ const MIN_STORE_ITEM_COST = 20;
 export default function TabLayout() {
   // Derived primitive selector — re-renders only when the balance changes.
   const availablePoints = usePlayerStore((s) => s.totalPoints - s.spentPoints);
+  const hasCompletedOnboarding = usePlayerStore(
+    (s) => s.hasCompletedOnboarding,
+  );
+  const playerHydrated = useHasHydrated(usePlayerStore);
   const { tabTint } = useMonsterTheme();
 
   // PERFORMANCE: Memoize the badge value to prevent tab options recalculation on every render
@@ -21,6 +26,14 @@ export default function TabLayout() {
   );
 
   // Empty-string badge renders as a coloured dot; undefined hides it entirely
+
+  // A native cold start opens at "/", which resolves to these tabs — the
+  // root layout's `anchor: "onboarding"` only stacks onboarding *underneath*
+  // them. The monster choice is made exactly once, here, so the tabs must
+  // send a player who has not finished onboarding there themselves. The
+  // flag is persisted: decide only from hydrated state, never the default.
+  if (!playerHydrated) return null;
+  if (!hasCompletedOnboarding) return <Redirect href="/onboarding" />;
 
   return (
     <Tabs

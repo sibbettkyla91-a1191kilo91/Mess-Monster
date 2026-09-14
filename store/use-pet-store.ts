@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import { rescheduleDailyNudges } from "@/utils/daily-nudge";
 import { localDayString } from "@/utils/local-day";
 import {
@@ -12,6 +11,18 @@ import {
 } from "./types";
 import { MonsterId, PET_SLICE_KEYS, resolveMonsterId } from "./monster-id";
 import { isPlayerPremium } from "./premium";
+import {
+  arrayOr,
+  createSafeStorage,
+  finiteNumberOr,
+  guardHydrationStep,
+  isRecord,
+  oneOf,
+  oneOfOrNull,
+  recordOfRecords,
+  recordOr,
+  safeMigrate,
+} from "./safe-persist";
 import { usePlayerStore } from "./use-player-store";
 
 const STREAK_MILESTONES = [3, 7, 14, 30];
@@ -93,41 +104,104 @@ export function createDefaultPetSlice(now = Date.now()): PetSlice {
   };
 }
 
-function pickPetSlice(source: Record<string, unknown> | PetSlice): PetSlice {
+const ADULT_VARIANTS: readonly AdultVariant[] = [
+  "base",
+  "kitchen",
+  "livingroom",
+  "bedroom",
+  "bathroom",
+];
+
+/**
+ * Coerce whatever was persisted for one monster into a PetSlice every
+ * selector can trust: finite, clamped stats; known stages and variants;
+ * numeric completion counts. Anything else falls back to a fresh egg's value.
+ */
+function pickPetSlice(source: unknown): PetSlice {
   const now = Date.now();
   const defaults = createDefaultPetSlice(now);
+  const src = recordOr(source);
+  const completions: PetSlice["categoryCompletions"] = {};
+  for (const [category, count] of Object.entries(
+    recordOr(src.categoryCompletions),
+  )) {
+    if (typeof count === "number" && Number.isFinite(count) && count >= 0) {
+      completions[category as TaskCategory] = count;
+    }
+  }
   return {
-    health: typeof source.health === "number" ? source.health : defaults.health,
-    happiness:
-      typeof source.happiness === "number"
-        ? source.happiness
-        : defaults.happiness,
-    lastCaredAt: safeTimestamp(source.lastCaredAt, now),
-    lastSessionAt: safeTimestamp(source.lastSessionAt, now),
-    evolutionStage:
-      typeof source.evolutionStage === "string"
-        ? (source.evolutionStage as EvolutionStage)
-        : defaults.evolutionStage,
-    totalPointsEarned:
-      typeof source.totalPointsEarned === "number"
-        ? source.totalPointsEarned
-        : defaults.totalPointsEarned,
-    adultVariant:
-      typeof source.adultVariant === "string"
-        ? (source.adultVariant as AdultVariant)
-        : defaults.adultVariant,
-    categoryCompletions:
-      source.categoryCompletions &&
-      typeof source.categoryCompletions === "object"
-        ? (source.categoryCompletions as PetSlice["categoryCompletions"])
-        : {},
-    pendingEvolution:
-      (source.pendingEvolution as EvolutionStage | null) ?? null,
-    pendingPremiumGate:
-      (source.pendingPremiumGate as EvolutionStage | null) ?? null,
-    premiumGateShownFor:
-      (source.premiumGateShownFor as EvolutionStage | null) ?? null,
+    health: clamp(finiteNumberOr(src.health, defaults.health)),
+    happiness: clamp(finiteNumberOr(src.happiness, defaults.happiness)),
+    lastCaredAt: safeTimestamp(src.lastCaredAt, now),
+    lastSessionAt: safeTimestamp(src.lastSessionAt, now),
+    evolutionStage: oneOf(src.evolutionStage, STAGE_ORDER, "egg"),
+    totalPointsEarned: Math.max(
+      0,
+      finiteNumberOr(src.totalPointsEarned, defaults.totalPointsEarned),
+    ),
+    adultVariant: oneOf(src.adultVariant, ADULT_VARIANTS, "base"),
+    categoryCompletions: completions,
+    pendingEvolution: oneOfOrNull(src.pendingEvolution, STAGE_ORDER),
+    pendingPremiumGate: oneOfOrNull(src.pendingPremiumGate, STAGE_ORDER),
+    premiumGateShownFor: oneOfOrNull(src.premiumGateShownFor, STAGE_ORDER),
   };
+}
+
+type PersistedPetState = ReturnType<typeof partializePet>;
+
+function partializePet(s: PetStore) {
+  return {
+    byMonster: s.byMonster,
+    legacySharedPet: s.legacySharedPet,
+    claimedStreakMilestones: s.claimedStreakMilestones,
+    pendingMilestoneBanner: s.pendingMilestoneBanner,
+    appliedRewardGrants: s.appliedRewardGrants,
+    appliedPurchases: s.appliedPurchases,
+    appliedFeeds: s.appliedFeeds,
+  };
+}
+
+/**
+ * Give a persisted pet record — same version, migrated, or damaged — a
+ * shape the store can run on. zustand's default merge is a shallow spread,
+ * so a save missing `byMonster.luna` or carrying NaN health would otherwise
+ * reach selectors untouched. Exported for tests.
+ */
+export function sanitizePetPersisted(persisted: unknown): PersistedPetState {
+  const src = recordOr(persisted);
+  const by = recordOr(src.byMonster);
+  const byMonster = {
+    nilly: pickPetSlice(by.nilly),
+    luna: pickPetSlice(by.luna),
+  };
+  const banner = src.pendingMilestoneBanner;
+  return {
+    byMonster,
+    legacySharedPet: isRecord(src.legacySharedPet)
+      ? pickPetSlice(src.legacySharedPet)
+      : null,
+    claimedStreakMilestones: arrayOr(src.claimedStreakMilestones).filter(
+      (m): m is number => typeof m === "number" && Number.isFinite(m),
+    ),
+    pendingMilestoneBanner:
+      typeof banner === "number" && Number.isFinite(banner) ? banner : null,
+    appliedRewardGrants: recordOfRecords(
+      src.appliedRewardGrants,
+    ) as PetStore["appliedRewardGrants"],
+    appliedPurchases: recordOfRecords(
+      src.appliedPurchases,
+    ) as PetStore["appliedPurchases"],
+    appliedFeeds: recordOfRecords(src.appliedFeeds) as PetStore["appliedFeeds"],
+  };
+}
+
+function mergePetState(persisted: unknown, current: PetStore): PetStore {
+  if (persisted === undefined) return current;
+  const clean = sanitizePetPersisted(persisted);
+  // The flat fields mirror the selected monster. The player store may not
+  // have hydrated yet; afterHydrate and the selectedMonster subscription
+  // re-flatten once it has.
+  return { ...current, ...clean, ...clean.byMonster[activeMonsterId()] };
 }
 
 function flattenActive(s: {
@@ -206,10 +280,14 @@ export function assignLegacyPetToSelectedMonster(): void {
 }
 
 function assignLegacyOncePlayerReady(then: () => void): void {
-  const run = () => {
-    assignLegacyPetToSelectedMonster();
-    then();
-  };
+  // Runs on a later tick, outside persist's promise chain: a throw here
+  // would be an uncaught exception on every launch, not a rejected
+  // hydration — guard it all the same.
+  const run = () =>
+    guardHydrationStep("mm-pet", () => {
+      assignLegacyPetToSelectedMonster();
+      then();
+    });
   if (usePlayerStore.persist.hasHydrated()) {
     run();
     return;
@@ -697,57 +775,50 @@ export const usePetStore = create<PetStore>()(
     {
       name: "mm-pet",
       version: 4,
-      migrate: migratePetState,
-      storage: createJSONStorage(() => AsyncStorage),
-      partialize: (s) => ({
-        byMonster: s.byMonster,
-        legacySharedPet: s.legacySharedPet,
-        claimedStreakMilestones: s.claimedStreakMilestones,
-        pendingMilestoneBanner: s.pendingMilestoneBanner,
-        appliedRewardGrants: s.appliedRewardGrants,
-        appliedPurchases: s.appliedPurchases,
-        appliedFeeds: s.appliedFeeds,
-      }),
+      migrate: safeMigrate("mm-pet", migratePetState),
+      storage: createSafeStorage(),
+      partialize: partializePet,
+      merge: mergePetState,
       // PERFORMANCE: Defer decay application to next tick instead of blocking hydration.
       // This unblocks the initial render and defers heavy computation to after the UI is ready.
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const afterHydrate = () => {
-            assignLegacyOncePlayerReady(() => {
-              const live = usePetStore.getState();
-              const now = Date.now();
-              let nextBy = live.byMonster;
-              let repaired = false;
-              for (const monster of ["nilly", "luna"] as MonsterId[]) {
-                const slice = nextBy[monster];
-                const lastCaredAt = safeTimestamp(slice.lastCaredAt, now);
-                if (lastCaredAt !== slice.lastCaredAt) {
-                  nextBy = {
-                    ...nextBy,
-                    [monster]: { ...slice, lastCaredAt },
-                  };
-                  repaired = true;
-                }
+          const afterLegacyAssigned = () => {
+            const live = usePetStore.getState();
+            const now = Date.now();
+            let nextBy = live.byMonster;
+            let repaired = false;
+            for (const monster of ["nilly", "luna"] as MonsterId[]) {
+              const slice = nextBy[monster];
+              const lastCaredAt = safeTimestamp(slice.lastCaredAt, now);
+              if (lastCaredAt !== slice.lastCaredAt) {
+                nextBy = {
+                  ...nextBy,
+                  [monster]: { ...slice, lastCaredAt },
+                };
+                repaired = true;
               }
-              if (repaired) {
-                usePetStore.setState({
-                  byMonster: nextBy,
-                  ...nextBy[activeMonsterId()],
-                });
-              } else {
-                usePetStore.setState({ ...flattenActive(live) });
-              }
-              live.applyDecay();
-              // Re-plan the nudge window from fresh persisted state (days may
-              // have passed since the last session). No-ops without permission.
-              const { monsterName } = usePlayerStore.getState();
-              const caredAt = usePetStore.getState().lastCaredAt;
-              const caredToday =
-                localDayString(new Date(caredAt)) === localDayString();
-              void rescheduleDailyNudges(monsterName, caredToday);
-              recheckPremiumEvolutionOnceHydrated();
-            });
+            }
+            if (repaired) {
+              usePetStore.setState({
+                byMonster: nextBy,
+                ...nextBy[activeMonsterId()],
+              });
+            } else {
+              usePetStore.setState({ ...flattenActive(live) });
+            }
+            live.applyDecay();
+            // Re-plan the nudge window from fresh persisted state (days may
+            // have passed since the last session). No-ops without permission.
+            const { monsterName } = usePlayerStore.getState();
+            const caredAt = usePetStore.getState().lastCaredAt;
+            const caredToday =
+              localDayString(new Date(caredAt)) === localDayString();
+            void rescheduleDailyNudges(monsterName, caredToday);
+            recheckPremiumEvolutionOnceHydrated();
           };
+          const afterHydrate = () =>
+            assignLegacyOncePlayerReady(afterLegacyAssigned);
           // Use setImmediate to schedule decay on the next event loop iteration.
           // This allows React to complete the initial render before we do heavy calculations.
           if (typeof setImmediate !== "undefined") {

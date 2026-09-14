@@ -10,7 +10,7 @@ module.exports = {
     "^.+\\.(ts|tsx)$": ["babel-jest", { presets: ["babel-preset-expo"] }],
   },
   collectCoverageFrom: [
-    "stores/**/*.{ts,tsx}",
+    "store/**/*.{ts,tsx}",
     "utils/**/*.{ts,tsx}",
     "components/**/*.{ts,tsx}",
     "!**/*.d.ts",

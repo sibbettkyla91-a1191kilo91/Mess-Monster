@@ -83,6 +83,49 @@ describe("Feed", () => {
     expect(usePetStore.getState().byMonster.nilly.health).toBe(50);
     expect(usePetStore.getState().byMonster.nilly.happiness).toBe(50);
   });
+
+  it("refuses a second tap once the last unit is gone, with no second +8/+8", () => {
+    useStoreStore.getState().buyItem(cookie);
+    expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    expect(executeFeed(cookie.id, "nilly")).toBe(false);
+
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[cookie.id].quantity).toBe(0);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(
+      50 + FEED_HEALTH_BOOST,
+    );
+    expect(usePetStore.getState().byMonster.nilly.happiness).toBe(
+      50 + FEED_HAPPINESS_BOOST,
+    );
+  });
+
+  it("feeds two snacks in the same millisecond as two separate feeds", () => {
+    useStoreStore.getState().buyItem(cookie);
+    useStoreStore.getState().buyItem(cookie);
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    try {
+      expect(executeFeed(cookie.id, "nilly")).toBe(true);
+      expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[cookie.id].quantity).toBe(0);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(
+      50 + 2 * FEED_HEALTH_BOOST,
+    );
+    expect(Object.keys(usePetStore.getState().appliedFeeds)).toHaveLength(2);
+  });
+
+  it("refuses to feed a toy or an unknown item", () => {
+    useStoreStore.getState().buyItem(yarn);
+    expect(executeFeed(yarn.id, "nilly")).toBe(false);
+    expect(executeFeed("food-not-in-catalog", "nilly")).toBe(false);
+    expect(usePetStore.getState().byMonster.nilly.health).toBe(50);
+    const bag = useStoreStore.getState().byMonster.nilly.owned;
+    expect(bag[yarn.id].quantity).toBe(1);
+  });
 });
 
 describe("Play", () => {
@@ -139,5 +182,54 @@ describe("Pet cap", () => {
     usePetStore.getState().addHappiness(3);
     expect(usePetStore.getState().byMonster.luna.happiness).toBe(53);
     expect(usePetStore.getState().byMonster.nilly.happiness).toBe(65);
+  });
+
+  it("resets at local midnight, not before, and only for the monster being petted", () => {
+    // 23:59:50 local time; the cap is per LOCAL calendar day.
+    const lateNight = new Date(2026, 8, 14, 23, 59, 50);
+    jest.useFakeTimers({ now: lateNight });
+    try {
+      for (let i = 0; i < 5; i++) {
+        expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+      }
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(false);
+      expect(usePlayerStore.getState().tapReactions.nilly).toEqual({
+        date: "2026-09-14",
+        count: 5,
+      });
+
+      // Nine seconds later it is still the 14th: still capped.
+      jest.setSystemTime(new Date(2026, 8, 14, 23, 59, 59));
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(false);
+
+      // Past midnight: a fresh allowance for Nilly alone.
+      jest.setSystemTime(new Date(2026, 8, 15, 0, 0, 1));
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+      expect(usePlayerStore.getState().tapReactions.nilly).toEqual({
+        date: "2026-09-15",
+        count: 1,
+      });
+      expect(usePlayerStore.getState().tapReactions.luna).toEqual({
+        date: "",
+        count: 0,
+      });
+      expect(usePlayerStore.getState().tapReactionCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("is not consumed by Feed or Play", () => {
+    useStoreStore.getState().buyItem(cookie, "nilly");
+    useStoreStore.getState().buyItem(yarn, "nilly");
+    const before = usePlayerStore.getState().tapReactions.nilly;
+
+    expect(executeFeed(cookie.id, "nilly")).toBe(true);
+    expect(executePlay(yarn.id, "nilly")).toBe(true);
+
+    expect(usePlayerStore.getState().tapReactions.nilly).toEqual(before);
+    for (let i = 0; i < 5; i++) {
+      expect(usePlayerStore.getState().recordTapReaction()).toBe(true);
+    }
   });
 });

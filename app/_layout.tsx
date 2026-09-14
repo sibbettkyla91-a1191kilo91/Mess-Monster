@@ -16,10 +16,17 @@ import { useTasksStore } from "@/store/use-tasks-store";
 import { subscribeUnsettledFeedRecovery } from "@/store/recover-unsettled-feeds";
 import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
 import { subscribeUnsettledPurchaseRecovery } from "@/store/recover-unsettled-purchases";
+import {
+  initSessionWelcome,
+  noteReturnFromLastSession,
+} from "@/store/use-session-store";
 import { initCrashReporting, wrapRoot } from "@/utils/crash-reporting";
 import { initNotifications } from "@/utils/daily-nudge";
 
 initCrashReporting();
+// Must subscribe before the pet store can finish hydrating: it snapshots the
+// persisted lastSessionAt so Home can say hello after a long gap.
+initSessionWelcome();
 
 export const unstable_settings = {
   anchor: "onboarding",
@@ -50,6 +57,8 @@ function RootLayout() {
       // rehydration runs this same catch-up itself, so there is nothing worth
       // doing until each store is ready.
       if (usePetStore.persist.hasHydrated()) {
+        // Read-only, and before decay stamps lastSessionAt to now.
+        noteReturnFromLastSession();
         usePetStore.getState().applyDecay();
       }
       if (useTasksStore.persist.hasHydrated()) {
