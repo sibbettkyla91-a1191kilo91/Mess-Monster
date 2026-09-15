@@ -70,11 +70,16 @@ export const STORE_CATEGORIES: {
 
 /**
  * Unlock tiers. Two items per category open at level 1 (so the 100-point
- * welcome gift buys something on day one), one more at level 2, the last
- * at level 4. See store/progression.ts for the level thresholds.
+ * welcome gift buys something on day one); the other eight items per
+ * monster open two at a time at levels 2, 4, 6 and 8. Cheaper shelves
+ * (food, toys/accessories) open first within each pair of tiers; plants
+ * and decor follow. Nilly and Luna share the schedule shelf-for-shelf.
+ * See store/progression.ts for the level thresholds.
  */
 const TIER_2 = { level: 2 } as const;
 const TIER_3 = { level: 4 } as const;
+const TIER_4 = { level: 6 } as const;
+const TIER_5 = { level: 8 } as const;
 
 type ItemSpec = Omit<StoreItem, "assetKey" | "repeatable" | "category"> & {
   repeatable?: boolean;
@@ -125,7 +130,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "plant",
     description: "Picked from a meadow that doesn't mind sharing.",
     price: 80,
-    unlock: TIER_2,
+    unlock: TIER_3,
   }),
   item({
     id: "nilly-plant-succulent-trio",
@@ -135,7 +140,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "plant",
     description: "Three small ones, huddled in one pot. Very brave.",
     price: 110,
-    unlock: TIER_3,
+    unlock: TIER_5,
   }),
 
   // ─── Food ──────────────────────────────────────────────────────────────
@@ -175,7 +180,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "food",
     description: "Still cool from the morning. Stains are part of it.",
     price: 35,
-    unlock: TIER_3,
+    unlock: TIER_4,
   }),
 
   // ─── Toys & Accessories ────────────────────────────────────────────────
@@ -215,7 +220,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "accessory",
     description: "Field royalty. Reign lasts until the petals drop.",
     price: 95,
-    unlock: TIER_3,
+    unlock: TIER_4,
   }),
 
   // ─── Room Decor ────────────────────────────────────────────────────────
@@ -245,7 +250,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "decor",
     description: "A wall-sized swirl. The room feels bigger with it up.",
     price: 90,
-    unlock: TIER_2,
+    unlock: TIER_3,
   }),
   item({
     id: "nilly-decor-mushroom-lamp",
@@ -255,7 +260,7 @@ const NILLY_ITEMS: StoreItem[] = [
     itemType: "decor",
     description: "Low amber glow from under the cap. Evening-shaped light.",
     price: 120,
-    unlock: TIER_3,
+    unlock: TIER_5,
   }),
 ];
 
@@ -287,7 +292,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "plant",
     description: "Patient. Hungry. An excellent listener.",
     price: 80,
-    unlock: TIER_2,
+    unlock: TIER_3,
   }),
   item({
     id: "luna-plant-nightshade-sprig",
@@ -297,7 +302,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "plant",
     description: "Decorative only. Luna insists. Do not test her.",
     price: 110,
-    unlock: TIER_3,
+    unlock: TIER_5,
   }),
 
   // ─── Food ──────────────────────────────────────────────────────────────
@@ -337,7 +342,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "food",
     description: "Clove, star anise, a slow simmer. Steam does the rest.",
     price: 35,
-    unlock: TIER_3,
+    unlock: TIER_4,
   }),
 
   // ─── Toys & Accessories ────────────────────────────────────────────────
@@ -377,7 +382,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "accessory",
     description: "Worn at the throat. Shows the future, or the ceiling.",
     price: 95,
-    unlock: TIER_3,
+    unlock: TIER_4,
   }),
 
   // ─── Room Decor ────────────────────────────────────────────────────────
@@ -407,7 +412,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "decor",
     description: "Three cards, face up, on the wall. Today's reading: fine.",
     price: 90,
-    unlock: TIER_2,
+    unlock: TIER_3,
   }),
   item({
     id: "luna-decor-spiderweb-curtain",
@@ -417,7 +422,7 @@ const LUNA_ITEMS: StoreItem[] = [
     itemType: "decor",
     description: "Lace, technically. Catches moonlight instead of flies.",
     price: 120,
-    unlock: TIER_3,
+    unlock: TIER_5,
   }),
 ];
 

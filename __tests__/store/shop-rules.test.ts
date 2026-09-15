@@ -153,6 +153,31 @@ describe("level locks", () => {
     expect(spent()).toBe(crown.price);
   });
 
+  it.each(["nilly", "luna"] as const)(
+    "%s: the shelf grows by two items at levels 2, 4, 6 and 8 and is full at 8",
+    (monster) => {
+      const expectedOpen: Record<number, number> = {
+        1: 8,
+        2: 10,
+        3: 10,
+        4: 12,
+        5: 12,
+        6: 14,
+        7: 14,
+        8: 16,
+        9: 16,
+        10: 16,
+      };
+      for (let level = 1; level <= 10; level++) {
+        setLevelXp(monster, xpForLevel(level));
+        const open = itemsForMonster(monster).filter((i) =>
+          isItemUnlockedFor(i, monster),
+        );
+        expect(open).toHaveLength(expectedOpen[level]);
+      }
+    },
+  );
+
   it("locked food is refused too, and unlocks per monster", () => {
     expect(executePaidShopPurchase(berries)).toBe(false);
     // Luna's level does not open Nilly's shelf.

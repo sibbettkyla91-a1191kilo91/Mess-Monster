@@ -9,7 +9,7 @@ import {
 } from "@/store/accessory-config";
 import { getDecorSlot } from "@/store/decor-slots";
 import { getItemArt, ITEM_ART } from "@/store/item-art";
-import { MONSTER_IDS } from "@/store/monster-id";
+import { MONSTER_IDS, MonsterId } from "@/store/monster-id";
 import {
   getItemType,
   getStoreItem,
@@ -214,6 +214,112 @@ describe("unlocks", () => {
   it("locked items state a level of at least 2", () => {
     for (const item of STORE_ITEMS) {
       if (item.unlock) expect(item.unlock.level).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  // The schedule is pinned literally: which items are open on day one is a
+  // product promise, and the gated ones open two at a time at 2/4/6/8.
+  const UNLOCK_SCHEDULE: Record<MonsterId, Record<string, number | null>> = {
+    nilly: {
+      "nilly-plant-sunflower": null,
+      "nilly-plant-pothos": null,
+      "nilly-plant-wildflower-bouquet": 4,
+      "nilly-plant-succulent-trio": 8,
+      "nilly-food-granola-honey-bar": null,
+      "nilly-food-herbal-sun-tea": null,
+      "nilly-food-mushroom-chips": 2,
+      "nilly-food-fresh-berries": 6,
+      "nilly-toy-tie-dye-yarn-ball": null,
+      "nilly-toy-mushroom-plushie": null,
+      "nilly-accessory-friendship-bracelet": 2,
+      "nilly-accessory-daisy-chain-crown": 6,
+      "nilly-decor-macrame-wall-hanging": null,
+      "nilly-decor-woven-rug": null,
+      "nilly-decor-tie-dye-tapestry": 4,
+      "nilly-decor-mushroom-lamp": 8,
+    },
+    luna: {
+      "luna-plant-black-rose": null,
+      "luna-plant-trailing-ivy": null,
+      "luna-plant-venus-flytrap": 4,
+      "luna-plant-nightshade-sprig": 8,
+      "luna-food-dark-chocolate-truffle": null,
+      "luna-food-elderberry-tonic": null,
+      "luna-food-blackberry-preserve": 2,
+      "luna-food-spiced-mulled-cider": 6,
+      "luna-toy-raven-feather": null,
+      "luna-toy-tarot-deck-charm": null,
+      "luna-accessory-spiderweb-choker": 2,
+      "luna-accessory-crystal-ball-charm": 6,
+      "luna-decor-candle-cluster": null,
+      "luna-decor-potion-bottle-set": null,
+      "luna-decor-tarot-card-display": 4,
+      "luna-decor-spiderweb-curtain": 8,
+    },
+  };
+
+  it.each(MONSTER_IDS)(
+    "%s: unlock level of every item is the pinned one",
+    (m) => {
+      const items = itemsForMonster(m);
+      expect(items).toHaveLength(16);
+      for (const item of items) {
+        expect(UNLOCK_SCHEDULE[m]).toHaveProperty(item.id);
+        expect(item.unlock?.level ?? null).toBe(UNLOCK_SCHEDULE[m][item.id]);
+      }
+    },
+  );
+
+  it.each(MONSTER_IDS)(
+    "%s: exactly 8 items open at level 1, then 2 each at levels 2, 4, 6 and 8",
+    (m) => {
+      const items = itemsForMonster(m);
+      const open = items.filter((i) => !i.unlock).map((i) => i.id);
+      expect(open.sort()).toEqual(
+        Object.keys(UNLOCK_SCHEDULE[m])
+          .filter((id) => UNLOCK_SCHEDULE[m][id] === null)
+          .sort(),
+      );
+      expect(open).toHaveLength(8);
+
+      const perLevel: Record<number, number> = {};
+      for (const i of items) {
+        if (i.unlock)
+          perLevel[i.unlock.level] = (perLevel[i.unlock.level] ?? 0) + 1;
+      }
+      expect(perLevel).toEqual({ 2: 2, 4: 2, 6: 2, 8: 2 });
+    },
+  );
+
+  it("across both shops, 16 items are open at level 1 and 4 open at each of 2, 4, 6, 8", () => {
+    expect(STORE_ITEMS.filter((i) => !i.unlock)).toHaveLength(16);
+    const perLevel: Record<number, number> = {};
+    for (const i of STORE_ITEMS) {
+      if (i.unlock)
+        perLevel[i.unlock.level] = (perLevel[i.unlock.level] ?? 0) + 1;
+    }
+    expect(perLevel).toEqual({ 2: 4, 4: 4, 6: 4, 8: 4 });
+  });
+
+  it("Nilly and Luna open the same shelves at the same levels", () => {
+    const nilly = itemsForMonster("nilly");
+    const luna = itemsForMonster("luna");
+    for (let i = 0; i < 16; i++) {
+      expect(luna[i].category).toBe(nilly[i].category);
+      expect(luna[i].unlock?.level ?? null).toBe(
+        nilly[i].unlock?.level ?? null,
+      );
+    }
+  });
+
+  it("within each pair of tiers the cheaper item opens earlier", () => {
+    for (const m of MONSTER_IDS) {
+      const gated = itemsForMonster(m).filter((i) => i.unlock);
+      const pricesAt = (level: number) =>
+        gated.filter((i) => i.unlock!.level === level).map((i) => i.price);
+      // Every level-2 item is cheaper than every level-4 item; same for 6 vs 8.
+      expect(Math.max(...pricesAt(2))).toBeLessThan(Math.min(...pricesAt(4)));
+      expect(Math.max(...pricesAt(6))).toBeLessThan(Math.min(...pricesAt(8)));
     }
   });
 });

@@ -125,7 +125,7 @@ describe("settleMilestonesFor", () => {
   });
 
   it("a tier milestone unlocks the shop items gated on that level", () => {
-    const locked = getStoreItem("nilly-plant-wildflower-bouquet")!;
+    const locked = getStoreItem("nilly-food-mushroom-chips")!;
     expect(locked.unlock?.level).toBe(TIER_MILESTONE.level);
     expect(isItemUnlockedFor(locked, "nilly")).toBe(false);
 
