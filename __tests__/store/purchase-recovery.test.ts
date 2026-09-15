@@ -22,8 +22,8 @@ jest.mock("@/utils/daily-nudge", () => ({
   rescheduleDailyNudges: jest.fn().mockResolvedValue(undefined),
 }));
 
-const plant = STORE_ITEMS.find((i) => i.id === "decor-plant")!;
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+const plant = STORE_ITEMS.find((i) => i.id === "nilly-plant-sunflower")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
 
 const purchase = (
   item: (typeof STORE_ITEMS)[number],

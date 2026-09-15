@@ -16,6 +16,7 @@ import { useTasksStore } from "@/store/use-tasks-store";
 import { subscribeUnsettledFeedRecovery } from "@/store/recover-unsettled-feeds";
 import { subscribeUnsettledGrantRecovery } from "@/store/recover-unsettled-grants";
 import { subscribeUnsettledPurchaseRecovery } from "@/store/recover-unsettled-purchases";
+import { subscribeUnsettledMilestoneRecovery } from "@/store/progression-milestones";
 import {
   initSessionWelcome,
   noteReturnFromLastSession,
@@ -74,6 +75,8 @@ function RootLayout() {
   useEffect(() => subscribeUnsettledGrantRecovery(), []);
   useEffect(() => subscribeUnsettledPurchaseRecovery(), []);
   useEffect(() => subscribeUnsettledFeedRecovery(), []);
+  // Progression milestones (pet slice claimed-mark + player/store payout).
+  useEffect(() => subscribeUnsettledMilestoneRecovery(), []);
 
   return (
     <AppErrorBoundary>

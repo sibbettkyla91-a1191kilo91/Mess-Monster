@@ -30,7 +30,9 @@ import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { LUNA_PALETTE, MonsterPalette, NILLY_PALETTE } from "@/monster-theme";
 import { getDecorSlot } from "@/store/decor-slots";
+import { getItemArt } from "@/store/item-art";
 import { useIsPremium } from "@/store/premium";
+import { xpToNextLevel } from "@/store/progression";
 import { executeFeed, executePlay } from "@/store/recover-unsettled-feeds";
 import { EvolutionStage } from "@/store/types";
 import { currentTimeOfDay, LastAction, pickLine } from "@/store/monster-voice";
@@ -41,6 +43,7 @@ import {
   usePetStore,
 } from "@/store/use-pet-store";
 import { PresetTask } from "@/store/preset-tasks";
+import { getItemType } from "@/store/store-items";
 import { usePlayerStore } from "@/store/use-player-store";
 import { pickTinyDare, useSessionStore } from "@/store/use-session-store";
 import { useStoreStore } from "@/store/use-store-store";
@@ -450,6 +453,9 @@ function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
         const slot = getDecorSlot(id, monster);
         if (!slot) return null;
         const sizePx = Math.round(slot.size * SCREEN_WIDTH);
+        // Registered item art first, then any slot-specific image, then the
+        // catalog emoji — the same fallback chain as every other renderer.
+        const art = getItemArt(owned[id].item.assetKey) ?? slot.image;
         return (
           <View
             key={id}
@@ -463,9 +469,9 @@ function DecorLayer({ monster }: { monster: "nilly" | "luna" }) {
               justifyContent: "center",
             }}
           >
-            {slot.image ? (
+            {art ? (
               <Image
-                source={slot.image}
+                source={art}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="contain"
               />
@@ -915,6 +921,12 @@ export default function HomeScreen() {
   const adultVariant = usePetStore(
     (s) => s.byMonster[selectedMonster].adultVariant,
   );
+  // Progression level: derived from this monster's lifetime points, read as
+  // a primitive so the selector never returns a fresh object.
+  const totalPointsEarned = usePetStore(
+    (s) => s.byMonster[selectedMonster].totalPointsEarned,
+  );
+  const levelProgress = xpToNextLevel(totalPointsEarned);
   const pendingMilestoneBanner = usePetStore((s) => s.pendingMilestoneBanner);
   const pendingEvolution = usePetStore(
     (s) => s.byMonster[selectedMonster].pendingEvolution,
@@ -1022,14 +1034,16 @@ export default function HomeScreen() {
       id: string;
       name: string;
       emoji: string;
+      assetKey?: string;
       quantity: number;
     }[] = [];
     for (const entry of Object.values(owned)) {
-      if (entry.item.category === "food" && entry.quantity > 0) {
+      if (getItemType(entry.item) === "food" && entry.quantity > 0) {
         list.push({
           id: entry.item.id,
           name: entry.item.name,
           emoji: entry.item.emoji,
+          assetKey: entry.item.assetKey,
           quantity: entry.quantity,
         });
       }
@@ -1038,13 +1052,20 @@ export default function HomeScreen() {
   }, [owned]);
 
   const toys = useMemo(() => {
-    const list: { id: string; name: string; emoji: string }[] = [];
+    const list: {
+      id: string;
+      name: string;
+      emoji: string;
+      assetKey?: string;
+    }[] = [];
     for (const entry of Object.values(owned)) {
-      if (entry.item.category === "toys" && entry.quantity > 0) {
+      // itemType, not shelf: accessories share the Toys shelf but are worn.
+      if (getItemType(entry.item) === "toy" && entry.quantity > 0) {
         list.push({
           id: entry.item.id,
           name: entry.item.name,
           emoji: entry.item.emoji,
+          assetKey: entry.item.assetKey,
         });
       }
     }
@@ -1587,6 +1608,19 @@ export default function HomeScreen() {
                 {STAGE_LABELS[evolutionStage]}
               </ThemedText>
             </View>
+            <View
+              style={[styles.levelPill, { borderColor: theme.accent + "66" }]}
+              accessibilityRole="text"
+              accessibilityLabel={
+                levelProgress.atMax
+                  ? `Level ${levelProgress.level}, top level`
+                  : `Level ${levelProgress.level}, ${levelProgress.remaining} points to next level`
+              }
+            >
+              <ThemedText style={[styles.levelLabel, { color: theme.accent }]}>
+                Lv {levelProgress.level}
+              </ThemedText>
+            </View>
             {!isPremium && (
               <Pressable
                 style={({ pressed }) => [
@@ -1608,6 +1642,12 @@ export default function HomeScreen() {
               </Pressable>
             )}
           </View>
+
+          {/* Two systems share the row above; one quiet line says which is
+              which. Level is progression (shop shelves); stage is evolution. */}
+          <ThemedText style={[styles.progressionHint, { color: theme.text }]}>
+            Level opens new things. Stage grows with time together.
+          </ThemedText>
 
           <View style={styles.statBars}>
             <StatBar
@@ -1839,6 +1879,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  levelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  levelLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    fontVariant: ["tabular-nums"],
+  },
+  progressionHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    opacity: 0.55,
+    marginTop: -4,
   },
   unlockButton: {
     marginLeft: "auto",

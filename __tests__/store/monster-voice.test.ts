@@ -28,10 +28,11 @@ const FORBIDDEN =
   /clean|mess|tidy|chore|task|neglect|miss(ed|es|ing)? you|lazy|should|guilt|shame|hours|days|weeks|so long|long time|finally|where (were|have) you|left me|alone|forgot|as an ai|assistant/i;
 
 describe("monster voice pools", () => {
-  it.each(MONSTERS)("%s has between 20 and 30 distinct lines", (m) => {
+  it.each(MONSTERS)("%s has between 20 and 36 distinct lines", (m) => {
+    // Upper bound moved 30 → 36 when the "task" bucket (3 lines) landed.
     const lines = allLines(m);
     expect(lines.length).toBeGreaterThanOrEqual(20);
-    expect(lines.length).toBeLessThanOrEqual(30);
+    expect(lines.length).toBeLessThanOrEqual(36);
   });
 
   it.each(MONSTERS)("%s has no empty bucket", (m) => {

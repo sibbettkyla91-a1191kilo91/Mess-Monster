@@ -18,7 +18,8 @@ import {
   SlotAnchor,
 } from "@/store/accessory-config";
 import { getAccessoryImage } from "@/store/accessory-images";
-import { STORE_ITEMS } from "@/store/store-items";
+import { getItemArt } from "@/store/item-art";
+import { getStoreItem } from "@/store/store-items";
 import { EquippedMap } from "@/store/use-store-store";
 
 const EMPTY_EQUIPPED: EquippedMap = {};
@@ -36,6 +37,7 @@ type LayerItem = {
   id: string;
   slot: AccessorySlot;
   emoji: string;
+  assetKey?: string;
   animation: AccessoryAnimation;
   anchor: SlotAnchor;
 };
@@ -52,11 +54,12 @@ function collectLayers(
     if (!id) continue;
     const def = getAccessoryDef(id);
     if (!def) continue;
-    const catalog = STORE_ITEMS.find((i) => i.id === id);
+    const catalog = getStoreItem(id);
     items.push({
       id,
       slot,
       emoji: catalog?.emoji ?? "🎁",
+      assetKey: catalog?.assetKey,
       animation: def.animation,
       anchor: overrides?.[slot] ?? getSlotAnchor(monster, stage, slot),
     });
@@ -105,7 +108,8 @@ function AccessoryPiece({ item, size }: { item: LayerItem; size: number }) {
   const pieceSize = Math.max(4, anchor.scale * size);
   const left = anchor.x * size - pieceSize / 2;
   const top = anchor.y * size - pieceSize / 2;
-  const image = getAccessoryImage(item.id);
+  // Catalog art registry first; the retired accessories keep their PNGs.
+  const image = getItemArt(item.assetKey) ?? getAccessoryImage(item.id);
 
   const body = image ? (
     <Image

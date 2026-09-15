@@ -5,8 +5,9 @@
  * is refreshed from the catalog so the Collection filter accepts them.
  * Food entries are untouched: quantity 0 there means correctly consumed.
  */
-import { STORE_ITEMS } from "@/store/store-items";
 import { migrateStoreState } from "@/store/use-store-store";
+
+import { LEGACY_ITEMS } from "../fixtures/legacy-catalog";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -14,11 +15,13 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
   removeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
-const catalogYarn = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
+// The v1 toys are no longer sold; the migration reads the persisted
+// snapshot's own category to recognise them.
+const catalogYarn = LEGACY_ITEMS["toy-yarn"];
 
 /** An owned entry as persisted under the old catalog (toys repeatable). */
 function legacyEntry(id: string, quantity: number) {
-  const item = STORE_ITEMS.find((i) => i.id === id)!;
+  const item = LEGACY_ITEMS[id];
   const legacyRepeatable = item.category === "toys" ? true : item.repeatable;
   return {
     item: { ...item, repeatable: legacyRepeatable },
@@ -35,8 +38,8 @@ describe("migrateStoreState v1 → v2", () => {
     );
 
     expect(out.owned["toy-yarn"].quantity).toBe(1);
-    // Snapshot refreshed from catalog: repeatable is now false, so the
-    // Collection screen's !repeatable filter accepts the entry.
+    // Snapshot corrected: repeatable is now false, so the Collection
+    // screen's !repeatable filter accepts the entry.
     expect(out.owned["toy-yarn"].item).toEqual(catalogYarn);
     // First-purchase timestamp is preserved.
     expect(out.owned["toy-yarn"].purchasedAt).toBe(1750000000000);

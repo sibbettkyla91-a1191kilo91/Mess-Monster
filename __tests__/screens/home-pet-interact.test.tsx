@@ -30,8 +30,8 @@ jest.mock("@/utils/daily-nudge", () => ({
 
 jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
-const yarn = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
+const yarn = STORE_ITEMS.find((i) => i.id === "nilly-toy-tie-dye-yarn-ball")!;
 
 async function flushHydration() {
   await new Promise<void>((resolve) => setImmediate(resolve));
@@ -108,15 +108,15 @@ describe("Home care menu", () => {
     act(() => {
       seedHome();
       useStoreStore.getState().buyItem(cookie);
-      useStoreStore.getState().buyItem(STORE_ITEMS.find((i) => i.id === "food-boba")!);
+      useStoreStore.getState().buyItem(STORE_ITEMS.find((i) => i.id === "nilly-food-herbal-sun-tea")!);
     });
 
     fireEvent.press(screen.getByLabelText("Care for Nilly"));
     fireEvent.press(screen.getByLabelText("Feed Nilly"));
-    fireEvent.press(screen.getByLabelText("Feed Boba Tea"));
+    fireEvent.press(screen.getByLabelText("Feed Herbal Sun Tea"));
 
-    expect(useStoreStore.getState().owned["food-boba"].quantity).toBe(0);
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(1);
+    expect(useStoreStore.getState().owned["nilly-food-herbal-sun-tea"].quantity).toBe(0);
+    expect(useStoreStore.getState().owned["nilly-food-granola-honey-bar"].quantity).toBe(1);
     expect(usePetStore.getState().health).toBe(58);
     expect(usePetStore.getState().happiness).toBe(58);
   });
@@ -133,9 +133,9 @@ describe("Home care menu", () => {
 
     fireEvent.press(screen.getByLabelText("Care for Nilly"));
     fireEvent.press(screen.getByLabelText("Play with Nilly"));
-    fireEvent.press(screen.getByLabelText("Play with Yarn Ball"));
+    fireEvent.press(screen.getByLabelText("Play with Tie-Dye Yarn Ball"));
 
-    expect(useStoreStore.getState().owned["toy-yarn"].quantity).toBe(1);
+    expect(useStoreStore.getState().owned["nilly-toy-tie-dye-yarn-ball"].quantity).toBe(1);
     expect(usePetStore.getState().happiness).toBe(58);
     expect(usePetStore.getState().health).toBe(53);
   });

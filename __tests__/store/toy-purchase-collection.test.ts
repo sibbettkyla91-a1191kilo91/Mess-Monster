@@ -20,9 +20,9 @@ beforeEach(() => {
   useStoreStore.setState({ owned: {}, placed: {} });
 });
 
-const aquarium = STORE_ITEMS.find((i) => i.id === "decor-aquarium")!;
-const yarnBall = STORE_ITEMS.find((i) => i.id === "toy-yarn")!;
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+const aquarium = STORE_ITEMS.find((i) => i.id === "nilly-decor-macrame-wall-hanging")!;
+const yarnBall = STORE_ITEMS.find((i) => i.id === "nilly-toy-tie-dye-yarn-ball")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
 
 /**
  * The store-store writes handleBuy performs for a paid purchase, including
@@ -48,7 +48,7 @@ describe("toy purchase behaves like decor", () => {
     const { autoConsumed } = buyLikeStoreScreen(yarnBall);
 
     expect(autoConsumed).toBe(false);
-    expect(useStoreStore.getState().owned["toy-yarn"].quantity).toBe(1);
+    expect(useStoreStore.getState().owned["nilly-toy-tie-dye-yarn-ball"].quantity).toBe(1);
   });
 
   it("warm-session aquarium-then-yarn-ball now shows both in Collection", () => {
@@ -56,8 +56,8 @@ describe("toy purchase behaves like decor", () => {
     buyLikeStoreScreen(yarnBall);
 
     const shown = collectionScreenItems().map((e) => e.item.id);
-    expect(shown).toContain("decor-aquarium");
-    expect(shown).toContain("toy-yarn");
+    expect(shown).toContain("nilly-decor-macrame-wall-hanging");
+    expect(shown).toContain("nilly-toy-tie-dye-yarn-ball");
   });
 
   it("a bought toy is placeable and DecorLayer sees it", () => {
@@ -72,18 +72,17 @@ describe("toy purchase behaves like decor", () => {
     const placedIds = Object.keys(placed).filter(
       (id) => (owned[id]?.quantity ?? 0) > 0,
     );
-    expect(placedIds).toEqual(["toy-yarn"]);
-    expect(getDecorSlot("toy-yarn", "luna")).not.toBeNull();
-    expect(getDecorSlot("toy-yarn", "nilly")).not.toBeNull();
+    expect(placedIds).toEqual(["nilly-toy-tie-dye-yarn-ball"]);
+    expect(getDecorSlot("nilly-toy-tie-dye-yarn-ball", "luna")).not.toBeNull();
+    expect(getDecorSlot("nilly-toy-tie-dye-yarn-ball", "nilly")).not.toBeNull();
   });
 
-  it("every toy in the catalog is non-repeatable and has a placement slot", () => {
-    const toys = STORE_ITEMS.filter((i) => i.category === "toys");
+  it("every toy in the catalog is non-repeatable and has a placement slot in its monster's room", () => {
+    const toys = STORE_ITEMS.filter((i) => i.itemType === "toy");
     expect(toys.length).toBeGreaterThan(0);
     for (const item of toys) {
       expect(item.repeatable).toBe(false);
-      expect(getDecorSlot(item.id, "nilly")).not.toBeNull();
-      expect(getDecorSlot(item.id, "luna")).not.toBeNull();
+      expect(getDecorSlot(item.id, item.monster)).not.toBeNull();
     }
   });
 });
@@ -93,12 +92,12 @@ describe("food purchases are unaffected", () => {
     const { autoConsumed } = buyLikeStoreScreen(cookie);
 
     expect(autoConsumed).toBe(false);
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(1);
+    expect(useStoreStore.getState().owned["nilly-food-granola-honey-bar"].quantity).toBe(1);
   });
 
   it("food never appears in Collection, even at quantity > 0 (gift path)", () => {
     useStoreStore.getState().buyItem(cookie); // gifted unit, unconsumed
-    expect(useStoreStore.getState().owned["food-cookie"].quantity).toBe(1);
+    expect(useStoreStore.getState().owned["nilly-food-granola-honey-bar"].quantity).toBe(1);
 
     expect(collectionScreenItems()).toHaveLength(0);
   });

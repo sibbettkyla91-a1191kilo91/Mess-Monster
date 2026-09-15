@@ -1,9 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { ItemGlyph } from "@/components/item-glyph";
+
 export type InteractChoice = {
   id: string;
   name: string;
   emoji: string;
+  /** Catalog art key; legacy bag items may not have one. */
+  assetKey?: string;
   quantity?: number;
 };
 
@@ -140,7 +144,13 @@ export function PetInteractMenu({
                     : `Play with ${item.name}`
                 }
               >
-                <Text style={styles.choiceEmoji}>{item.emoji}</Text>
+                <View style={styles.choiceEmoji}>
+                  <ItemGlyph
+                    assetKey={item.assetKey}
+                    emoji={item.emoji}
+                    size={30}
+                  />
+                </View>
                 <Text style={[styles.choiceName, { color: text }]}>
                   {item.name}
                 </Text>
@@ -238,7 +248,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   choiceEmoji: {
-    fontSize: 22,
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
   choiceName: {
     flex: 1,

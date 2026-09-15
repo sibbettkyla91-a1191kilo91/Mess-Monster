@@ -1,5 +1,5 @@
 import { MonsterId, resolveMonsterId } from "./monster-id";
-import { STORE_ITEMS } from "./store-items";
+import { getItemType, resolveUsableItem } from "./store-items";
 import {
   assignLegacyInventoryToSelectedMonster,
   UnsettledFeed,
@@ -108,9 +108,14 @@ export function executeFeed(itemId: string, monster?: MonsterId): boolean {
     const monsterId = resolveMonsterId(
       monster ?? usePlayerStore.getState().selectedMonster,
     );
-    const catalog = STORE_ITEMS.find((i) => i.id === itemId);
-    if (!catalog || catalog.category !== "food") return false;
     if (!useStoreStore.getState().isOwned(itemId, monsterId)) return false;
+    // A snack from the retired catalog is still a snack (legacy snapshot);
+    // an unknown id in the current shape is refused.
+    const item = resolveUsableItem(
+      itemId,
+      useStoreStore.getState().byMonster[monsterId].owned[itemId]?.item,
+    );
+    if (!item || getItemType(item) !== "food") return false;
 
     const feed: UnsettledFeed = {
       id: nextFeedId(itemId),
@@ -129,9 +134,13 @@ export function executePlay(itemId: string, monster?: MonsterId): boolean {
   const monsterId = resolveMonsterId(
     monster ?? usePlayerStore.getState().selectedMonster,
   );
-  const catalog = STORE_ITEMS.find((i) => i.id === itemId);
-  if (!catalog || catalog.category !== "toys") return false;
   if (!useStoreStore.getState().isOwned(itemId, monsterId)) return false;
+  const item = resolveUsableItem(
+    itemId,
+    useStoreStore.getState().byMonster[monsterId].owned[itemId]?.item,
+  );
+  // itemType, not shelf: accessories share the Toys shelf but are worn.
+  if (!item || getItemType(item) !== "toy") return false;
   usePetStore.getState().applyPlay(monsterId);
   return true;
 }

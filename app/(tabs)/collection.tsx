@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ItemGlyph } from "@/components/item-glyph";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
 import {
@@ -20,6 +21,7 @@ import {
   getAccessoryDef,
   isAccessorySlotLocked,
 } from "@/store/accessory-config";
+import { getItemType, isPlaceableType } from "@/store/store-items";
 import { usePlayerStore } from "@/store/use-player-store";
 import { useStoreStore } from "@/store/use-store-store";
 
@@ -163,11 +165,13 @@ export default function CollectionScreen() {
         >
           {collectionItems.map((entry) => {
             const { item } = entry;
-            const isPlaceable =
-              item.category === "decor" || item.category === "toys";
+            // getItemType reads legacy snapshots (old category names) too,
+            // so items from the retired catalog keep their buttons.
+            const itemType = getItemType(item);
+            const isPlaceable = isPlaceableType(itemType);
             const isPlaced = !!placed[item.id];
             const acc = getAccessoryDef(item.id);
-            const isAccessory = item.category === "accessories" && !!acc;
+            const isAccessory = itemType === "accessory" && !!acc;
             const isWorn = !!acc && equipped?.[acc.slot] === item.id;
             const headLocked =
               !!acc && isAccessorySlotLocked(selectedMonster, acc.slot);
@@ -187,7 +191,11 @@ export default function CollectionScreen() {
                 <View
                   style={[styles.emojiWell, { backgroundColor: accentSoft }]}
                 >
-                  <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                  <ItemGlyph
+                    assetKey={item.assetKey}
+                    emoji={item.emoji}
+                    size={40}
+                  />
                 </View>
                 <Text
                   style={[
@@ -311,8 +319,8 @@ export default function CollectionScreen() {
             Nothing here yet
           </Text>
           <Text style={[styles.emptyMessage, { color: inkMuted }]}>
-            The shop has toys, wearables, and a few things for the room. Buy
-            something once — it lives here.
+            The shop has plants, toys, wearables, and a few things for the room.
+            Buy something once — it lives here.
           </Text>
         </View>
       )}
@@ -391,9 +399,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
-  },
-  itemEmoji: {
-    fontSize: 28,
   },
   itemName: {
     fontSize: 17,

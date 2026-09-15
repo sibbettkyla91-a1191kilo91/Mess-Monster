@@ -36,7 +36,7 @@ jest.mock("@/utils/daily-nudge", () => ({
 
 jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
 
-const cookie = STORE_ITEMS.find((i) => i.id === "food-cookie")!;
+const cookie = STORE_ITEMS.find((i) => i.id === "nilly-food-granola-honey-bar")!;
 
 async function flushHydration() {
   await new Promise<void>((resolve) => setImmediate(resolve));
@@ -119,7 +119,7 @@ describe("Home talk-back caption", () => {
 
     fireEvent.press(screen.getByLabelText("Care for Nilly"));
     fireEvent.press(screen.getByLabelText("Feed Nilly"));
-    fireEvent.press(screen.getByLabelText("Feed Cookie"));
+    fireEvent.press(screen.getByLabelText("Feed Granola & Honey Bar"));
 
     const line = currentLine(screen, "nilly");
     expect(VOICE_LINES.nilly.feed).toContain(line);

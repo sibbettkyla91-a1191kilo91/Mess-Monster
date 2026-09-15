@@ -45,14 +45,15 @@ function coldStart() {
   const { useStoreStore } = require("@/store/use-store-store");
   const { executeFeed } = require("@/store/recover-unsettled-feeds");
   const { localDayString } = require("@/utils/local-day");
-  const { STORE_ITEMS } = require("@/store/store-items");
+  const { LEGACY_ITEMS } = require("../fixtures/legacy-catalog");
   return {
     usePlayerStore,
     usePetStore,
     useStoreStore,
     executeFeed,
     today: localDayString() as string,
-    item: (id: string) => STORE_ITEMS.find((i: { id: string }) => i.id === id),
+    // A v3 save carries snapshots from the retired catalog.
+    item: (id: string) => LEGACY_ITEMS[id],
   };
 }
 /* eslint-enable @typescript-eslint/no-require-imports */

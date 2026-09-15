@@ -7,14 +7,15 @@ import { PetMood } from "./use-pet-store";
  *
  * Pure module — no store reads, no timers, no side effects. Home decides
  * when to ask for a line (idle rotation, right after a care action, on a
- * welcome-back) and passes the context in. Both voices stay warm and
+ * welcome-back, or when a claimed chore reward is handed over) and passes
+ * the context in. Both voices stay warm and
  * pressure-free: nothing here comments on chores, tidiness, or how long the
  * player was away. A low mood gets gentle company, never a guilt trip.
  */
 
 export type TimeOfDay = "morning" | "afternoon" | "evening" | "late";
 export type VoiceMood = "thriving" | "happy" | "neutral" | "low";
-export type LastAction = "feed" | "play" | "pet" | "welcome" | null;
+export type LastAction = "feed" | "play" | "pet" | "welcome" | "task" | null;
 
 export type VoiceContext = {
   mood: PetMood;
@@ -31,6 +32,8 @@ export type VoicePools = {
   play: readonly string[];
   pet: readonly string[];
   welcome: readonly string[];
+  /** Right after a chore reward is claimed. Company, not a gold star. */
+  task: readonly string[];
 };
 
 export const VOICE_LINES: Record<MonsterId, VoicePools> = {
@@ -88,6 +91,11 @@ export const VOICE_LINES: Record<MonsterId, VoicePools> = {
       "You're back! I did a happy spin.",
       "Hi hi! I kept your spot warm.",
       "There you are. My favorite arrival.",
+    ],
+    task: [
+      "Ooh, the room feels lighter. Or that's me floating.",
+      "I watched the whole thing. Very dramatic. Loved it.",
+      "Is it snack time now? I feel like it's snack time.",
     ],
   },
   luna: {
@@ -148,6 +156,11 @@ export const VOICE_LINES: Record<MonsterId, VoicePools> = {
       "Look who wandered back. Good.",
       "The door knew it was you. So did I.",
     ],
+    task: [
+      "Done, then. The candles approve. I'm withholding comment.",
+      "Something shifted in here. Quieter. I like quieter.",
+      "I'd have used a spell. Your way works too, apparently.",
+    ],
   },
 };
 
@@ -186,6 +199,7 @@ export function allLines(monster: MonsterId): string[] {
     ...p.play,
     ...p.pet,
     ...p.welcome,
+    ...p.task,
   ]);
   return [...out];
 }
@@ -209,6 +223,8 @@ export function poolFor(
       return p.pet;
     case "welcome":
       return p.welcome;
+    case "task":
+      return p.task;
     default:
       return [
         ...p.general,

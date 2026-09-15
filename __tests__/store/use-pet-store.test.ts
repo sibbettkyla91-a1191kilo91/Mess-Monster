@@ -12,7 +12,13 @@ jest.mock("@/utils/daily-nudge", () => ({
 
 const hoursAgo = (h: number) => Date.now() - h * 3_600_000;
 
+// Freeze the clock so the seed stamp in beforeEach, each test's `before`, and
+// the store's own Date.now() all read the same instant. Without this, a
+// millisecond ticking between beforeEach and the test body made the
+// "lastSessionAt >= before" checks flaky.
 beforeEach(() => {
+  jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+  jest.setSystemTime(new Date("2026-05-27T12:00:00Z"));
   usePetStore.setState({
     health: 100,
     happiness: 100,
@@ -20,6 +26,10 @@ beforeEach(() => {
     lastSessionAt: Date.now(),
     appliedRewardGrants: {},
   });
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 // ─── deriveMood ───────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ export const PET_SLICE_KEYS = [
   "pendingEvolution",
   "pendingPremiumGate",
   "premiumGateShownFor",
+  "claimedMilestones",
 ] as const;
 
 export type PetSliceKey = (typeof PET_SLICE_KEYS)[number];

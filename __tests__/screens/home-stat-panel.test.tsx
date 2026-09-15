@@ -7,6 +7,7 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 import HomeScreen from "@/app/(tabs)/index";
+import { usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -60,4 +61,28 @@ describe("stat panel collapse toggle", () => {
     expect(usePlayerStore.getState().statPanelCollapsed).toBe(false);
     expect(screen.getByLabelText("Hide monster stats")).toBeTruthy();
   });
+});
+
+describe("level vs stage hint", () => {
+  const COPY = "Level opens new things. Stage grows with time together.";
+
+  it.each(["nilly", "luna"] as const)(
+    "%s: one quiet line under the stage and level pills says which is which",
+    async (monster) => {
+      const screen = render(<HomeScreen />);
+      await act(async () => {
+        await flushHydration();
+      });
+      act(() => {
+        usePlayerStore.setState({ selectedMonster: monster });
+        usePetStore.setState({ evolutionStage: "baby", totalPointsEarned: 0 });
+      });
+
+      // Both systems stay on screen: the stage pill, the level pill, and the
+      // one line explaining them.
+      expect(screen.getByText("Baby")).toBeTruthy();
+      expect(screen.getByText("Lv 1")).toBeTruthy();
+      expect(screen.getByText(COPY)).toBeTruthy();
+    },
+  );
 });

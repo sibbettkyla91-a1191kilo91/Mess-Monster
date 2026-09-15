@@ -66,6 +66,35 @@ export interface AccessoryDef {
 }
 
 export const ACCESSORY_DEFS: Record<string, AccessoryDef> = {
+  // ── Current catalog (store/store-items.ts) ──────────────────────────────
+  // Nilly: crown on the head; the bracelet is worn at the neck — the sprites
+  // have no wrist slot, and a knotted cord reads fine as a collar.
+  "nilly-accessory-daisy-chain-crown": {
+    id: "nilly-accessory-daisy-chain-crown",
+    slot: "head",
+    animation: { kind: "transform", preset: "sway", amount: 2, durationMs: 1800 },
+  },
+  "nilly-accessory-friendship-bracelet": {
+    id: "nilly-accessory-friendship-bracelet",
+    slot: "neck",
+    animation: { kind: "static" },
+  },
+  // Luna: both at the neck. Her head slot is locked (hat painted in), and a
+  // dangling crystal reads better as a pendant than a face piece.
+  "luna-accessory-spiderweb-choker": {
+    id: "luna-accessory-spiderweb-choker",
+    slot: "neck",
+    animation: { kind: "static" },
+  },
+  "luna-accessory-crystal-ball-charm": {
+    id: "luna-accessory-crystal-ball-charm",
+    slot: "neck",
+    animation: { kind: "transform", preset: "bob", amount: 2, durationMs: 2000 },
+  },
+
+  // ── Retired catalog ─────────────────────────────────────────────────────
+  // No longer sold, but saves may still own them. Keeping the defs means a
+  // legacy accessory stays wearable from the Collection.
   "acc-bow": {
     id: "acc-bow",
     slot: "head",

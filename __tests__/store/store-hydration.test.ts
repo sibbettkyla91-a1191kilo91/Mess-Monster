@@ -38,7 +38,7 @@ function coldStart() {
   const { useStoreStore } = require("@/store/use-store-store");
   const { STORE_ITEMS } = require("@/store/store-items");
   /* eslint-enable @typescript-eslint/no-require-imports */
-  const decorItem = STORE_ITEMS.find((i: any) => i.id === "decor-plant")!;
+  const decorItem = STORE_ITEMS.find((i: any) => i.id === "nilly-plant-sunflower")!;
   return { useStoreStore, decorItem };
 }
 
@@ -56,7 +56,7 @@ describe("cold-start hydration race", () => {
 
     // Fast tap: buy before AsyncStorage has resolved.
     expect(useStoreStore.getState().buyItem(decorItem)).toBe(true);
-    expect(useStoreStore.getState().owned["decor-plant"]).toBeDefined();
+    expect(useStoreStore.getState().owned["nilly-plant-sunflower"]).toBeDefined();
 
     // Rehydration lands with the previous session's save.
     mockResolveGetItem(EMPTY_SAVE);
@@ -64,7 +64,7 @@ describe("cold-start hydration race", () => {
 
     // The purchase is gone — this is why the Store screen gates on hydration.
     expect(useStoreStore.persist.hasHydrated()).toBe(true);
-    expect(useStoreStore.getState().owned["decor-plant"]).toBeUndefined();
+    expect(useStoreStore.getState().owned["nilly-plant-sunflower"]).toBeUndefined();
   });
 
   it("hasHydrated() is false while AsyncStorage is pending and true after", async () => {
@@ -89,20 +89,20 @@ describe("cold-start hydration race", () => {
 
     // Pre-hydration tap: prevented, nothing written to clobber.
     expect(attemptBuy()).toBe(false);
-    expect(useStoreStore.getState().owned["decor-plant"]).toBeUndefined();
+    expect(useStoreStore.getState().owned["nilly-plant-sunflower"]).toBeUndefined();
 
     mockResolveGetItem(EMPTY_SAVE);
     await flushHydration();
 
     // Retry after hydration: succeeds and survives.
     expect(attemptBuy()).toBe(true);
-    expect(useStoreStore.getState().owned["decor-plant"]).toBeDefined();
+    expect(useStoreStore.getState().owned["nilly-plant-sunflower"]).toBeDefined();
 
     // Collection screen read: quantity > 0, non-repeatable.
     const collectionIds = Object.values(useStoreStore.getState().owned)
       .filter((e: any) => e.quantity > 0)
       .filter((e: any) => !e.item.repeatable)
       .map((e: any) => e.item.id);
-    expect(collectionIds).toEqual(["decor-plant"]);
+    expect(collectionIds).toEqual(["nilly-plant-sunflower"]);
   });
 });

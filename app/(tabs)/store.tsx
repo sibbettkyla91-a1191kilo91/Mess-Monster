@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -12,18 +12,30 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ItemGlyph } from "@/components/item-glyph";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { useMonsterTheme } from "@/hooks/use-monster-theme";
+import { xpToNextLevel } from "@/store/progression";
 import { usePetStore } from "@/store/use-pet-store";
 import { usePlayerStore } from "@/store/use-player-store";
 import { executePaidShopPurchase } from "@/store/recover-unsettled-purchases";
 import { useStoreStore } from "@/store/use-store-store";
 import {
+  itemsForMonster,
   STORE_CATEGORIES,
-  STORE_ITEMS,
   StoreCategory,
   StoreItem,
+  StoreItemType,
 } from "@/store/store-items";
+
+/** Where a bought item ends up — stated once per card, no surprises. */
+const DESTINATION: Record<StoreItemType, string> = {
+  food: "Goes in the bag · feed from Home",
+  toy: "Kept · play from Home",
+  accessory: "Kept · wear from Collection",
+  plant: "Kept · place from Collection",
+  decor: "Kept · place from Collection",
+};
 
 const fontRounded = Platform.select({
   ios: "ui-rounded",
@@ -37,6 +49,13 @@ export default function StoreScreen() {
   const isOwned = useStoreStore((s) => s.isOwned);
   const owned = useStoreStore((s) => s.byMonster[selectedMonster].owned);
   const equipped = useStoreStore((s) => s.byMonster[selectedMonster].equipped);
+  // Level is derived from this monster's lifetime points (store/progression).
+  const xp = usePetStore(
+    (s) => s.byMonster[selectedMonster]?.totalPointsEarned ?? 0,
+  );
+  const progress = xpToNextLevel(xp);
+  const level = progress.level;
+  const monsterName = usePlayerStore((s) => s.monsterName);
   // handleBuy writes to all three persisted stores; a purchase made before
   // AsyncStorage rehydration completes gets clobbered when the hydration
   // merge lands, so the shop stays closed until every store is hydrated.
@@ -91,6 +110,13 @@ export default function StoreScreen() {
       // hasn't finished rehydrating, or the write gets clobbered.
       if (!hydrated) return;
 
+      // Level gate — the same rule executePaidShopPurchase enforces from
+      // live state; this is just the friendlier message.
+      if (item.unlock && level < item.unlock.level) {
+        showFeedback(`Opens at level ${item.unlock.level}.`);
+        return;
+      }
+
       // Check if non-repeatable and already owned
       if (!item.repeatable && isOwned(item.id)) {
         showFeedback("Already in the collection.");
@@ -121,12 +147,19 @@ export default function StoreScreen() {
         showFeedback(`${item.name} is theirs now.`);
       }
     },
-    [hydrated, availablePoints, isOwned, showFeedback],
+    [hydrated, availablePoints, isOwned, level, showFeedback],
   );
 
-  const filteredItems = STORE_ITEMS.filter(
-    (i) => i.category === activeCategory,
+  const filteredItems = useMemo(
+    () =>
+      itemsForMonster(selectedMonster).filter(
+        (i) => i.category === activeCategory,
+      ),
+    [selectedMonster, activeCategory],
   );
+
+  const displayName =
+    monsterName || (selectedMonster === "luna" ? "Luna" : "Nilly");
 
   const isLuna = monster === "luna";
   const cardLift = isLuna
@@ -162,6 +195,46 @@ export default function StoreScreen() {
           >
             {availablePoints} pts
           </Text>
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.progressCard,
+          { backgroundColor: surface, borderColor: line },
+        ]}
+        accessibilityRole="summary"
+        accessibilityLabel={
+          progress.atMax
+            ? `${displayName} is level ${level}, the top level`
+            : `${displayName} is level ${level}, ${progress.remaining} points to level ${level + 1}`
+        }
+      >
+        <View style={styles.progressRow}>
+          <Text
+            style={[
+              styles.progressLevel,
+              { color: ink, fontFamily: fontRounded },
+            ]}
+          >
+            {displayName} · Level {level}
+          </Text>
+          <Text style={[styles.progressHint, { color: inkMuted }]}>
+            {progress.atMax
+              ? "Top level"
+              : `${progress.remaining} pts to level ${level + 1}`}
+          </Text>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: accentSoft }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: accent,
+                width: `${Math.round(progress.fraction * 100)}%`,
+              },
+            ]}
+          />
         </View>
       </View>
 
@@ -226,8 +299,9 @@ export default function StoreScreen() {
             const bagCount = item.repeatable
               ? (owned[item.id]?.quantity ?? 0)
               : 0;
+            const levelLocked = !!item.unlock && level < item.unlock.level;
             const canAfford = availablePoints >= item.price;
-            const canPress = canAfford;
+            const canPress = canAfford && !levelLocked;
             const isEquipped =
               !item.repeatable &&
               !!equipped &&
@@ -252,9 +326,28 @@ export default function StoreScreen() {
                   <View
                     style={[styles.emojiWell, { backgroundColor: accentSoft }]}
                   >
-                    <Text style={styles.itemEmoji}>{item.emoji}</Text>
+                    <ItemGlyph
+                      assetKey={item.assetKey}
+                      emoji={item.emoji}
+                      size={40}
+                    />
                   </View>
-                  {isEquipped ? (
+                  {levelLocked && !ownedForever ? (
+                    <View
+                      style={[
+                        styles.stateChip,
+                        {
+                          backgroundColor: surface,
+                          borderColor: line,
+                          borderWidth: 1,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.stateChipText, { color: inkMuted }]}>
+                        Level {item.unlock?.level}
+                      </Text>
+                    </View>
+                  ) : isEquipped ? (
                     <View
                       style={[styles.stateChip, { backgroundColor: accent }]}
                     >
@@ -306,6 +399,11 @@ export default function StoreScreen() {
                 <Text style={[styles.itemDesc, { color: inkMuted }]}>
                   {item.description}
                 </Text>
+                <Text style={[styles.itemMeta, { color: inkMuted }]}>
+                  {levelLocked
+                    ? `Opens at level ${item.unlock?.level} · ${DESTINATION[item.itemType]}`
+                    : DESTINATION[item.itemType]}
+                </Text>
 
                 <View style={styles.itemFooter}>
                   {bagCount > 0 && (
@@ -347,7 +445,11 @@ export default function StoreScreen() {
                       disabled={!canPress}
                       accessibilityRole="button"
                       accessibilityState={{ disabled: !canPress }}
-                      accessibilityLabel={`Buy ${item.name}, ${item.price} points`}
+                      accessibilityLabel={
+                        levelLocked
+                          ? `${item.name}, ${item.price} points, opens at level ${item.unlock?.level}`
+                          : `Buy ${item.name}, ${item.price} points`
+                      }
                     >
                       <Text
                         style={[
@@ -358,7 +460,9 @@ export default function StoreScreen() {
                           },
                         ]}
                       >
-                        {`Buy · ${item.price} pts`}
+                        {levelLocked
+                          ? `Level ${item.unlock?.level} · ${item.price} pts`
+                          : `Buy · ${item.price} pts`}
                       </Text>
                     </Pressable>
                   )}
@@ -399,6 +503,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
+  },
+  progressCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  progressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 8,
+  },
+  progressLevel: {
+    fontSize: 14,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  progressHint: {
+    fontSize: 12,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
   },
   feedbackPill: {
     borderRadius: 999,
@@ -466,9 +603,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  itemEmoji: {
-    fontSize: 28,
-  },
   stateChip: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -487,6 +621,12 @@ const styles = StyleSheet.create({
   itemDesc: {
     fontSize: 13,
     fontWeight: "500",
+    marginBottom: 4,
+  },
+  itemMeta: {
+    fontSize: 11,
+    fontWeight: "500",
+    letterSpacing: 0.2,
     marginBottom: 10,
   },
   itemFooter: {

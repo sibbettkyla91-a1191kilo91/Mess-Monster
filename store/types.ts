@@ -32,6 +32,12 @@ export interface PetSlice {
   pendingEvolution: EvolutionStage | null; // set when evolution triggers; cleared after UI shows it
   pendingPremiumGate: EvolutionStage | null; // set when premium gate blocks evolution
   premiumGateShownFor: EvolutionStage | null; // tracks which stage gate was already shown (prevent repeat)
+  /**
+   * Progression milestone levels (store/progression.ts) already handed over
+   * for this monster. Level itself is derived from totalPointsEarned; this
+   * only remembers which one-time payouts happened.
+   */
+  claimedMilestones: number[];
 }
 
 export interface PetState extends PetSlice {
