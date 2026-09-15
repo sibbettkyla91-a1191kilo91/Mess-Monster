@@ -1643,6 +1643,12 @@ export default function HomeScreen() {
             )}
           </View>
 
+          {/* Two systems share the row above; one quiet line says which is
+              which. Level is progression (shop shelves); stage is evolution. */}
+          <ThemedText style={[styles.progressionHint, { color: theme.text }]}>
+            Level opens new things. Stage grows with time together.
+          </ThemedText>
+
           <View style={styles.statBars}>
             <StatBar
               icon="❤️"
@@ -1885,6 +1891,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.6,
     fontVariant: ["tabular-nums"],
+  },
+  progressionHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    opacity: 0.55,
+    marginTop: -4,
   },
   unlockButton: {
     marginLeft: "auto",
