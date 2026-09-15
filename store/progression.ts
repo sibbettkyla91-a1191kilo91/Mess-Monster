@@ -24,8 +24,9 @@ import type { MonsterId } from "./monster-id";
 /**
  * Cumulative lifetime points needed to REACH each level. Index 0 is level 1.
  * A typical chore pays 10–40 points (×1–2 with a photo roll), so level 2
- * lands in the first couple of days and level 4 — which opens the last shop
- * tier — after a few weeks of ordinary use.
+ * lands in the first couple of days and level 4 after a few weeks of
+ * ordinary use. Shop shelves open at levels 2, 4, 6 and 8; level 8 is the
+ * last of them.
  */
 export const LEVEL_THRESHOLDS: readonly number[] = [
   0, // 1
@@ -116,7 +117,7 @@ export type Milestone = {
   note: Record<MonsterId, string>;
   points?: number;
   itemId?: Record<MonsterId, string>;
-  /** True when this level opens a shop tier (see TIER_2 / TIER_3 in store-items). */
+  /** True when this level opens a shop tier (see TIER_2 … TIER_5 in store-items). */
   unlocksShopTier?: boolean;
 };
 
@@ -141,10 +142,10 @@ export const MILESTONES: readonly Milestone[] = [
   },
   {
     level: 4,
-    title: "The last shelf opens",
+    title: "Another shelf opens",
     note: {
-      nilly: "Everything in the shop is yours to browse now.",
-      luna: "The back room is open. Mind the candles.",
+      nilly: "A few more things in the shop. Nilly has already picked a favorite.",
+      luna: "The shop added a shelf. Luna has read every label, allegedly by accident.",
     },
     unlocksShopTier: true,
   },
@@ -161,6 +162,15 @@ export const MILESTONES: readonly Milestone[] = [
     },
   },
   {
+    level: 6,
+    title: "More on the shelves",
+    note: {
+      nilly: "New things in the shop. Nilly went to look and came back humming.",
+      luna: "Another shelf in the shop. Luna noticed. She always notices.",
+    },
+    unlocksShopTier: true,
+  },
+  {
     level: 7,
     title: "Well along",
     note: {
@@ -168,6 +178,15 @@ export const MILESTONES: readonly Milestone[] = [
       luna: "Eighty points. Luna raised one eyebrow. That's a lot, for her.",
     },
     points: 80,
+  },
+  {
+    level: 8,
+    title: "The last shelf opens",
+    note: {
+      nilly: "The whole shop is yours to wander now. Nilly is proud in a small, warm way.",
+      luna: "That's every shelf. The back room is open too. Mind the candles.",
+    },
+    unlocksShopTier: true,
   },
   {
     level: 10,

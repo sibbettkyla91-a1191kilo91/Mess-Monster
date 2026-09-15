@@ -120,9 +120,31 @@ describe("milestones", () => {
     );
     expect(tierLevels.length).toBeGreaterThan(0);
     for (const level of tierLevels) expect(unlockLevels.has(level)).toBe(true);
-    // Only levels 2 and 4 are announced today; the level-6 and level-8
-    // shelves open silently. Adding a milestone for them is an owner call.
-    expect(tierLevels).toEqual([2, 4]);
+    // Every shelf the catalog opens is announced, and nothing else is.
+    expect(tierLevels).toEqual([2, 4, 6, 8]);
+    expect(tierLevels).toEqual([...unlockLevels].sort((a, b) => a - b));
+  });
+
+  it("shelf-opening milestones carry no payout; only the last one says so", () => {
+    const lastUnlockLevel = Math.max(
+      ...STORE_ITEMS.filter((i) => i.unlock).map((i) => i.unlock!.level),
+    );
+    expect(lastUnlockLevel).toBe(8);
+    for (const m of MILESTONES) {
+      if (m.unlocksShopTier) {
+        expect(m.points).toBeUndefined();
+        expect(m.itemId).toBeUndefined();
+      }
+      const copy = [m.title, ...MONSTER_IDS.map((id) => m.note[id])]
+        .join(" ")
+        .toLowerCase();
+      const claimsLast =
+        copy.includes("last shelf") ||
+        copy.includes("every shelf") ||
+        copy.includes("whole shop") ||
+        copy.includes("everything in the shop");
+      expect(claimsLast).toBe(m.level === lastUnlockLevel);
+    }
   });
 
   it("looks up by level and builds stable grant ids", () => {
