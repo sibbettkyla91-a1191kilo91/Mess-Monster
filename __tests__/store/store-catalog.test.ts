@@ -362,12 +362,16 @@ describe("wiring into slots and rooms", () => {
 });
 
 describe("item art registry", () => {
-  it("is empty today, so every renderer falls back to the emoji", () => {
-    expect(Object.keys(ITEM_ART)).toEqual([]);
-    for (const item of STORE_ITEMS) {
-      expect(getItemArt(item.assetKey)).toBeUndefined();
+  it("Nilly's sixteen pieces have art; Luna still falls back to the emoji", () => {
+    expect(Object.keys(ITEM_ART).sort()).toEqual([...NILLY_IDS].sort());
+    for (const id of NILLY_IDS) {
+      expect(getItemArt(id)).toBeDefined();
+    }
+    for (const id of LUNA_IDS) {
+      expect(getItemArt(id)).toBeUndefined();
     }
     expect(getItemArt(undefined)).toBeUndefined();
+    expect(getItemArt("not-a-real-item")).toBeUndefined();
   });
 });
 
