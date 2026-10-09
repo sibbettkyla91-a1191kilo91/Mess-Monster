@@ -23,6 +23,11 @@ export const ITEM_ART: Record<string, ImageSourcePropType> = {
   "nilly-toy-tie-dye-yarn-ball": require("../assets/images/items/nilly-toy-tie-dye-yarn-ball.png"),
   "nilly-toy-mushroom-plushie": require("../assets/images/items/nilly-toy-mushroom-plushie.png"),
   "nilly-accessory-friendship-bracelet": require("../assets/images/items/nilly-accessory-friendship-bracelet.png"),
+  "nilly-accessory-daisy-chain-crown": require("../assets/images/items/nilly-accessory-daisy-chain-crown.png"),
+  "nilly-decor-macrame-wall-hanging": require("../assets/images/items/nilly-decor-macrame-wall-hanging.png"),
+  "nilly-decor-woven-rug": require("../assets/images/items/nilly-decor-woven-rug.png"),
+  "nilly-decor-tie-dye-tapestry": require("../assets/images/items/nilly-decor-tie-dye-tapestry.png"),
+  "nilly-decor-mushroom-lamp": require("../assets/images/items/nilly-decor-mushroom-lamp.png"),
 };
 
 export function getItemArt(
