@@ -90,7 +90,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="debug-sprites"
         options={{
-          href: __DEV__ ? undefined : null,
+          href: null,
           title: "Tune",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="ladybug" color={color} />

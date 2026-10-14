@@ -15,7 +15,6 @@ import {
   PET_SLICE_KEYS,
   resolveMonsterId,
 } from "./monster-id";
-import { isPlayerPremium } from "./premium";
 import {
   arrayOr,
   createSafeStorage,
@@ -253,32 +252,26 @@ function writeSlice(
 }
 
 /**
- * Re-run the existing evolution check for a premium player once both sides of
- * it are actually restored. The check straddles two independently persisted
- * stores — stage and lifetime points here, isPremium and activeDaysCount in
- * the player store — and otherwise only ever runs from the upgrade button. A
- * player who force-quit between unlocking premium and evolving would come back
- * premium at teen with the gate already marked shown, leaving nothing to
- * trigger it. Non-premium players are left alone: an unhydrated default must
- * never stand in for a real answer, and cold start is no place to raise a
- * paywall.
+ * Re-run the existing evolution check once both sides of it are restored.
+ * The check straddles two independently persisted stores — stage and lifetime
+ * points here, activeDaysCount in the player store. Adult is free for now, so
+ * a teen who already hit the old paywall (or force-quit mid-growth) needs this
+ * pass to grow up. Wait for the player store: an unhydrated day count must
+ * not stand in for a real answer.
  */
-function recheckPremiumEvolutionOnceHydrated(): void {
-  const recheckIfPremium = () => {
-    if (!isPlayerPremium()) return;
+function recheckEvolutionOncePlayerHydrated(): void {
+  const recheckWhenDaysAreReal = () => {
     usePetStore.getState().recheckEvolution();
   };
 
   if (usePlayerStore.persist.hasHydrated()) {
-    recheckIfPremium();
+    recheckWhenDaysAreReal();
     return;
   }
 
-  // Hydration order between the two stores isn't guaranteed; wait for the
-  // authoritative premium value rather than reading defaults.
   const stopListening = usePlayerStore.persist.onFinishHydration(() => {
     stopListening();
-    recheckIfPremium();
+    recheckWhenDaysAreReal();
   });
 }
 
@@ -410,7 +403,7 @@ interface PetStore extends PetState {
   applyFeed: (feedId: string, monster: MonsterId, itemId: string) => void;
   applyPlay: (monster: MonsterId) => void;
   trackEarned: (amount: number, category?: TaskCategory) => void;
-  recheckEvolution: () => void; // re-run evolution check (e.g., after premium unlock)
+  recheckEvolution: () => void; // re-run evolution check after both stores hydrate
   checkStreakMilestones: () => void;
   unclaimedStreakMilestone: () => number | undefined;
   recordStreakMilestone: (hit: number) => void;
@@ -467,18 +460,8 @@ function computeTrackEarnedUpdate(
     newTotal >= threshold.points && activeDaysCount >= threshold.days;
   if (!meetsConditions) return baseUpdate;
 
-  // Premium gate: adult requires premium (ascended is reserved; gate checked via nextStage)
-  if (next === "adult") {
-    if (!isPlayerPremium()) {
-      // Show gate once per stage — don't repeat if already shown
-      if (s.premiumGateShownFor === next) return baseUpdate;
-      return {
-        ...baseUpdate,
-        pendingPremiumGate: next,
-        premiumGateShownFor: next,
-      };
-    }
-  }
+  // Adult is free while real-money billing stays off. Ascended is still
+  // reserved (nextStage never returns it).
 
   // Evolve!
   const adultVariant =
@@ -508,13 +491,6 @@ function recheckOneMonster(s: PetStore, monster: MonsterId): Partial<PetSlice> {
     activeDaysCount < threshold.days
   )
     return {};
-
-  if (next === "adult" && !isPlayerPremium()) {
-    if (slice.premiumGateShownFor !== next) {
-      return { pendingPremiumGate: next, premiumGateShownFor: next };
-    }
-    return {};
-  }
 
   const adultVariant =
     next === "adult"
@@ -895,7 +871,7 @@ export const usePetStore = create<PetStore>()(
             const caredToday =
               localDayString(new Date(caredAt)) === localDayString();
             void rescheduleDailyNudges(monsterName, caredToday);
-            recheckPremiumEvolutionOnceHydrated();
+            recheckEvolutionOncePlayerHydrated();
           };
           const afterHydrate = () =>
             assignLegacyOncePlayerReady(afterLegacyAssigned);
