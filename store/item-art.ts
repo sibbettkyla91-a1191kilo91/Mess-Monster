@@ -28,6 +28,13 @@ export const ITEM_ART: Record<string, ImageSourcePropType> = {
   "nilly-decor-woven-rug": require("../assets/images/items/nilly-decor-woven-rug.png"),
   "nilly-decor-tie-dye-tapestry": require("../assets/images/items/nilly-decor-tie-dye-tapestry.png"),
   "nilly-decor-mushroom-lamp": require("../assets/images/items/nilly-decor-mushroom-lamp.png"),
+  "luna-plant-black-rose": require("../assets/images/items/luna-plant-black-rose.png"),
+  "luna-plant-trailing-ivy": require("../assets/images/items/luna-plant-trailing-ivy.png"),
+  "luna-plant-venus-flytrap": require("../assets/images/items/luna-plant-venus-flytrap.png"),
+  "luna-plant-nightshade-sprig": require("../assets/images/items/luna-plant-nightshade-sprig.png"),
+  "luna-food-dark-chocolate-truffle": require("../assets/images/items/luna-food-dark-chocolate-truffle.png"),
+  "luna-food-elderberry-tonic": require("../assets/images/items/luna-food-elderberry-tonic.png"),
+  "luna-food-blackberry-preserve": require("../assets/images/items/luna-food-blackberry-preserve.png"),
 };
 
 export function getItemArt(

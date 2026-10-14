@@ -361,14 +361,31 @@ describe("wiring into slots and rooms", () => {
   });
 });
 
+const LUNA_ART_IDS = [
+  "luna-plant-black-rose",
+  "luna-plant-trailing-ivy",
+  "luna-plant-venus-flytrap",
+  "luna-plant-nightshade-sprig",
+  "luna-food-dark-chocolate-truffle",
+  "luna-food-elderberry-tonic",
+  "luna-food-blackberry-preserve",
+];
+
 describe("item art registry", () => {
-  it("Nilly's sixteen pieces have art; Luna still falls back to the emoji", () => {
-    expect(Object.keys(ITEM_ART).sort()).toEqual([...NILLY_IDS].sort());
+  it("Nilly's sixteen pieces and Luna's first seven have art; the rest stay on emoji", () => {
+    expect(Object.keys(ITEM_ART).sort()).toEqual(
+      [...NILLY_IDS, ...LUNA_ART_IDS].sort(),
+    );
     for (const id of NILLY_IDS) {
       expect(getItemArt(id)).toBeDefined();
     }
+    for (const id of LUNA_ART_IDS) {
+      expect(getItemArt(id)).toBeDefined();
+    }
     for (const id of LUNA_IDS) {
-      expect(getItemArt(id)).toBeUndefined();
+      if (!LUNA_ART_IDS.includes(id)) {
+        expect(getItemArt(id)).toBeUndefined();
+      }
     }
     expect(getItemArt(undefined)).toBeUndefined();
     expect(getItemArt("not-a-real-item")).toBeUndefined();
