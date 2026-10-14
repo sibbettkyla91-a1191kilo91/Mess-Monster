@@ -23,6 +23,8 @@ import {
   LivingMonster,
   LivingMonsterHandle,
 } from "@/components/living-monster";
+import { BootScreen } from "@/components/boot-screen";
+import { CareSettings } from "@/components/care-settings";
 import { PetInteractMenu } from "@/components/pet-interact-menu";
 import { ThemedText } from "@/components/themed-text";
 import { FOUNDING_MEMBER_PURCHASE_ENABLED } from "@/constants/feature-flags";
@@ -814,9 +816,15 @@ function PremiumGateModal({
             </View>
           ))}
         </View>
-        <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
-          $24.99/year · Founding Member rate
-        </ThemedText>
+        {FOUNDING_MEMBER_PURCHASE_ENABLED ? (
+          <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
+            $24.99/year · Founding Member rate
+          </ThemedText>
+        ) : (
+          <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
+            A later extra · nothing to buy today
+          </ThemedText>
+        )}
         <Pressable
           style={[
             premiumStyles.upgradeButton,
@@ -964,6 +972,14 @@ export default function HomeScreen() {
   // Manual entry point for the upgrade modal — the auto-popup only shows
   // once per stage, so non-premium users need a way to reopen it anytime.
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const notifPermissionAsked = usePlayerStore((s) => s.notifPermissionAsked);
+  const markNotifPermissionAsked = usePlayerStore(
+    (s) => s.markNotifPermissionAsked,
+  );
+  const lastCaredAt = usePetStore(
+    (s) => s.byMonster[selectedMonster].lastCaredAt,
+  );
 
   const tasks = useTasksStore((s) => s.tasks);
   const dailyRollSize = useTasksStore((s) => s.dailyRoll.length);
@@ -1348,7 +1364,7 @@ export default function HomeScreen() {
   // hold the whole habitat back rather than paint the wrong pet: an empty
   // container shows the navigator's own background for that moment.
   if (!playerHydrated) {
-    return <View style={styles.container} />;
+    return <BootScreen />;
   }
 
   return (
@@ -1394,6 +1410,22 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
         )}
+        <Pressable
+          style={({ pressed }) => [
+            styles.pillScrim,
+            { opacity: pressed ? 0.75 : 1 },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowSettings(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open care settings"
+        >
+          <ThemedText style={[styles.pillText, { color: theme.pillText }]}>
+            Care
+          </ThemedText>
+        </Pressable>
       </View>
 
       {/* ── Monster ── */}
@@ -1721,6 +1753,23 @@ export default function HomeScreen() {
       )}
 
       {/* ── Founding Member modal (evolution gate or manual info pill) ── */}
+      {showSettings && (
+        <CareSettings
+          theme={{
+            accent: theme.accent,
+            cardBg: theme.cardBg,
+            text: theme.text,
+            muted: theme.text,
+            border: theme.cardBorder,
+          }}
+          monsterName={displayName}
+          lastCaredAt={lastCaredAt}
+          notifAsked={notifPermissionAsked}
+          onMarkNotifAsked={markNotifPermissionAsked}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
       {(pendingPremiumGate !== null || showUpgradeModal) && (
         <PremiumGateModal
           stage={pendingPremiumGate}
