@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BootScreen } from "@/components/boot-screen";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
 import { LUNA_PALETTE, NILLY_PALETTE } from "@/monster-theme";
 import { randomMonsterName } from "@/store/name-randomizer";
@@ -234,7 +235,7 @@ export default function OnboardingScreen() {
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
-  if (!hydrated) return null;
+  if (!hydrated) return <BootScreen tone="night" />;
   if (hasCompletedOnboarding) return <Redirect href="/(tabs)" />;
 
   const goTo = (i: number) => {
@@ -307,7 +308,7 @@ const s = StyleSheet.create({
     fontSize: 64,
     fontWeight: "800",
     color: "#f4efe6",
-    letterSpacing: -1.4,
+    letterSpacing: -0.2,
     lineHeight: 68,
     marginBottom: 20,
   },

@@ -37,9 +37,10 @@ export class AppErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <View style={styles.screen} accessibilityRole="alert">
-          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.title}>The house hiccuped</Text>
           <Text style={styles.body}>
-            Your progress is safe. Tap below to try again.
+            Your monster and your points are still here. Tap below to open the
+            house again.
           </Text>
           <Pressable
             onPress={this.handleRestart}

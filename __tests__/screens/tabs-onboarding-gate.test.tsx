@@ -136,13 +136,14 @@ beforeEach(() => {
 });
 
 describe("Tabs onboarding gate", () => {
-  it("renders neither the tabs nor a redirect before the player store hydrates", async () => {
+  it("shows the boot screen, not tabs or a redirect, before the player store hydrates", async () => {
     const screen = render(<TabLayout />);
     await act(async () => {
       await flushHydration();
     });
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(false);
+    expect(screen.getByLabelText("Opening Mess Monster")).toBeTruthy();
     expect(screen.queryByTestId("tabs")).toBeNull();
     expect(redirects()).toEqual([]);
   });

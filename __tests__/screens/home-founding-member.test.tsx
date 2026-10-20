@@ -62,6 +62,8 @@ describe("Founding Member purchase hole", () => {
 
     expect(usePlayerStore.getState().isPremium).toBe(false);
     expect(screen.getByText("Coming soon")).toBeTruthy();
+    expect(screen.getByText("A later extra · nothing to buy today")).toBeTruthy();
     expect(screen.getByText("A secret final form to discover later")).toBeTruthy();
+    expect(screen.queryByText(/\$24\.99/)).toBeNull();
   });
 });

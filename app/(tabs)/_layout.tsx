@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from "expo-router";
 import React, { useMemo } from "react";
 
+import { BootScreen } from "@/components/boot-screen";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useHasHydrated } from "@/hooks/use-has-hydrated";
@@ -32,7 +33,7 @@ export default function TabLayout() {
   // them. The monster choice is made exactly once, here, so the tabs must
   // send a player who has not finished onboarding there themselves. The
   // flag is persisted: decide only from hydrated state, never the default.
-  if (!playerHydrated) return null;
+  if (!playerHydrated) return <BootScreen />;
   if (!hasCompletedOnboarding) return <Redirect href="/onboarding" />;
 
   return (
