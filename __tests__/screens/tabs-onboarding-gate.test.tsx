@@ -12,9 +12,12 @@ import { usePlayerStore } from "@/store/use-player-store";
 
 type Resolvers = Record<string, (value: string | null) => void>;
 
+type TabScreenRecord = { name: string; href: unknown; title?: string };
+
 type Holder = typeof globalThis & {
   __mmTabGateResolvers?: Resolvers;
   __mmTabGateRedirects?: string[];
+  __mmTabScreens?: TabScreenRecord[];
 };
 
 const holder = globalThis as Holder;
@@ -39,13 +42,30 @@ jest.mock("@react-native-async-storage/async-storage", () => {
 });
 
 jest.mock("expo-router", () => {
-  const { Text } = require("react-native");
+  const { Text, View } = require("react-native");
   const h = globalThis as Holder;
   h.__mmTabGateRedirects ??= [];
-  function Tabs() {
-    return <Text testID="tabs">tabs</Text>;
+  function Tabs({ children }: { children?: unknown }) {
+    return (
+      <View>
+        <Text testID="tabs">tabs</Text>
+        {children}
+      </View>
+    );
   }
-  Tabs.Screen = function TabsScreen() {
+  Tabs.Screen = function TabsScreen({
+    name,
+    options,
+  }: {
+    name: string;
+    options?: { href?: unknown; title?: string };
+  }) {
+    h.__mmTabScreens ??= [];
+    h.__mmTabScreens.push({
+      name,
+      href: options?.href,
+      title: options?.title,
+    });
     return null;
   };
   function Redirect({ href }: { href: string }) {
@@ -103,6 +123,7 @@ async function resolvePlayer(save: string | null) {
  */
 beforeEach(() => {
   holder.__mmTabGateRedirects = [];
+  holder.__mmTabScreens = [];
   delete holder.__mmTabGateResolvers!["mm-player"];
   usePlayerStore.setState({
     selectedMonster: null,
@@ -151,6 +172,8 @@ describe("Tabs onboarding gate", () => {
     expect(redirects()).toEqual([]);
     expect(screen.getByTestId("tabs")).toBeTruthy();
     expect(usePlayerStore.getState().selectedMonster).toBe("luna");
+    const tune = holder.__mmTabScreens?.find((s) => s.name === "debug-sprites");
+    expect(tune).toEqual({ name: "debug-sprites", href: null, title: "Tune" });
   });
 
   it("drops the redirect and shows the tabs the moment onboarding completes", async () => {

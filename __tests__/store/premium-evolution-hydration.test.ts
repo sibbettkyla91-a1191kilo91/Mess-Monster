@@ -1,15 +1,10 @@
 /**
- * Adult evolution is premium-gated, and the check straddles both persisted
- * stores: the stage and lifetime points live in the pet store, while
- * isPremium and activeDaysCount live in the player store. They rehydrate
- * independently, and recheckEvolution otherwise only ever runs from the Home
- * upgrade button.
- *
- * So a premium player who force-quit between unlocking and evolving comes back
- * with isPremium true, stage teen, and premiumGateShownFor already "adult" —
- * no gate left to tap and nothing to re-run the check. These tests pin down
- * the post-hydration recheck that unsticks them, and that it stays a no-op for
- * everyone else.
+ * Adult evolution is free, and the check straddles both persisted stores: the
+ * stage and lifetime points live in the pet store, while activeDaysCount lives
+ * in the player store. They rehydrate independently. A teen who already hit
+ * the old paywall (premiumGateShownFor already "adult") still needs this
+ * post-hydration recheck to grow up. These tests pin down that pass, and that
+ * it stays a no-op for monsters who are already grown.
  */
 
 // Deferred AsyncStorage keyed by persist name, so each store's hydration stays
@@ -98,8 +93,7 @@ describe("premium evolution recheck after hydration", () => {
 
     expect(usePlayerStore.persist.hasHydrated()).toBe(false);
     const s = usePetStore.getState();
-    // isPremium still reads false from defaults — but that must not be taken
-    // as a real answer: no evolution, and no gate raised off a default.
+    // activeDaysCount still reads 0 from defaults — that must not grow them.
     expect(s.evolutionStage).toBe("teen");
     expect(s.pendingEvolution).toBeNull();
     expect(s.pendingPremiumGate).toBeNull();
@@ -138,22 +132,16 @@ describe("premium evolution recheck after hydration", () => {
     expect(s.pendingEvolution).toBe("adult");
   });
 
-  it("leaves a non-premium player exactly where they were", async () => {
+  it("grows a free eligible teen once both stores hydrate", async () => {
     const { usePetStore } = coldStart();
-    const recheckEvolution = jest.spyOn(
-      usePetStore.getState(),
-      "recheckEvolution",
-    );
 
     mockResolvers["mm-pet"](petSave());
     mockResolvers["mm-player"](playerSave(false));
     await flushHydration();
 
-    // No premium-specific recheck merely because hydration finished.
-    expect(recheckEvolution).not.toHaveBeenCalled();
     const s = usePetStore.getState();
-    expect(s.evolutionStage).toBe("teen");
-    expect(s.pendingEvolution).toBeNull();
+    expect(s.evolutionStage).toBe("adult");
+    expect(s.pendingEvolution).toBe("adult");
     expect(s.pendingPremiumGate).toBeNull();
   });
 
@@ -225,22 +213,21 @@ describe("premium evolution recheck after hydration", () => {
     expect(s.pendingEvolution).toBeNull();
   });
 
-  it("the existing setPremium + recheckEvolution upgrade path still evolves", async () => {
+  it("recheckEvolution still grows an eligible teen after a later entitlement flip", async () => {
     const { usePetStore, usePlayerStore } = coldStart();
 
     mockResolvers["mm-pet"](petSave());
     mockResolvers["mm-player"](playerSave(false));
     await flushHydration();
-    expect(usePetStore.getState().evolutionStage).toBe("teen");
+    expect(usePetStore.getState().evolutionStage).toBe("adult");
 
-    // Direct entitlement write + recheck — Home no longer grants premium
-    // from the upgrade button. The hydration repair must not replace this.
     usePlayerStore.getState().setPremium(true);
+    usePetStore.getState().clearPendingEvolution();
     usePetStore.getState().recheckEvolution();
 
     const s = usePetStore.getState();
     expect(s.evolutionStage).toBe("adult");
-    expect(s.pendingEvolution).toBe("adult");
+    expect(s.pendingEvolution).toBeNull();
     expect(s.pendingPremiumGate).toBeNull();
   });
 });

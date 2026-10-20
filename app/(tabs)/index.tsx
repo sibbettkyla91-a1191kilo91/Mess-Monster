@@ -731,7 +731,7 @@ const evolutionStyles = StyleSheet.create({
 // ─── PremiumGateModal ───────────────────────────────────────────────────────
 
 const FOUNDING_MEMBER_PERKS = [
-  { emoji: "🧬", text: "Adult form — plus a secret final form to discover" },
+  { emoji: "✨", text: "A secret final form to discover later" },
   { emoji: "📝", text: "Custom task lists that fit your home" },
   { emoji: "🎵", text: "Mess Monster Picks — cleaning soundtracks we love" },
 ];
@@ -799,7 +799,7 @@ function PremiumGateModal({
         </ThemedText>
         <ThemedText style={[evolutionStyles.stageName, { color: theme.text }]}>
           {stageName
-            ? `Your monster is ready for its ${stageName} form — that one comes with Founding Member.`
+            ? `Your monster can grow into its ${stageName} form on its own. Founding Member is a later extra.`
             : "A little extra for you and your monster, whenever you feel like it."}
         </ThemedText>
         <View style={premiumStyles.perkList}>

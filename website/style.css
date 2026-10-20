@@ -549,6 +549,47 @@ footer {
   opacity: 0.6;
 }
 
+/* --- PRIVACY / LEGAL --- */
+.legal-page {
+  overflow-x: hidden;
+}
+
+.legal {
+  padding: 140px 0 80px;
+}
+
+.legal-kicker {
+  font-family: "Fredoka", sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: var(--primary-mint-dark);
+  margin-bottom: 0.5rem;
+}
+
+.legal h1 {
+  font-size: 2.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.legal-meta {
+  color: var(--warm-gray);
+  margin-bottom: 2rem;
+}
+
+.legal h2 {
+  font-size: 1.4rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.legal ul {
+  margin: 0.75rem 0 1rem 1.25rem;
+}
+
+.legal a {
+  color: var(--primary-mint-dark);
+}
+
 /* --- RESPONSIVE --- */
 @media screen and (max-width: 768px) {
   .nav-links {

@@ -90,23 +90,22 @@ describe("single premium source", () => {
     expect(isPlayerPremium()).toBe(false);
   });
 
-  it("setPremium(true) is what evolves an eligible teen", () => {
-    usePlayerStore.getState().setPremium(true);
-    expect(isPlayerPremium()).toBe(true);
+  it("an eligible teen grows to adult without premium", () => {
+    expect(isPlayerPremium()).toBe(false);
 
     usePetStore.getState().recheckEvolution();
     expect(usePetStore.getState().evolutionStage).toBe("adult");
     expect(usePetStore.getState().pendingEvolution).toBe("adult");
   });
 
-  it("setPremium(false) leaves an eligible teen ungated-but-not-evolved", () => {
+  it("setPremium(false) does not block an eligible teen from growing up", () => {
     usePlayerStore.getState().setPremium(true);
     usePlayerStore.getState().setPremium(false);
     expect(isPlayerPremium()).toBe(false);
 
     usePetStore.getState().recheckEvolution();
-    expect(usePetStore.getState().evolutionStage).toBe("teen");
-    expect(usePetStore.getState().pendingEvolution).toBeNull();
+    expect(usePetStore.getState().evolutionStage).toBe("adult");
+    expect(usePetStore.getState().pendingEvolution).toBe("adult");
   });
 
   it("subscription trial status alone cannot grant premium", () => {
@@ -118,9 +117,6 @@ describe("single premium source", () => {
 
     expect(isPlayerPremium()).toBe(false);
     expect(useSubscriptionStore.getState().isOnTrial()).toBe(true);
-
-    usePetStore.getState().recheckEvolution();
-    expect(usePetStore.getState().evolutionStage).toBe("teen");
   });
 
   it("subscription store has no accept-all receipt validator", () => {
@@ -138,8 +134,5 @@ describe("single premium source", () => {
     });
 
     expect(isPlayerPremium()).toBe(false);
-
-    usePetStore.getState().recheckEvolution();
-    expect(usePetStore.getState().evolutionStage).toBe("teen");
   });
 });

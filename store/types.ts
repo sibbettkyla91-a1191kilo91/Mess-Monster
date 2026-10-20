@@ -30,8 +30,8 @@ export interface PetSlice {
   adultVariant: AdultVariant; // determined at adult evolution, stored permanently
   categoryCompletions: Partial<Record<TaskCategory, number>>; // lifetime task completions by category
   pendingEvolution: EvolutionStage | null; // set when evolution triggers; cleared after UI shows it
-  pendingPremiumGate: EvolutionStage | null; // set when premium gate blocks evolution
-  premiumGateShownFor: EvolutionStage | null; // tracks which stage gate was already shown (prevent repeat)
+  pendingPremiumGate: EvolutionStage | null; // leftover from the old adult paywall; unused while billing is off
+  premiumGateShownFor: EvolutionStage | null; // leftover from the old adult paywall; unused while billing is off
   /**
    * Progression milestone levels (store/progression.ts) already handed over
    * for this monster. Level itself is derived from totalPointsEarned; this

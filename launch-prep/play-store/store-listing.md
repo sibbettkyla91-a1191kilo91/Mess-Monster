@@ -18,10 +18,10 @@ Mess Monster: Cleaning Pet
 ## Short Description
 
 ```
-Log chores, earn points & care for your virtual pet. Zero shame cleaning app.
+Free chore pet. Log cleaning, earn points, grow your monster. Zero shame.
 ```
 
-**Character count: 77 / 80** ✓
+**Character count: 72 / 80** ✓
 
 ---
 
@@ -41,7 +41,7 @@ CHOOSE YOUR COMPANION
 🌿 Nilly — mint-green kawaii cutie with sparkly leaf energy. Sweet, soft, wholesome.
 🌑 Luna — dark witchy mystery with star-ember vibes. Spooky, bold, unapologetically weird.
 
-Give your monster a custom name, then watch it evolve through stages of growth — including a secret final form that only the most consistent cleaners will ever unlock. 👀
+Give your monster a custom name, then watch it grow from egg to adult as you keep showing up. A later extra called Founding Member is listed as Coming soon — nothing to buy today.
 
 DAILY TASKS THAT FIT REAL LIFE
 
@@ -65,7 +65,8 @@ DESIGNED FOR REAL HUMANS
 ✓ Gentle on ADHD, executive dysfunction, and rough-week energy
 ✓ No calendar lockdown, no overdue shame spirals
 ✓ No account required — all data stays on your device, always
-✓ Core cleaning + care loop: free, forever
+✓ The whole cleaning + care loop is free right now
+✓ No account. No real-money checkout in this version
 
 Start small. Clean one thing. Your monster's rooting for you.
 ```
@@ -81,9 +82,9 @@ Start small. Clean one thing. Your monster's rooting for you.
 - [x] Full desc ≤ 4,000 chars
 - [x] No mention of Spotify (not implemented at launch)
 - [x] No mention of push notifications (not implemented at launch)
-- [x] No mention of premium pricing (not implemented at launch)
+- [x] No mention of premium pricing (Founding Member is Coming soon)
 - [x] No mention of Roommate/Partner Sync
-- [x] Final evolution form referenced as silhouette/mystery only — no details revealed
+- [x] Adult growth is free; later extras stay vague
 - [x] Health/happiness system described honestly (real decay, but no permanent loss)
 - [x] Zero-shame tone throughout
 - [x] "No account required" stated explicitly (matches reality: local AsyncStorage only)
