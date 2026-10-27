@@ -119,6 +119,7 @@ async function completeHydration() {
   await act(async () => {
     resolvers["mm-player"]?.(PLAYER_LUNA_SAVE);
     resolvers["mm-pet"]?.(PET_SAVE);
+    resolvers["mm-store-owned"]?.(null);
     await flushHydration();
   });
 }

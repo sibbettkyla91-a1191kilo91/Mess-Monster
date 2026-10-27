@@ -141,8 +141,8 @@ describe("hold-to-pet", () => {
     await act(async () => {
       await flushHydration();
     });
-    // Only the player store hydrates: the monster is drawn, but Home is
-    // not yet allowed to write.
+    // Only the player store hydrates: Home keeps its boot screen up, so
+    // there is no monster to hold and nothing can write.
     await act(async () => {
       resolverHolder()["mm-player"]?.(null);
       await flushHydration();
@@ -151,7 +151,8 @@ describe("hold-to-pet", () => {
     expect(usePetStore.persist.hasHydrated()).toBe(false);
 
     const happinessBefore = usePetStore.getState().happiness;
-    hold(screen.getByLabelText("Care for Nilly"));
+    expect(screen.queryByLabelText("Care for Nilly")).toBeNull();
+    expect(screen.getByLabelText("Opening Mess Monster")).toBeTruthy();
 
     expect(usePetStore.getState().happiness).toBe(happinessBefore);
     expect(usePlayerStore.getState().tapReactionCount).toBe(0);
