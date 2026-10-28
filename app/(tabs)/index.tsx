@@ -817,11 +817,15 @@ function PremiumGateModal({
           ))}
         </View>
         {FOUNDING_MEMBER_PURCHASE_ENABLED ? (
-          <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
+          <ThemedText
+            style={[premiumStyles.priceLine, { color: theme.accent }]}
+          >
             $24.99/year · Founding Member rate
           </ThemedText>
         ) : (
-          <ThemedText style={[premiumStyles.priceLine, { color: theme.accent }]}>
+          <ThemedText
+            style={[premiumStyles.priceLine, { color: theme.accent }]}
+          >
             A later extra · nothing to buy today
           </ThemedText>
         )}

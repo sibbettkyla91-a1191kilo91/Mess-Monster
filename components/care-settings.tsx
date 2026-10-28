@@ -1,19 +1,9 @@
 import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
-import {
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
-import {
-  PRIVACY_CONTACT_EMAIL,
-  PRIVACY_SUMMARY,
-} from "@/constants/legal";
+import { PRIVACY_CONTACT_EMAIL, PRIVACY_SUMMARY } from "@/constants/legal";
 import { localDayString } from "@/utils/local-day";
 import {
   requestNudgePermission,
@@ -57,7 +47,9 @@ export function CareSettings({
       void rescheduleDailyNudges(monsterName, caredToday);
       setNudgeNote("Evening reminders are on. One quiet check-in a day.");
     } else {
-      setNudgeNote("That’s okay. You can turn them on later in phone settings.");
+      setNudgeNote(
+        "That’s okay. You can turn them on later in phone settings.",
+      );
     }
   };
 

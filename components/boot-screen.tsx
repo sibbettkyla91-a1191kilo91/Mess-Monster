@@ -4,15 +4,14 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
  * Soft hold while a persisted store finishes loading. Used instead of a
  * blank screen so a cold start never looks like a crash.
  */
-export function BootScreen({
-  tone = "mint",
-}: {
-  tone?: "mint" | "night";
-}) {
+export function BootScreen({ tone = "mint" }: { tone?: "mint" | "night" }) {
   const night = tone === "night";
   return (
     <View
-      style={[styles.screen, { backgroundColor: night ? "#0c0a12" : "#e8f0e6" }]}
+      style={[
+        styles.screen,
+        { backgroundColor: night ? "#0c0a12" : "#e8f0e6" },
+      ]}
       accessibilityRole="progressbar"
       accessibilityLabel="Opening Mess Monster"
     >
