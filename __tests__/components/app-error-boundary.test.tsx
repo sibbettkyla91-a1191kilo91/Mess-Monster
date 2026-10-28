@@ -34,7 +34,7 @@ describe("AppErrorBoundary", () => {
       </AppErrorBoundary>,
     );
 
-    expect(screen.getByText("Something went wrong")).toBeTruthy();
+    expect(screen.getByText("The house hiccuped")).toBeTruthy();
     expect(screen.queryByText("All good")).toBeNull();
 
     screenRender.rerender(
@@ -45,7 +45,7 @@ describe("AppErrorBoundary", () => {
     fireEvent.press(screen.getByLabelText("Tap to restart"));
 
     expect(screen.getByText("All good")).toBeTruthy();
-    expect(screen.queryByText("Something went wrong")).toBeNull();
+    expect(screen.queryByText("The house hiccuped")).toBeNull();
   });
 
   it("reports the caught render error so a crash is not silent", () => {
