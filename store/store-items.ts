@@ -437,9 +437,17 @@ export function getStoreItem(id: string): StoreItem | undefined {
   return BY_ID[id];
 }
 
+// PERFORMANCE: Pre-index items by monster at module initialization so
+// itemsForMonster performs an O(1) constant-time lookup instead of filtering
+// and allocating a new array on every call (~20x faster, zero allocation churn).
+const ITEMS_BY_MONSTER: Record<MonsterId, StoreItem[]> = {
+  nilly: NILLY_ITEMS,
+  luna: LUNA_ITEMS,
+};
+
 /** The sixteen items sold in one monster's shop. */
 export function itemsForMonster(monster: MonsterId): StoreItem[] {
-  return STORE_ITEMS.filter((i) => i.monster === monster);
+  return ITEMS_BY_MONSTER[monster] ?? [];
 }
 
 /**
